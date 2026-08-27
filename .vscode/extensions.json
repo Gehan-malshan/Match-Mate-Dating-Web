@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "golang.go",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-containers",
+    "ms-vscode-remote.remote-containers",
+    "redhat.vscode-yaml",
+    "ms-ossdata.vscode-pgsql",
+    "davidanson.vscode-markdownlint",
+    "streetsidesoftware.code-spell-checker",
+    "github.vscode-github-actions"
+  ]
+}
+

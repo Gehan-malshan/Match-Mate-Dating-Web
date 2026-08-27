@@ -28,9 +28,10 @@ Before planning or editing, read:
 2. `docs/README.md`
 3. `docs/architecture/README.md`
 4. `docs/implementation/README.md`
-5. The README in every application, service, package, contract, or infrastructure directory you will change
-6. Relevant specialized guides under `docs/`
-7. Existing ADRs and change-log entries related to the change
+5. `docs/development/README.md` before changing tools, workspace configuration, or local dependencies
+6. The README in every application, service, package, contract, or infrastructure directory you will change
+7. Relevant specialized guides under `docs/`
+8. Existing ADRs and change-log entries related to the change
 
 Do not start implementation from a ticket title alone.
 
@@ -80,6 +81,7 @@ Documentation must describe the implemented result, not an intended result that 
 | Booking/payment state | Architecture/data guides, API/events, reconciliation behavior, failure tests, change log |
 | Deployment/configuration | Infrastructure README, runbook, environment variables, rollback steps, change log |
 | CI/test policy | Testing guide, GitHub documentation, branch protection notes, change log |
+| Developer tool/workspace | Development guide, `.vscode`, version/config files, CI compatibility, change log |
 
 ## 6. Contract and compatibility rules
 
@@ -162,4 +164,3 @@ A change is done only when:
 - Observability and operational behavior are documented.
 - Canonical documentation and service README files match implementation.
 - The before/after change-log entry is complete.
-

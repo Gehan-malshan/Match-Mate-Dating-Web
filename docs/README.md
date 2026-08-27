@@ -7,14 +7,16 @@ This documentation is the canonical, repository-local source of truth for MatchM
 1. Read the repository-level [`AGENTS.md`](../AGENTS.md).
 2. Read [`architecture/README.md`](architecture/README.md) to understand the complete system.
 3. Read [`implementation/README.md`](implementation/README.md) to identify the current phase and permitted next work.
-4. Read the relevant service or application README before changing that area.
-5. Read the specialized guide for matchmaking, data, testing, security, or operations when the change touches that concern.
+4. Read [`development/README.md`](development/README.md) before configuring tools or running local dependencies.
+5. Read the relevant service or application README before changing that area.
+6. Read the specialized guide for matchmaking, data, testing, security, or operations when the change touches that concern.
 
 ## Canonical documentation map
 
 | Topic | Canonical file | Must be updated when |
 |---|---|---|
 | Product and system architecture | [`architecture/README.md`](architecture/README.md) | Capabilities, boundaries, interactions, states, security, or deployment change |
+| Developer workspace | [`development/README.md`](development/README.md) | Tool versions, VS Code, extensions, package manager, Compose, Dev Container, tasks, or local workflow change |
 | Implementation sequence | [`implementation/README.md`](implementation/README.md) | Phases, dependencies, deliverables, or completion criteria change |
 | Matchmaking | [`matchmaking/README.md`](matchmaking/README.md) | Questions, filters, weights, optimizer, reveal, responses, or fairness rules change |
 | Data architecture | [`data/README.md`](data/README.md) | Tables, ownership, migrations, retention, constraints, or consistency change |
@@ -50,4 +52,3 @@ Use these labels when a statement is not equally certain:
 ## Documentation maintenance rule
 
 Documentation changes are required in the same pull request as implementation changes. Every significant change must include a before/after entry in the change log, affected contracts, migrations, tests, operational impact, and rollback notes. A pull request is incomplete when its implementation and documentation disagree.
-

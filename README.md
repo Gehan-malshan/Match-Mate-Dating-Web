@@ -45,6 +45,7 @@ Match-Mate-Dating-Web/
 |   `-- terraform/                 Future infrastructure-as-code
 |-- docs/
 |   |-- architecture/              Architecture documents and diagrams
+|   |-- development/               VS Code and developer workstation setup
 |   |-- implementation/            Phased development plan and completion criteria
 |   |-- matchmaking/               Deterministic matching specification
 |   |-- data/                      Database ownership, schemas, and migrations
@@ -58,7 +59,10 @@ Match-Mate-Dating-Web/
 |   |-- contract/                  Cross-service compatibility tests
 |   |-- e2e/                       Critical user-journey tests
 |   `-- performance/               Capacity and load-test plans
-`-- .github/                       Repository and future GitHub Actions documentation
+|-- .vscode/                       Shared extension recommendations and workspace settings
+|-- .editorconfig                  Cross-editor formatting conventions
+|-- .gitattributes                 Repository line-ending and binary-file rules
+`-- .github/                       Repository governance and future GitHub Actions
 ```
 
 ## Architecture principles
@@ -98,6 +102,7 @@ This repository is designed to be understandable without external project docume
 
 Specialized references:
 
+- [`docs/development/README.md`](docs/development/README.md) — VS Code, toolchain, Docker, secrets, and daily workflow setup.
 - [`docs/matchmaking/README.md`](docs/matchmaking/README.md) — deterministic matchmaking rules and pairing algorithm.
 - [`docs/data/README.md`](docs/data/README.md) — database ownership, schemas, migrations, retention, and consistency.
 - [`docs/testing/README.md`](docs/testing/README.md) — mandatory test strategy and CI quality gates.
