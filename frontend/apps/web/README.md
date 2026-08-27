@@ -16,9 +16,11 @@ The web app never connects directly to databases, RabbitMQ, PayHere secrets, or 
 
 The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
-The first implemented slice is the public `/` landing route. It includes responsive navigation, a privacy/safety overview, an accurate four-step member journey, an explicit no-ML matchmaking explanation, a pre-launch event state, original project-local imagery, reduced-motion support, visible keyboard focus, and component tests. Login, registration, and event inventory are intentionally not presented as operational until their backend journeys exist.
+The first implemented slice is the public `/` landing route. Its AIDA composition includes a floating responsive navigation, the approved full-bleed cinematic hero, a dense privacy/safety trust grid, a keyboard-operable four-step journey accordion, a scrubbed no-ML explanation, and a truthful pre-launch event stage. Original project-local imagery, visible focus, text reflow, and a complete reduced-motion path are covered by the implementation and component tests. Login, registration, and event inventory are intentionally not presented as operational until their backend journeys exist.
 
-All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). Existing landing-page styling predates the canonical token guide and should be aligned through focused, tested follow-up changes rather than undocumented one-off edits.
+GSAP and `@gsap/react` provide progressive entrance and scroll motion. Motion is presentation-only: the page remains complete without JavaScript-driven animation, and `prefers-reduced-motion: reduce` bypasses GSAP timelines and disables the marquee animation. Do not use motion to create pressure around consent, privacy, payment, or safety decisions.
+
+All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). The landing page now implements its semantic dark surfaces, brand gradient, 12-column rhythm, tonal elevation, responsive gutters, approved logo, and motion rules. Future changes must preserve the varied composition and must not drift back toward repeated generic cards or unsupported product claims.
 
 ## Local commands
 

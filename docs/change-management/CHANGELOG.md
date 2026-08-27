@@ -4,6 +4,52 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-006 — Recompose the member landing page
+
+- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Member landing-page structure, visual hierarchy, motion, accessibility, tests, design guidance, and member-web documentation
+- **Decision/ADR:** No ADR required; this is a focused presentation-layer redesign within the existing React/Vite application and Midnight Chemistry system
+
+#### Before
+
+The landing page accurately described MatchMate but relied on a conventional left-aligned hero, a repeated four-card journey, a static compatibility panel, and limited interaction. The page did not yet use the repository-local `gpt-taste` guidance, and its visual rhythm did not fully express the cinematic, intentional character described by Midnight Chemistry.
+
+#### After
+
+The landing page uses a responsive AIDA composition with a floating glass navigation, the approved earlier full-bleed cinematic hero, a gapless `7 + 5` then `4 + 4 + 4` trust grid, a keyboard-operable horizontal journey accordion, a scrubbed explainability statement, a local-image event stage, and a truthful pre-launch action. The hero restores the two-line `Where mystery meets connection` headline, left editorial overlay, full background image, and privacy note instead of the rejected detached portrait composition. GSAP and `@gsap/react` add scoped entrance, text-reveal, and image-scale motion while reduced-motion users receive the complete static experience. The page continues to state the no-chat, no-ML, confirmed-booking, organizer-review, privacy, and consent boundaries without collecting data or claiming live availability.
+
+#### Reason
+
+The first public experience should feel distinct, premium, and intentional while communicating MatchMate's privacy, no-chat, deterministic no-ML, verified-booking, and consent boundaries clearly.
+
+#### Compatibility and migration
+
+Presentation-layer change only. No API, event, database, route, stored data, authentication, booking, payment, or deployment contract changes. `gsap@3.15.0` and `@gsap/react@2.1.2` are recorded through the existing app manifest and Bun lockfile; no second package manager or lockfile was introduced.
+
+#### Security, privacy, and moderation impact
+
+The page remains public and static, collects no data, exposes no community profiles, and does not imply operational registration, event inventory, or identity reveal. Motion must respect reduced-motion settings, and all interactive elements require keyboard focus and readable contrast.
+
+#### Deployment and rollback
+
+Rebuild and redeploy the member web application. Rollback restores the previous landing component, stylesheet, package manifest/lockfile, tests, and documentation; no backend or data rollback is required.
+
+#### Verification
+
+- `bun run typecheck:web` passed.
+- `bun run test:web` passed four component tests covering product boundaries, navigation, accordion interaction, and approved logo use.
+- `bun run build:web` produced the Vite production bundle.
+- The test environment exercises the reduced-motion path so GSAP does not hide content when animation is disabled.
+- Responsive desktop/tablet/mobile rules, keyboard focus, semantic navigation, local assets, overflow containment, and contrast-oriented tokens were reviewed in source.
+- Git whitespace validation passed.
+
+#### Documentation updated
+
+Member-web README, canonical design guide, and this change history.
+
 ### CHG-20260828-004 — Adopt the supplied MatchMate logo
 
 - **Status:** In progress (implementation complete; awaiting review/merge)

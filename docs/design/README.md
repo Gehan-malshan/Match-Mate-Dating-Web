@@ -243,6 +243,19 @@ Icons use rounded caps and corners. Rounded shapes should support hierarchy and 
 - Motion should reinforce navigation, state change, and hierarchy—not create pressure in consent, payment, or safety decisions.
 - Support `prefers-reduced-motion`; essential state changes must remain understandable without animation.
 
+### 9.1 Public landing-page expression
+
+The member landing page applies Midnight Chemistry as a cinematic AIDA narrative rather than a repeated card template:
+
+- Attention uses the approved full-bleed event image, a strong left editorial gradient, a two-line headline, a restrained privacy note, and a glass navigation surface. Do not replace it with a detached portrait or partially visible decorative image.
+- Interest uses a complete 12-column trust grid: `7 + 5` columns followed by `4 + 4 + 4`, with no empty cells or decorative placeholders.
+- Desire uses an accessible horizontal journey accordion, a scrubbed explanation statement, and local event imagery that scales into view.
+- Action uses a truthful pre-launch state instead of an operational registration form or invented event inventory.
+
+GSAP motion is progressive enhancement. Entrance, text-reveal, and image-scale effects must be scoped to the landing page, cleaned up with the owning React lifecycle, and skipped when reduced motion is requested. CSS animation must also stop under the same preference. Content cannot begin hidden in the reduced-motion or no-animation experience.
+
+Use project-local approved imagery rather than third-party random-image services. Hover scaling stays inside clipped image containers, and decorative motion must not introduce horizontal scrolling.
+
 ## 10. Accessibility requirements
 
 WCAG 2.2 AA is the minimum implementation target unless an approved policy requires a stronger target.
