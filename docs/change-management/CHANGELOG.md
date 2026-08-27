@@ -4,6 +4,50 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-004 — Add project-scoped `gpt-taste` skill
+
+- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Repository-local agent skill and developer setup documentation
+- **Decision/ADR:** No ADR required; the skill supplies optional agent guidance without changing application architecture or runtime behavior
+
+#### Before
+
+The working tree contained an uncommitted README and empty directories from an earlier multi-skill import, but no usable repository-scoped skill file.
+
+#### After
+
+The earlier import artifacts are removed. MatchMate contains one project-scoped skill at `.agents/skills/gpt-taste/SKILL.md`, created from the supplied Markdown instructions. It is discoverable only from this repository and remains subordinate to MatchMate's architecture, security, privacy, accessibility, and Midnight Chemistry design requirements.
+
+#### Reason
+
+The project needs one focused frontend design and GSAP motion skill without installing or maintaining the previous multi-skill bundle.
+
+#### Compatibility and migration
+
+No runtime, API, event, database, package, or user-data migration is required. The skill is a Markdown instruction artifact. Codex sessions may need to start a new turn before newly added project skills appear in discovery.
+
+#### Security, privacy, and moderation impact
+
+The skill receives no credentials or production data. Suggestions involving external images, dependencies, animation, or UI content remain subject to normal authorization, privacy, accessibility, content, and supply-chain review.
+
+#### Deployment and rollback
+
+No application deployment is required. Rollback removes `.agents/skills/gpt-taste` and the related documentation.
+
+#### Verification
+
+- Validate the skill name, description, frontmatter, and folder naming.
+- Confirm only one project `SKILL.md` remains.
+- Confirm no global Codex skill directory changed.
+- Run Git whitespace validation and review the complete diff.
+
+#### Documentation updated
+
+Developer setup guide and this change history.
+
 ### CHG-20260828-003 — Group frontend applications and packages under `frontend`
 
 - **Status:** In progress (migration complete; awaiting review/merge)
