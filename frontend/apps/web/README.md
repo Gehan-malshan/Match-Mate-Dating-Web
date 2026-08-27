@@ -10,7 +10,7 @@ The member-facing React and TanStack application will support registration, prof
 - TanStack Router for typed route/access structure.
 - TanStack Query for server state; backend services remain authoritative.
 - TanStack Form and Zod for accessible client validation; server validation is mandatory.
-- Shared presentation components from `packages/ui` and generated OpenAPI client helpers.
+- Shared presentation components from `frontend/packages/ui` and generated OpenAPI client helpers.
 
 The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the API Gateway over HTTPS.
 
@@ -18,7 +18,7 @@ The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or 
 
 The first implemented slice is the public `/` landing route. It includes responsive navigation, a privacy/safety overview, an accurate four-step member journey, an explicit no-ML matchmaking explanation, a pre-launch event state, original project-local imagery, reduced-motion support, visible keyboard focus, and component tests. Login, registration, and event inventory are intentionally not presented as operational until their backend journeys exist.
 
-All new visual work must follow the canonical [Midnight Chemistry base design system](../../docs/design/README.md). Existing landing-page styling predates the canonical token guide and should be aligned through focused, tested follow-up changes rather than undocumented one-off edits.
+All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). Existing landing-page styling predates the canonical token guide and should be aligned through focused, tested follow-up changes rather than undocumented one-off edits.
 
 ## Local commands
 
@@ -32,7 +32,7 @@ bun run test:web
 bun run build:web
 ```
 
-The development URL is `http://127.0.0.1:5173`; the production build is written to `apps/web/dist` and is ignored by Git.
+The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
 
 ## Planned feature areas
 

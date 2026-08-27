@@ -246,7 +246,7 @@ This design system does not authorize new product behavior. All interfaces must 
 
 ## 12. Implementation guidance
 
-The target implementation location for reusable tokens and components is `packages/ui`; application-specific composition remains within the owning app.
+The target implementation location for reusable tokens and components is `frontend/packages/ui`; application-specific composition remains within the owning app.
 
 When implementation begins or changes:
 
@@ -281,4 +281,3 @@ A change to a canonical token, typography role, spacing scale, radius, component
 - [ ] Loading, empty, pending, failure, disabled, and restricted states are designed.
 - [ ] Mobile fixed navigation does not obscure content or controls.
 - [ ] Relevant tests, screenshots, documentation, and change history are updated.
-

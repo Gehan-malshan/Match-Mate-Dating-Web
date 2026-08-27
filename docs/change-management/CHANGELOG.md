@@ -4,6 +4,52 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-003 — Group frontend applications and packages under `frontend`
+
+- **Status:** In progress (migration complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Repository layout, Bun workspace paths and scripts, member/admin app paths, frontend package paths, developer/testing/design/implementation documentation
+- **Decision/ADR:** No ADR required; organizational change preserves the existing monorepo, technology, ownership, and independent-deployment decisions
+
+#### Before
+
+Frontend applications were stored under root-level `apps/`, while frontend components, validation helpers, and telemetry helpers were stored under root-level `packages/`. Frontend code was therefore distributed across two top-level directories beside backend services, contracts, infrastructure, and system tests.
+
+#### After
+
+All frontend applications and frontend-only shared packages are grouped under `frontend/`. Deployable applications live under `frontend/apps/web` and `frontend/apps/admin`; shared frontend packages live under `frontend/packages/ui`, `frontend/packages/validation`, and `frontend/packages/telemetry`. The root Bun workspace and lockfile remain authoritative, and each frontend application remains independently buildable and deployable. `frontend/README.md` explains the boundary and supported commands.
+
+#### Reason
+
+A single frontend boundary makes the monorepo easier for developers and coding agents to navigate and simplifies future frontend-specific CI path filters without combining applications into one deployment.
+
+#### Compatibility and migration
+
+This is a repository-path migration only. Imports, workspace globs, scripts, documentation, CI path filters, Docker build contexts, and deployment definitions must use the new paths. No browser route, API, event, database, user-data, or runtime behavior changes.
+
+#### Security, privacy, and moderation impact
+
+No product-data or authorization impact. Existing privacy, safety, moderation, payment, and no-ML requirements remain unchanged and continue to apply through repository-level and frontend documentation.
+
+#### Deployment and rollback
+
+No deployment is performed. Future pipelines must build from the new paths. Rollback moves both frontend subtrees back to root-level `apps/` and `packages/`, restores Bun paths and documentation, and regenerates the lockfile without changing runtime data.
+
+#### Verification
+
+- `bun install --frozen-lockfile` passed with the migrated lockfile.
+- `bun run typecheck:web` passed from `frontend/apps/web`.
+- `bun run test:web` passed both component tests.
+- `bun run build:web` produced the Vite production build under the new path.
+- Active repository references were updated to the `frontend/` boundary.
+- Local Markdown links and Git whitespace validation passed.
+
+#### Documentation updated
+
+Root README and package manifest, Bun lockfile, frontend boundary/app/package READMEs, developer guide, testing guide, design guide, implementation status, and this change history.
+
 ### CHG-20260828-002 — Establish Midnight Chemistry as the base design system
 
 - **Status:** In progress (documentation complete; awaiting review/merge)

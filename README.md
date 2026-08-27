@@ -20,9 +20,14 @@ This repository is a monorepo for the MatchMate member website, organizer portal
 
 ```text
 Match-Mate-Dating-Web/
-|-- apps/
-|   |-- web/                       Member-facing React/TanStack application
-|   `-- admin/                     Organizer and moderation portal
+|-- frontend/
+|   |-- apps/
+|   |   |-- web/                   Member-facing React/TanStack application
+|   |   `-- admin/                 Organizer and moderation portal
+|   `-- packages/
+|       |-- ui/                    Shared frontend design system
+|       |-- validation/            Frontend validation and generated client helpers
+|       `-- telemetry/             Frontend observability helpers
 |-- services/
 |   |-- account-service/           Authentication, profiles, preferences, and blocks
 |   |-- event-service/             Event catalog, schedules, pricing, and policies
@@ -31,10 +36,6 @@ Match-Mate-Dating-Web/
 |   |-- payment-service/           PayHere payments and reconciliation
 |   |-- notification-service/      Email, SMS, and other notifications
 |   `-- moderation-service/        Reports, moderation, and safety actions
-|-- packages/
-|   |-- ui/                        Shared frontend design system
-|   |-- validation/                Frontend validation and generated client helpers
-|   `-- telemetry/                 Technical observability helpers
 |-- contracts/
 |   |-- openapi/                   REST API contracts
 |   `-- asyncapi/                  RabbitMQ event contracts
@@ -79,7 +80,7 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository now contains its first executable application slice: a responsive, public member landing page under `apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
+The repository now contains its first executable application slice: a responsive, public member landing page under `frontend/apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
 
 Backend services, authentication, live event data, booking/payment flows, versioned API/event contracts, migrations, and production deployment definitions remain unimplemented and must be added incrementally by following `AGENTS.md` and the implementation guide.
 

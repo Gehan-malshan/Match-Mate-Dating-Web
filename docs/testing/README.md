@@ -29,8 +29,8 @@ This guide defines mandatory testing levels, ownership, critical scenarios, envi
 ## 3. Test ownership and location
 
 ```text
-apps/web/                         frontend unit/component tests
-apps/admin/                       admin unit/component tests
+frontend/apps/web/                member frontend unit/component tests
+frontend/apps/admin/              admin frontend unit/component tests
 services/<service>/              service unit/component tests
 contracts/                        schemas and compatibility fixtures
 tests/contract/                   cross-component contract checks
@@ -310,4 +310,3 @@ Coverage percentages are secondary. Critical invariants require explicit tests e
 - [ ] Performance/security/recovery tests are included when risk requires them.
 - [ ] CI commands and local reproduction are documented.
 - [ ] Change log records verification evidence.
-

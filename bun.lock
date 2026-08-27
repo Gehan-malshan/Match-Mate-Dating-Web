@@ -5,7 +5,7 @@
     "": {
       "name": "matchmate",
     },
-    "apps/web": {
+    "frontend/apps/web": {
       "name": "@matchmate/web",
       "version": "0.0.0",
       "dependencies": {
@@ -58,7 +58,7 @@
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
-    "@matchmate/web": ["@matchmate/web@workspace:apps/web"],
+    "@matchmate/web": ["@matchmate/web@workspace:frontend/apps/web"],
 
     "@oxc-project/types": ["@oxc-project/types@0.147.0", "", {}, "sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg=="],
 

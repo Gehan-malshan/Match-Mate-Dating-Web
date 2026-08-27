@@ -176,19 +176,19 @@ go test ./...
 
 The exact test/lint commands will be documented and wrapped in repository tasks/scripts before they become required. Do not invent different local commands that bypass CI options.
 
-## 10. Bun frontend workspace setup when implementation begins
+## 10. Bun frontend workspace
 
-The root Bun workspace will eventually include:
+The root Bun workspace groups all frontend applications and frontend-only packages under `frontend/`:
 
 ```text
-apps/web
-apps/admin
-packages/ui
-packages/validation
-packages/telemetry
+frontend/apps/web
+frontend/apps/admin
+frontend/packages/ui
+frontend/packages/validation
+frontend/packages/telemetry
 ```
 
-The root `package.json` will define npm-compatible workspaces:
+The root `package.json` defines npm-compatible workspaces:
 
 ```json
 {
@@ -196,34 +196,27 @@ The root `package.json` will define npm-compatible workspaces:
   "private": true,
   "packageManager": "bun@<approved-version>",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "frontend/apps/*",
+    "frontend/packages/*"
   ]
 }
 ```
 
 The only frontend lockfile is `bun.lock`. Do not add `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package-lock.json`, or `yarn.lock`.
 
-After the root package and Bun lockfile exist:
+Install and verify the implemented member application from the repository root:
 
 ```powershell
 bun install --frozen-lockfile
-bun run lint
-bun run typecheck
-bun run test
-bun run build
+bun run typecheck:web
+bun run test:web
+bun run build:web
+bun run dev:web
 ```
 
 Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.
 
-Use Bun to run Vite rather than replacing Vite's plugin-based build configuration:
-
-```powershell
-bun run dev:web
-bun run dev:admin
-```
-
-The exact script names become authoritative when added to the root `package.json`. TypeScript type checking remains a separate script such as `tsc --noEmit`; Bun's TypeScript transpilation does not replace type checking.
+Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. An admin command will be added only when `frontend/apps/admin` becomes executable. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
 
 ## 11. Docker and local dependencies
 
