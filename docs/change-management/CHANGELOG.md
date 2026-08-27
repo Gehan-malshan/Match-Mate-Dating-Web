@@ -4,6 +4,53 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-004 — Adopt the supplied MatchMate logo
+
+- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Brand assets, member landing-page header/footer, favicon and browser metadata, base design documentation, frontend tests
+- **Decision/ADR:** No ADR required; adopts user-supplied brand artwork within the existing Midnight Chemistry visual system
+
+#### Before
+
+The member landing page used a temporary circular gradient badge containing an italic `M`. The repository had no authoritative MatchMate logo source, transparent web mark, favicon, or documented logo-usage rules.
+
+#### After
+
+The supplied magenta-to-orange double-arch mark is MatchMate's authoritative logo. The repository preserves the supplied artwork, includes a transparent web-ready master and optimized navigation/favicon sizes, replaces the temporary header/footer marks, provides favicon and Apple touch metadata, and documents accessible logo usage and change control. The existing valid social-preview image remains in place because this change does not alter its truthful product content.
+
+#### Reason
+
+The project now has approved brand artwork that should be used consistently instead of the temporary generated letter badge.
+
+#### Compatibility and migration
+
+Visual and static-asset change only. Browser routes, APIs, events, databases, user data, and backend services are unchanged. Existing caches may temporarily retain the previous favicon until refreshed.
+
+#### Security, privacy, and moderation impact
+
+No user-data impact. Logo assets contain no personal information, external tracking, embedded script, or operational metadata. Accessible names remain textual rather than relying on the image alone.
+
+#### Deployment and rollback
+
+The frontend must be rebuilt and deployed to publish the new assets. Rollback restores the temporary mark and prior favicon metadata; no service or data rollback is required.
+
+#### Verification
+
+- The transparent master is 1254×1254 ARGB with transparent corner pixels.
+- The optimized navigation mark is 256×256 and the favicon is 64×64.
+- `bun run typecheck:web` passed.
+- `bun run test:web` passed three component tests, including header/footer logo usage.
+- `bun run build:web` produced the production bundle.
+- The landing route, navigation logo, and favicon returned HTTP 200 in the local preview.
+- Favicon/touch metadata, documentation links, and Git whitespace validation passed.
+
+#### Documentation updated
+
+Canonical design guide, member web README, member web metadata/component/test/style files, brand assets, and this change history.
+
 ### CHG-20260828-003 — Group frontend applications and packages under `frontend`
 
 - **Status:** In progress (migration complete; awaiting review/merge)
