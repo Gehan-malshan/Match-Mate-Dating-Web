@@ -34,6 +34,10 @@ bun run build:web
 
 The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
 
+## Brand assets
+
+Approved logo files live under `public/brand`. The supplied artwork is preserved as `matchmate-logo-source.png`; runtime navigation uses the transparent, optimized `matchmate-logo-nav.png`, and browser metadata uses `matchmate-favicon.png`. Do not replace, redraw, recolor, or repurpose these files without updating the canonical design guide and change history.
+
 ## Planned feature areas
 
 ```text

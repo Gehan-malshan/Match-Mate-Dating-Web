@@ -42,7 +42,7 @@ export function LandingPage() {
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="MatchMate home"><span className="brand-mark" aria-hidden="true">M</span><span>MatchMate</span></a>
+        <a className="brand" href="#top" aria-label="MatchMate home"><img className="brand-mark" src="/brand/matchmate-logo-nav.png" alt="" width="44" height="44" /><span>MatchMate</span></a>
         <nav aria-label="Primary navigation"><a href="#how-it-works">How it works</a><a href="#events">Events</a><a href="#about">About</a></nav>
         <div className="header-actions"><a className="text-action" href="#join">Log in</a><a className="button button-small" href="#join">Join MatchMate</a></div>
       </header>
@@ -105,9 +105,8 @@ export function LandingPage() {
       </section>
 
       <footer>
-        <a className="brand footer-brand" href="#top" aria-label="Back to the top"><span className="brand-mark" aria-hidden="true">M</span><span>MatchMate</span></a><p>Privacy-first blind-dating events for Sri Lanka.</p><nav aria-label="Footer navigation"><a href="#about">Privacy approach</a><a href="#how-it-works">How it works</a><a href="#events">Events</a></nav><small>© 2026 MatchMate. Product policies are under development.</small>
+        <a className="brand footer-brand" href="#top" aria-label="Back to the top"><img className="brand-mark" src="/brand/matchmate-logo-nav.png" alt="" width="44" height="44" /><span>MatchMate</span></a><p>Privacy-first blind-dating events for Sri Lanka.</p><nav aria-label="Footer navigation"><a href="#about">Privacy approach</a><a href="#how-it-works">How it works</a><a href="#events">Events</a></nav><small>© 2026 MatchMate. Product policies are under development.</small>
       </footer>
     </main>
   )
 }
-

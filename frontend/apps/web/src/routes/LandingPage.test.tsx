@@ -34,4 +34,20 @@ describe('LandingPage', () => {
       '#about',
     )
   })
+
+  it('uses the approved MatchMate logo in the header and footer', () => {
+    const { container } = render(<LandingPage />)
+
+    const logoMarks = container.querySelectorAll<HTMLImageElement>(
+      'img.brand-mark[src="/brand/matchmate-logo-nav.png"]',
+    )
+
+    expect(logoMarks).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'MatchMate home' })).toContainElement(
+      logoMarks[0],
+    )
+    expect(screen.getByRole('link', { name: 'Back to the top' })).toContainElement(
+      logoMarks[1],
+    )
+  })
 })

@@ -29,6 +29,29 @@ Deep neutral surfaces create depth. Translucent layers, purposeful typography, r
 
 Use semantic token names in components. Do not bind reusable components directly to raw hexadecimal values.
 
+### Approved logo
+
+The approved MatchMate logo is the rounded double-arch lowercase `m` mark supplied by the project owner. Its color travels from vivid magenta on the left through coral to sunset orange/gold on the right, with a restrained glow.
+
+Canonical member-web assets:
+
+| Asset | Purpose |
+|---|---|
+| `frontend/apps/web/public/brand/matchmate-logo-source.png` | Preserved supplied source artwork; do not load in routine navigation |
+| `frontend/apps/web/public/brand/matchmate-logo-mark.png` | Transparent high-resolution web master |
+| `frontend/apps/web/public/brand/matchmate-logo-nav.png` | Optimized navigation/footer mark |
+| `frontend/apps/web/public/brand/matchmate-favicon.png` | Browser/favicon mark |
+
+Logo rules:
+
+- Preserve the double-arch silhouette, rounded geometry, gradient direction, and proportions.
+- Keep sufficient clear space so the glow and outer edges are not cropped.
+- Use the transparent mark on dark or approved contrasting surfaces; do not place the black-backed source artwork directly in compact UI.
+- Do not recolor, rotate, stretch, outline, add a heart, add effects beyond the approved restrained glow, or recreate it with a text glyph.
+- Pair the mark with the textual name `MatchMate` when context does not already provide the accessible brand name.
+- Decorative logo images use empty alternative text inside a link or container that already has an accessible name. Standalone informational use requires `alt="MatchMate"`.
+- New formats or geometry changes require owner approval and the documented design-change workflow.
+
 ### 3.1 Surfaces and content
 
 | Token | Value | Primary use |
