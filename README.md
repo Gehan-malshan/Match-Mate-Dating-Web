@@ -45,6 +45,11 @@ Match-Mate-Dating-Web/
 |   `-- terraform/                 Future infrastructure-as-code
 |-- docs/
 |   |-- architecture/              Architecture documents and diagrams
+|   |-- implementation/            Phased development plan and completion criteria
+|   |-- matchmaking/               Deterministic matching specification
+|   |-- data/                      Database ownership, schemas, and migrations
+|   |-- testing/                   Test strategy and CI quality gates
+|   |-- change-management/         Required before/after project history
 |   |-- adr/                       Architecture decision records
 |   |-- api/                       API usage and integration guidance
 |   |-- security/                  Privacy, security, and threat-model documents
@@ -68,17 +73,35 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository currently contains the initial directory structure and documentation placeholders. Application code, runtime configuration, and deployment definitions will be added incrementally.
+The repository currently contains the planned monorepo structure and a repository-local project handbook. Application code, runtime configuration, versioned API/event contracts, migrations, and deployment definitions will be added incrementally by following `AGENTS.md` and the implementation guide.
 
 ## Suggested implementation order
 
 1. Confirm product policies, privacy rules, matching questions, and event workflows.
 2. Define OpenAPI and AsyncAPI contracts.
 3. Build the frontend foundation and Account/Profile Service.
-4. Add Event, Booking, Payment, and Notification services.
-5. Implement the rule-based Matchmaking Service and organizer workflow.
-6. Add moderation, observability, security hardening, and production delivery automation.
+4. Add Event Service.
+5. Add Booking capacity and hold flow.
+6. Add Payment Service and confirmed-booking integration.
+7. Implement Matchmaking Service and organizer review/lock workflow.
+8. Add event interaction, Notification, moderation hardening, observability, security, and production delivery.
 
 ## Documentation
 
-Start with the README files inside each directory. Record significant technical decisions under `docs/adr` before implementation creates dependencies on them.
+This repository is designed to be understandable without external project documents. Developers and coding agents must read the following files before making changes:
+
+1. [`AGENTS.md`](AGENTS.md) — mandatory engineering and documentation rules.
+2. [`docs/README.md`](docs/README.md) — canonical project handbook index.
+3. [`docs/architecture/README.md`](docs/architecture/README.md) — complete system architecture and workflows.
+4. [`docs/implementation/README.md`](docs/implementation/README.md) — phased implementation plan and definition of done.
+5. The README belonging to the application, service, contract, or infrastructure area being changed.
+
+Specialized references:
+
+- [`docs/matchmaking/README.md`](docs/matchmaking/README.md) — deterministic matchmaking rules and pairing algorithm.
+- [`docs/data/README.md`](docs/data/README.md) — database ownership, schemas, migrations, retention, and consistency.
+- [`docs/testing/README.md`](docs/testing/README.md) — mandatory test strategy and CI quality gates.
+- [`docs/change-management/README.md`](docs/change-management/README.md) — required before/after change records.
+- [`docs/change-management/CHANGELOG.md`](docs/change-management/CHANGELOG.md) — chronological project change history.
+
+Documentation is part of the product. Any change to behavior, APIs, events, data, security, deployment, or workflows must update the relevant documentation in the same pull request.
