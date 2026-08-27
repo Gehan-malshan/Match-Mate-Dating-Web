@@ -78,7 +78,18 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository currently contains the planned monorepo structure and a repository-local project handbook. Application code, runtime configuration, versioned API/event contracts, migrations, and deployment definitions will be added incrementally by following `AGENTS.md` and the implementation guide.
+The repository now contains its first executable application slice: a responsive, public member landing page under `apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
+
+Backend services, authentication, live event data, booking/payment flows, versioned API/event contracts, migrations, and production deployment definitions remain unimplemented and must be added incrementally by following `AGENTS.md` and the implementation guide.
+
+Run the web application from the repository root:
+
+```powershell
+bun install --frozen-lockfile
+bun run dev:web
+```
+
+Open `http://127.0.0.1:5173`. Use `bun run typecheck:web`, `bun run test:web`, and `bun run build:web` before submitting frontend changes.
 
 ## Suggested implementation order
 

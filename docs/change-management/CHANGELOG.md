@@ -4,6 +4,52 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-001 — Introduce the MatchMate member landing page
+
+- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Root Bun workspace, `apps/web`, public marketing experience, generated visual assets, frontend tests and documentation
+- **Decision/ADR:** No ADR required; implements the approved Bun/Vite/React/TanStack frontend direction without changing service boundaries
+
+#### Before
+
+The repository documented a planned member web application but contained no frontend package manifest, runtime entry point, routes, visual assets, tests, or production build. Visitors could not view a MatchMate marketing experience from this repository.
+
+#### After
+
+The repository contains an independently buildable Bun workspace for a responsive MatchMate landing page using Vite, React, TypeScript, TanStack Router, and TanStack Query. The page communicates privacy-first curated events and explainable rule-based matching without presenting unverified business metrics or implying machine learning. It includes original project-local hero, event, and social-preview imagery; truthful pre-launch states; responsive layouts; keyboard focus; reduced-motion handling; and component tests for core boundaries and navigation.
+
+#### Reason
+
+The project needs its first user-visible web vertical slice, based on the supplied Google Stitch visual reference while following the repository's established technology, privacy, safety, and no-ML boundaries.
+
+#### Compatibility and migration
+
+This is a new public frontend with no existing browser contract or stored data to migrate. The root will gain a Bun workspace and lockfile. Backend API contracts are unchanged because the first landing page uses static, truthful product content and no live service integration.
+
+#### Security, privacy, and moderation impact
+
+The page collects no personal data, stores no authentication token, and exposes no community profiles. Login and registration remain clearly identified as future routes until those journeys are implemented. Generated imagery contains fictional adults and no contact or identity information.
+
+#### Deployment and rollback
+
+The member web app is independently buildable and can be deployed separately from all Go services. Production hosting is not selected by this change. Rollback removes the new workspace/app files and restores the documentation-only repository; no database, event, payment, or service rollback is required.
+
+#### Verification
+
+- `bun install --frozen-lockfile` completed without lockfile changes.
+- `bun run typecheck:web` passed.
+- `bun run test:web` passed two component tests.
+- `bun run build:web` produced the Vite production bundle.
+- The local Vite preview returned HTTP 200 for the landing route with the expected title.
+- The generated project-local images and social-preview metadata were verified.
+
+#### Documentation updated
+
+Root README, member web README, implementation phase status, and this change history.
+
 ### CHG-20260827-003 — Adopt Bun for frontend package management and scripts
 
 - **Status:** In progress (documentation updated; awaiting review/merge)

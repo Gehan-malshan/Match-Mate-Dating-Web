@@ -1,4 +1,4 @@
-g# MatchMate Implementation Guide
+# MatchMate Implementation Guide
 
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
@@ -387,7 +387,7 @@ When implementation starts, maintain this table in the same pull request as phas
 
 | Phase | Status | Owner | Evidence | Blocking decisions |
 |---|---|---|---|---|
-| 0 Foundation | Not started | Unassigned | — | Product/policy decisions |
+| 0 Foundation | In progress | Project team | Root Bun workspace and tested `apps/web` public landing slice | Product/policy decisions and contracts |
 | 1 Account/Profile | Not started | Unassigned | — | Verification/profile policy |
 | 2 Event | Not started | Unassigned | — | Event lifecycle/capacity policy |
 | 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
