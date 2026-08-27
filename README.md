@@ -47,6 +47,7 @@ Match-Mate-Dating-Web/
 |-- docs/
 |   |-- architecture/              Architecture documents and diagrams
 |   |-- development/               VS Code and developer workstation setup
+|   |-- design/                    Canonical Midnight Chemistry design system
 |   |-- implementation/            Phased development plan and completion criteria
 |   |-- matchmaking/               Deterministic matching specification
 |   |-- data/                      Database ownership, schemas, and migrations
@@ -115,6 +116,7 @@ This repository is designed to be understandable without external project docume
 Specialized references:
 
 - [`docs/development/README.md`](docs/development/README.md) — VS Code, toolchain, Docker, secrets, and daily workflow setup.
+- [`docs/design/README.md`](docs/design/README.md) — canonical Midnight Chemistry colors, typography, spacing, components, responsive behavior, imagery, and accessibility rules.
 - [`docs/matchmaking/README.md`](docs/matchmaking/README.md) — deterministic matchmaking rules and pairing algorithm.
 - [`docs/data/README.md`](docs/data/README.md) — database ownership, schemas, migrations, retention, and consistency.
 - [`docs/testing/README.md`](docs/testing/README.md) — mandatory test strategy and CI quality gates.

@@ -10,6 +10,7 @@ This documentation is the canonical, repository-local source of truth for MatchM
 4. Read [`development/README.md`](development/README.md) before configuring tools or running local dependencies.
 5. Read the relevant service or application README before changing that area.
 6. Read the specialized guide for matchmaking, data, testing, security, or operations when the change touches that concern.
+7. Read [`design/README.md`](design/README.md) before designing or changing any frontend interface or shared UI component.
 
 ## Canonical documentation map
 
@@ -18,6 +19,7 @@ This documentation is the canonical, repository-local source of truth for MatchM
 | Product and system architecture | [`architecture/README.md`](architecture/README.md) | Capabilities, boundaries, interactions, states, security, or deployment change |
 | Developer workspace | [`development/README.md`](development/README.md) | Tool versions, VS Code, extensions, package manager, Compose, Dev Container, tasks, or local workflow change |
 | Implementation sequence | [`implementation/README.md`](implementation/README.md) | Phases, dependencies, deliverables, or completion criteria change |
+| Base design system | [`design/README.md`](design/README.md) | Colors, typography, spacing, shape, elevation, components, responsive behavior, imagery, motion, or UI accessibility change |
 | Matchmaking | [`matchmaking/README.md`](matchmaking/README.md) | Questions, filters, weights, optimizer, reveal, responses, or fairness rules change |
 | Data architecture | [`data/README.md`](data/README.md) | Tables, ownership, migrations, retention, constraints, or consistency change |
 | Testing and CI | [`testing/README.md`](testing/README.md) | Test levels, required cases, tooling, or quality gates change |

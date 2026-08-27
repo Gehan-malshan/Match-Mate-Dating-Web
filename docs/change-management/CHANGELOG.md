@@ -4,6 +4,50 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-002 — Establish Midnight Chemistry as the base design system
+
+- **Status:** In progress (documentation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Canonical design documentation, repository reading rules, member web application guidance, project handbook index
+- **Decision/ADR:** No architecture ADR required; this is a frontend visual-language and design-governance decision
+
+#### Before
+
+The repository had an implemented landing-page visual style but no canonical design-system document. Colors, typography, spacing, elevation, shapes, component appearance, responsive navigation, accessibility, and privacy-safe profile presentation could therefore drift between developers and coding agents.
+
+#### After
+
+`docs/design/README.md` defines **Midnight Chemistry** as MatchMate's base visual system. It provides canonical color, gradient, typography, spacing, radius, elevation, component, responsive, accessibility, privacy, implementation, and change-governance rules. Frontend developers and agents must read it before changing user interfaces. Where the supplied design reference contained overlapping values, the guide resolves them explicitly: `#131316` is the application background, `#0F0F12` is the deepest decorative backdrop, 4px is the atomic spacing unit with an 8px primary rhythm, and responsive gutters are defined by breakpoint. Discovery-card metadata is constrained to fields approved by MatchMate's privacy allow-list.
+
+#### Reason
+
+A repository-local base design system gives human developers and coding agents one consistent visual source of truth while preserving MatchMate's privacy, safety, accessibility, and no-ML product boundaries.
+
+#### Compatibility and migration
+
+Documentation-only change. Existing UI is not silently restyled by this change. New components must follow the guide; existing components should be aligned through focused, tested follow-up changes. No API, event, database, or stored-user-data migration is required.
+
+#### Security, privacy, and moderation impact
+
+The design guide is subordinate to repository security and privacy rules. Profile cards may render only explicitly approved community-profile fields and must never expose contact details or private matchmaking inputs. Error states, reports, blocks, consent, focus, contrast, reduced motion, and non-color status cues remain mandatory.
+
+#### Deployment and rollback
+
+No runtime deployment is required. Rollback removes the design guide and its documentation references; it does not modify the current compiled frontend. Removing the guide would restore the previous risk of inconsistent visual implementation.
+
+#### Verification
+
+- Confirm the canonical design guide contains every supplied token and design area.
+- Confirm conflicting source values have an explicit repository interpretation.
+- Confirm handbook, agent, root, and member-web references resolve.
+- Confirm no runtime source, API, event, database, or dependency changed.
+
+#### Documentation updated
+
+Canonical design guide, `AGENTS.md`, root README, project handbook index, member web README, and this change history.
+
 ### CHG-20260828-001 — Introduce the MatchMate member landing page
 
 - **Status:** In progress (implementation complete; awaiting review/merge)

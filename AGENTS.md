@@ -32,6 +32,7 @@ Before planning or editing, read:
 6. The README in every application, service, package, contract, or infrastructure directory you will change
 7. Relevant specialized guides under `docs/`
 8. Existing ADRs and change-log entries related to the change
+9. `docs/design/README.md` before designing or changing a frontend interface, visual token, shared component, imagery rule, or responsive navigation behavior
 
 Do not start implementation from a ticket title alone.
 
@@ -82,6 +83,7 @@ Documentation must describe the implemented result, not an intended result that 
 | Deployment/configuration | Infrastructure README, runbook, environment variables, rollback steps, change log |
 | CI/test policy | Testing guide, GitHub documentation, branch protection notes, change log |
 | Developer tool/workspace | Development guide, `.vscode`, version/config files, CI compatibility, change log |
+| Visual design or shared UI | Design guide, affected app/package README, accessibility/visual tests, change log |
 
 ## 6. Contract and compatibility rules
 

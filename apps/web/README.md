@@ -18,6 +18,8 @@ The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or 
 
 The first implemented slice is the public `/` landing route. It includes responsive navigation, a privacy/safety overview, an accurate four-step member journey, an explicit no-ML matchmaking explanation, a pre-launch event state, original project-local imagery, reduced-motion support, visible keyboard focus, and component tests. Login, registration, and event inventory are intentionally not presented as operational until their backend journeys exist.
 
+All new visual work must follow the canonical [Midnight Chemistry base design system](../../docs/design/README.md). Existing landing-page styling predates the canonical token guide and should be aligned through focused, tested follow-up changes rather than undocumented one-off edits.
+
 ## Local commands
 
 Run these commands from the repository root:
