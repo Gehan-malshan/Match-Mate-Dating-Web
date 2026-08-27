@@ -4,9 +4,53 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260827-003 — Adopt Bun for frontend package management and scripts
+
+- **Status:** In progress (documentation updated; awaiting review/merge)
+- **Date:** 2026-08-27
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Root technology stack, member web application guidance, architecture tooling decision, developer workstation setup, future frontend workspace and CI commands
+- **Decision/ADR:** Bun selected before frontend implementation; Vite remains the frontend development server and production bundler
+
+#### Before
+
+The repository development guide selected Node.js, Corepack, and pnpm for the future frontend workspace. Planned commands used `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`, with a future pnpm workspace and lockfile.
+
+#### After
+
+Bun is the single selected frontend package manager and script runner. The future monorepo uses npm-compatible workspaces in the root `package.json`, an approved pinned Bun version, and one `bun.lock`. Developers and CI use `bun install --frozen-lockfile` and `bun run <script>`. Vite remains the frontend development server and production bundler, and TypeScript type checking remains an explicit script. pnpm, npm, and Yarn lockfiles are prohibited.
+
+#### Reason
+
+The team chose Bun before frontend code or lockfiles existed, making this the lowest-risk point to standardize faster dependency installation and script execution without a package-manager migration.
+
+#### Compatibility and migration
+
+No frontend package files or dependencies exist yet, so no lockfile conversion or dependency migration is required. Future root/app/package manifests, CI, Dockerfiles, and Dev Container configuration must use the pinned Bun version. Node.js may be added only for a documented tool compatibility requirement.
+
+#### Security, privacy, and moderation impact
+
+No user data impact. Bun versions and dependencies must be pinned and scanned in CI under the same supply-chain controls as other tools.
+
+#### Deployment and rollback
+
+No runtime deployment. Before frontend implementation, rollback requires documentation changes only. After `bun.lock` and CI exist, changing package managers requires a separate migration plan and reproducibility verification.
+
+#### Verification
+
+- Confirm no current-state documentation instructs developers to use pnpm or Corepack.
+- Confirm Bun/Vite responsibilities are unambiguous.
+- Confirm all local Markdown links and JSON files remain valid.
+- Confirm the unrelated local implementation-guide modification is preserved.
+
+#### Documentation updated
+
+Root README, architecture guide, web application README, developer workstation guide, and change history.
+
 ### CHG-20260827-002 — Standardize the VS Code developer workspace
 
-- **Status:** In progress (configuration prepared; awaiting review/merge)
+- **Status:** Released; package-manager guidance superseded by CHG-20260827-003
 - **Date:** 2026-08-27
 - **Owner:** Project team
 - **Issue/PR:** Pending

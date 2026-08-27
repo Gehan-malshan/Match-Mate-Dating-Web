@@ -85,6 +85,7 @@ Telemetry -> centralized logs, metrics, and traces
 | Area | Target |
 |---|---|
 | Frontend | React, TypeScript, TanStack Router/Query/Form/Table as needed, Zod, accessible design system |
+| Frontend tooling | Bun package manager and script runner; Vite development server and production bundler |
 | Backend | Go; prefer `net/http` or `chi`, `pgx`, and `sqlc` unless an ADR changes it |
 | Persistence | PostgreSQL database/user per service; PostGIS for approved geographic discovery |
 | Messaging | RabbitMQ, durable queues, retry/DLQ, transactional outbox/inbox, AsyncAPI |
@@ -310,4 +311,3 @@ Local development uses Docker Compose. Production may begin on a managed contain
 - Every queue has retry, DLQ, replay, retention, dashboard, alert, and owner definitions.
 - Back up every database independently, support point-in-time recovery, and perform quarterly restore drills.
 - Before changing ownership, consistency, security, communication, deployment, or major technology: add an ADR, define compatibility/migration, update canonical docs/contracts/tests, record before/after, then implement.
-

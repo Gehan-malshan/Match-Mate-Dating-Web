@@ -10,7 +10,7 @@ The initial supported setup is:
 Windows 10/11
   -> Visual Studio Code
   -> Git for Windows
-  -> local Go and Node.js toolchains
+  -> local Go and Bun toolchains
   -> Docker Desktop with WSL 2 engine
   -> PostgreSQL, RabbitMQ, Redis, and services through Docker Compose
 ```
@@ -26,9 +26,10 @@ Install:
 - Visual Studio Code stable.
 - Git for Windows with Git Credential Manager.
 - The stable Go version required by the repository's future `go.work`/`go.mod` files.
-- Current Node.js LTS; use the version pinned by the future repository version file when present.
-- Corepack for the repository-pinned pnpm version.
+- Bun using the version pinned by the future root `package.json` and CI configuration.
 - Docker Desktop with the WSL 2 backend and Docker Compose.
+
+Node.js is not the selected package manager or primary frontend script runtime. Install Node.js only if a checked-in tool has a documented compatibility requirement that Bun cannot satisfy.
 
 Optional operating tools:
 
@@ -45,21 +46,21 @@ Open PowerShell and run:
 ```powershell
 git --version
 go version
-node --version
-corepack --version
+bun --version
+bun --revision
 docker --version
 docker compose version
 code --version
 ```
 
-When the root `package.json` includes a `packageManager` field, enable Corepack and let it use that pinned pnpm version:
+Install Bun on Windows with the official PowerShell installer, then restart VS Code and PowerShell:
 
 ```powershell
-corepack enable
-pnpm --version
+powershell -c "irm bun.sh/install.ps1 | iex"
+bun --version
 ```
 
-Do not independently upgrade Go, Node, pnpm, linters, or generators beyond repository/CI versions. Propose a version change through the normal documented change process.
+When the root `package.json` exists, it must declare the approved Bun version in `packageManager`, for example `bun@<approved-version>`. Local development and CI use the same version. Do not independently upgrade Go, Bun, Vite, linters, or generators beyond repository/CI versions. Propose a version change through the normal documented change process.
 
 ## 4. Clone and open the repository
 
@@ -175,9 +176,9 @@ go test ./...
 
 The exact test/lint commands will be documented and wrapped in repository tasks/scripts before they become required. Do not invent different local commands that bypass CI options.
 
-## 10. Frontend workspace setup when implementation begins
+## 10. Bun frontend workspace setup when implementation begins
 
-The root pnpm workspace will eventually include:
+The root Bun workspace will eventually include:
 
 ```text
 apps/web
@@ -187,18 +188,42 @@ packages/validation
 packages/telemetry
 ```
 
-After the root package and lock files exist:
+The root `package.json` will define npm-compatible workspaces:
 
-```powershell
-corepack enable
-pnpm install --frozen-lockfile
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+```json
+{
+  "name": "matchmate",
+  "private": true,
+  "packageManager": "bun@<approved-version>",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
 ```
 
-Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, and related tools must be local pinned development dependencies; do not rely on global installations.
+The only frontend lockfile is `bun.lock`. Do not add `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package-lock.json`, or `yarn.lock`.
+
+After the root package and Bun lockfile exist:
+
+```powershell
+bun install --frozen-lockfile
+bun run lint
+bun run typecheck
+bun run test
+bun run build
+```
+
+Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.
+
+Use Bun to run Vite rather than replacing Vite's plugin-based build configuration:
+
+```powershell
+bun run dev:web
+bun run dev:admin
+```
+
+The exact script names become authoritative when added to the root `package.json`. TypeScript type checking remains a separate script such as `tsc --noEmit`; Bun's TypeScript transpilation does not replace type checking.
 
 ## 11. Docker and local dependencies
 
@@ -260,7 +285,7 @@ Do not work directly on `main` for feature changes.
 - [ ] Correct repository opened and Git remote verified.
 - [ ] `MatchMate Development` VS Code profile created.
 - [ ] Recommended extensions installed.
-- [ ] Git, Go, Node, Corepack, Docker, Compose, and VS Code commands work.
+- [ ] Git, Go, Bun, Docker, Compose, and VS Code commands work.
 - [ ] Docker Desktop uses WSL 2 and starts successfully.
 - [ ] Workspace files use LF and save without unexpected formatting conflicts.
 - [ ] `AGENTS.md` and project handbook read.
@@ -280,8 +305,15 @@ Do not work directly on `main` for feature changes.
 
 - Confirm the extension is enabled.
 - Install repository dependencies after `package.json`/lockfile exist.
-- Use the workspace version, not a global package.
+- Run `bun install --frozen-lockfile` and use the workspace version, not a global package.
 - Check the VS Code Output panel for ESLint/Prettier diagnostics.
+
+### Bun is unavailable
+
+- Run `bun --version` in a newly opened VS Code terminal.
+- Restart VS Code after installation so the updated user `PATH` is loaded.
+- Confirm the Bun installation directory is present in the user `PATH`.
+- Do not substitute npm, pnpm, or Yarn and commit another lockfile; fix the approved Bun setup.
 
 ### Docker is unavailable
 
@@ -309,4 +341,3 @@ Changing required tool versions, extensions, workspace settings, package manager
 3. Updates to this guide, `.vscode`, version files, CI, and relevant READMEs.
 4. Verification on a clean setup or documented equivalent.
 5. Migration/rollback guidance when the change can interrupt existing work.
-

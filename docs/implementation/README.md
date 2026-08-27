@@ -1,4 +1,4 @@
-# MatchMate Implementation Guide
+g# MatchMate Implementation Guide
 
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
@@ -397,4 +397,3 @@ When implementation starts, maintain this table in the same pull request as phas
 | 7 Production hardening | Not started | Unassigned | — | Hosting/SLO/compliance/operations |
 
 Allowed status values are `Not started`, `In progress`, `Blocked`, `In review`, and `Complete`. A phase is `Complete` only when its exit criteria and evidence are present.
-

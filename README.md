@@ -6,7 +6,8 @@ This repository is a monorepo for the MatchMate member website, organizer portal
 
 ## Planned technology stack
 
-- Frontend: React, TypeScript, TanStack Router, TanStack Query, TanStack Form, and Zod
+- Frontend: React, TypeScript, TanStack Router, TanStack Query, TanStack Form, Zod, and Vite
+- Frontend tooling: Bun for package management and script execution; Vite for development and production builds
 - Backend: Go microservices
 - Databases: PostgreSQL with independent ownership per service
 - Messaging: RabbitMQ

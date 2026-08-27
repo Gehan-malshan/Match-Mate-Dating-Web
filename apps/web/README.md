@@ -5,12 +5,16 @@ The member-facing React and TanStack application will support registration, prof
 ## Planned stack and boundaries
 
 - React + TypeScript.
+- Bun for package management, workspace dependency installation, and script execution.
+- Vite for the development server and production frontend build.
 - TanStack Router for typed route/access structure.
 - TanStack Query for server state; backend services remain authoritative.
 - TanStack Form and Zod for accessible client validation; server validation is mandatory.
 - Shared presentation components from `packages/ui` and generated OpenAPI client helpers.
 
 The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the API Gateway over HTTPS.
+
+The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
 ## Planned feature areas
 
@@ -47,4 +51,3 @@ account privacy, sessions, deactivation
 - Generated-client contract compile and critical browser E2E.
 
 Update this README, relevant handbook pages, API contracts, tests, and change history whenever behavior changes.
-
