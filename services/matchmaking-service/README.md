@@ -1,33 +1,51 @@
 # Matchmaking Service
 
-Owns candidate eligibility, versioned profile and preference snapshots, rule-based compatibility scoring, pairing optimization, organizer review and locking, participant responses, reveal consent, and match feedback.
+The executable prototype owns deterministic candidate eligibility, immutable participant snapshots, explainable weighted scoring, event-wide optimization, organizer review/override/lock/publish, member responses, reveal consent, structured feedback, audit, and transactional outbox records. It uses no machine-learning model.
 
-The initial matching engine will use deterministic business rules and weighted scoring without machine learning.
+The canonical rule specification remains [`../../docs/matchmaking/README.md`](../../docs/matchmaking/README.md).
 
-The complete algorithm specification is [`../../docs/matchmaking/README.md`](../../docs/matchmaking/README.md). This README defines the service implementation boundary; the algorithm document is canonical for rules and calculations.
+## Implemented prototype boundary
 
-## Responsibilities
+- Go API on port `8083` with Account-issued ES256 JWT validation.
+- Independent PostgreSQL database on development port `5435`.
+- Immutable `prototype-v1` ruleset and ten fixture participant projections for event `11111111-1111-4111-8111-000000000001`.
+- Reciprocal account/profile/booking, group, age, block, safety, deal-breaker, and repeat-pair hard filters.
+- Relationship, personality, interests, lifestyle, values, and language/broad-location component scores.
+- `IGNORE_AND_RENORMALIZE` missing-data policy; absent optional answers are not scored as zero.
+- Hungarian maximum-weight bipartite optimization with cardinality priority and lexicographic deterministic tie-breaking.
+- Original suggestions preserved separately from review selections and audited overrides.
+- Hard-eligibility revalidation before immutable locking.
+- Member-safe published-match responses using participant codes and generalized reasons only.
+- Idempotency keys for generation, override, lock, publish, response, consent, and feedback commands.
+- Reversible reveal consent with an append-only, policy-versioned decision history; current member state is a separate projection.
+- Transactional outbox rows for lifecycle facts. RabbitMQ relay delivery is explicitly deferred from this prototype.
 
-- Maintain immutable, approved ruleset versions.
-- Build event participant projections from confirmed/cancelled booking and restriction facts.
-- Snapshot approved profile/preferences for one run without owning source data.
-- Evaluate reciprocal hard constraints with internal reason codes.
-- Calculate component/directional scores and weighted total.
-- Run deterministic event-wide maximum-weight pairing.
-- Persist run/suggestion/unmatched output and explainable safe reasons.
-- Support organizer review/override/lock/publish with complete audit.
-- Record member responses, mutual outcomes, reveal consent, and feedback.
+The fixture projection is a Matchmaking-owned simulation of future Booking, Account, Event, and Moderation facts. The service never reads another service database. Production ingestion through inbox-deduplicated events remains a later integration phase.
 
-## Does not own
+## Ruleset
 
-Account credentials/source profile, event catalog, capacity/booking confirmation, payment, notification delivery, or moderation evidence.
+`prototype-v1` uses the repository's proposed initial weights:
 
-## Proposed API
+| Component | Weight |
+|---|---:|
+| Relationship intention | 25% |
+| Personality compatibility | 20% |
+| Shared interests | 20% |
+| Lifestyle compatibility | 15% |
+| Values | 10% |
+| Shared language and broad location | 10% |
+
+The minimum selectable score is 45. Used rulesets are never updated; any rule, weight, matrix, threshold, missing-data, or optimizer semantic change requires a new version.
+
+## API
 
 ```text
+GET  /health/live
+GET  /health/ready
 GET  /api/v1/events/{eventId}/matching-runs
 POST /api/v1/events/{eventId}/matching-runs
 GET  /api/v1/matching-runs/{runId}
+POST /api/v1/matching-runs/{runId}/review
 POST /api/v1/matching-runs/{runId}/overrides
 POST /api/v1/matching-runs/{runId}/lock
 POST /api/v1/matching-runs/{runId}/publish
@@ -37,50 +55,57 @@ POST /api/v1/matches/{matchId}/reveal-consent
 POST /api/v1/matches/{matchId}/feedback
 ```
 
-Generation, override, lock, publish, response, consent, and feedback commands require appropriate idempotency/state protection.
+The canonical request/response contract is [`../../contracts/openapi/matchmaking-v1.yaml`](../../contracts/openapi/matchmaking-v1.yaml). Protected commands require `Authorization: Bearer <access-token>`; non-repeatable commands also require `Idempotency-Key`.
 
-## Proposed data
+Organizer fixture login:
 
-`ruleset`, `participant_snapshot`, `matching_run`, `candidate`, `compatibility_score`, `pairing_suggestion`, `pairing_override`, `locked_pairing`, `match_response`, `reveal_consent`, `match_feedback`, `inbox`, and `outbox`.
+```text
+organizer@example.test
+MatchMateDev123!
+```
 
-Key invariants:
+The fixture event is scoped to that organizer's Account ID. Administrators may access every event scope. No development authentication bypass exists.
 
-- Identical snapshots/ruleset/algorithm/tie inputs produce identical result.
-- Score never overrides a block, safety restriction, booking, age/preference, deal-breaker, or event constraint.
-- One participant has at most one locked pairing per event/round.
-- Used rulesets, snapshots, generated results, and locked history are immutable.
-- Overrides preserve original suggestion and require authorized actor/reason.
-- Member APIs expose only own published, policy-approved information.
+## Run lifecycle
 
-## Events
+```text
+GENERATED -> UNDER_REVIEW -> LOCKED -> PUBLISHED
+```
 
-Produces `MatchingRunGenerated`, `PairingsLocked`, `PairingsPublished`, `MatchResponseRecorded`, `MutualInterestEstablished`, reveal-consent facts, and safe feedback workflow facts.
+Generation snapshots all inputs and persists every candidate eligibility decision. Review creates a mutable selected-set projection while preserving original optimizer suggestions. Overrides must select an already eligible, above-threshold candidate and cannot select a participant twice. Lock re-evaluates current hard eligibility, writes immutable pairings, and enforces one pairing per event participant/round. Publication is the only state visible through `/matches/mine`.
 
-Consumes account/profile eligibility, block/restriction, event lifecycle/policy, booking confirmed/cancelled/refunded/no-show, and moderation action facts. Every consumer is inbox-deduplicated.
+## Local startup
 
-## Workers
+From the repository root:
 
-- Participant projection updater.
-- Matching-run generator/optimizer for asynchronous large runs.
-- Outbox relay.
-- Deadline/response/reveal workflow processor where approved.
+```powershell
+docker compose up --build -d
+docker compose ps -a
+Invoke-RestMethod http://localhost:8083/health/ready
+```
 
-Workers use bounded concurrency and explicit run status; cancellation/retry must not create a second conflicting result.
+Successful one-shot jobs show `matchmaking-migrate` and `matchmaking-seed` as `Exited (0)`. The API and Matchmaking PostgreSQL remain running.
+The migrator applies ordered, additive schema versions; version 2 introduces reveal-consent history and safely backfills existing decisions.
 
-## Required tests
+Fast verification:
 
-- All filters, score components, weights, missing-data policies, and explanations.
-- Known optimum matrices, greedy counterexample, ties, imbalance, disconnected graph, thresholds, repeat penalties.
-- Determinism and version immutability.
-- Event/organizer/member authorization.
-- Projection event duplicate/reorder and restriction-before-lock race.
-- Concurrent generation/override/lock and unique pairing constraints.
-- No private fields/reasons in member API, events, logs, or notifications.
-- Expected event-size performance plus approved safety margin.
+```powershell
+go -C services/matchmaking-service test ./...
+go -C services/matchmaking-service vet ./...
+```
 
-## Completion criteria
+## Privacy and safety
 
-A confirmed cohort produces reproducible explainable suggestions; authorized organizer can review/override/lock without bypassing hard rules; members see only their own published pairing information; outcome/consent/feedback state is safe, audited, and tested.
+- Participant snapshots contain private inputs and never appear in member APIs or events.
+- Candidate rejection codes are organizer/internal diagnostics, never member explanations.
+- Member results include only their match ID, event ID, partner code, score, generalized reasons, and their own response/consent state.
+- Exact locations, private deal-breakers, blocks, safety state, preferences, emails, and dates of birth are not emitted.
+- Override cannot bypass any hard constraint.
+- Reveal consent requires mutual `INTERESTED` responses; grant/revoke changes record policy and decision versions without erasing history.
+- Feedback is structured; free text is excluded from this prototype to reduce PII and moderation risk.
 
-Any matchmaking change must create a new ruleset/policy version where applicable and update algorithm docs, fixtures, contracts, this README, and before/after history.
+## Current limitations and next integration
 
+This is a complete deterministic prototype vertical slice, not production completion. Before production, replace fixtures with inbox-deduplicated Account/Event/Booking/Moderation facts, add the RabbitMQ relay/retry/DLQ runbook, event-state integration, organizer UI, component/concurrency/performance suites, rate limiting, metrics/traces, retention/backup evidence, and approved questionnaire/group/reveal policies.
+
+Every future matching behavior change must update the ruleset version, deterministic fixtures/tests, OpenAPI/AsyncAPI contracts, canonical matchmaking guide, this README, and the pull-request before/after record.

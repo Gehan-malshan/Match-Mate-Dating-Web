@@ -392,7 +392,7 @@ When implementation starts, maintain this table in the same pull request as phas
 | 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, audit/outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
 | 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
 | 4 Payment | Not started | Unassigned | — | PayHere/refund/reconciliation policy |
-| 5 Matchmaking | Not started | Unassigned | — | Questionnaire/groups/weights/rounds |
+| 5 Matchmaking | In progress | Project team | Deterministic Go engine, PostgreSQL migration, `prototype-v1` fixtures, authenticated lifecycle/member APIs, v1 contracts, optimizer tests | Production questionnaire/groups/rounds approval, Booking/Moderation consumers, organizer UI, relay/performance/concurrency evidence |
 | 6 Interaction/Notification | Not started | Unassigned | — | Reveal/response/channel policy |
 | 7 Production hardening | Not started | Unassigned | — | Hosting/SLO/compliance/operations |
 

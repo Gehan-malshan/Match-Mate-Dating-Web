@@ -28,7 +28,7 @@ This documentation is the canonical, repository-local source of truth for MatchM
 | RabbitMQ events | `contracts/asyncapi/` | Producers, consumers, routing, envelopes, payloads, or versions change |
 | Architecture decisions | [`adr/README.md`](adr/README.md) | A significant decision is proposed, accepted, replaced, or reversed |
 | Operations | [`runbooks/README.md`](runbooks/README.md) | Deployment, alerts, recovery, reconciliation, or incident behavior changes |
-| Change history | [`change-management/CHANGELOG.md`](change-management/CHANGELOG.md) | Every user-visible or architecture-significant change |
+| Change process | [`change-management/README.md`](change-management/README.md) | Pull-request before/after summaries for user-visible or architecture-significant changes |
 
 ## Documentation authority
 

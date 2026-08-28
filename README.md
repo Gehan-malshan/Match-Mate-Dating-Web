@@ -65,6 +65,7 @@ Match-Mate-Dating-Web/
 |-- .vscode/                       Shared extension recommendations and workspace settings
 |-- .editorconfig                  Cross-editor formatting conventions
 |-- .gitattributes                 Repository line-ending and binary-file rules
+|-- Makefile                       Common setup, run, test, build, and cleanup commands
 `-- .github/                       Repository governance and future GitHub Actions
 ```
 
@@ -80,18 +81,87 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository now contains its first executable application slice: a responsive, public member landing page under `frontend/apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
+The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event, Booking, Payment, Matchmaking, Notification, and full Moderation services remain planned.
 
-The Account/Profile slice and the initial Event vertical slice are executable. Event provides scoped draft management, initial lifecycle commands, safe future-event discovery, optimistic concurrency, a service-owned PostgreSQL migration, audit/outbox relay, v1 contracts, member discovery pages, and an organizer workspace. Later Event policy/lifecycle work, booking/payment flows, and production delivery remain incremental work.
+The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
+Event provides scoped draft management, lifecycle commands, safe future-event
+discovery, optimistic concurrency, a service-owned PostgreSQL migration,
+audit/outbox relay, v1 contracts, member discovery pages, and an organizer
+workspace. Booking, payment, matchmaking, notification, and production
+delivery remain planned incremental work. Matchmaking currently uses versioned development fixtures until Booking and Moderation fact consumers exist.
 
-Run the web application from the repository root:
+## Quick start
+
+Prerequisites are Go 1.26+, Bun 1.3+, and Docker Desktop with Docker Compose.
+GNU Make is optional. Keep Docker Desktop running.
+
+First-time setup on Windows:
 
 ```powershell
 bun install --frozen-lockfile
+go -C services/account-service mod download
+```
+
+Start the backend from the repository root:
+
+```powershell
+docker compose up --build -d
+```
+
+In a second terminal, start the frontend:
+
+```powershell
 bun run dev:web
 ```
 
-Open `http://127.0.0.1:5173`. Use `bun run typecheck:web`, `bun run test:web`, and `bun run build:web` before submitting frontend changes.
+Open `http://localhost:5173` after Bun prints the Vite URL. Docker automatically
+runs the idempotent database migration and creates the shared development users.
+
+If GNU Make is installed, `make start` performs those two startup steps for you:
+it starts the Docker backend, then keeps the frontend development server running in
+the same terminal.
+
+Verify backend startup:
+
+```bash
+make status
+```
+
+The `account-migrate` and `account-seed` jobs should show `Exited (0)`, which means success. `postgres-account`, `rabbitmq`, `account-api`, and `account-outbox` should be running.
+
+In a second terminal, start the web application:
+
+```bash
+make web
+```
+
+Open `http://127.0.0.1:5173`. The API is available at `http://localhost:8081`, and RabbitMQ management is at `http://localhost:15672` using `matchmate` / `matchmate`.
+
+Shared web login:
+
+```text
+Email: member@example.test
+Password: MatchMateDev123!
+```
+
+Additional development users are `community@example.test`, `moderator@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production.
+
+## Make command reference
+
+```text
+make help                         Show all commands
+make setup                        Install Bun and Go dependencies
+make start                        Start backend, then frontend in one terminal
+make backend                      Start/rebuild the local backend
+make frontend                     Start the frontend only
+make status                       Show running and completed containers
+make logs                         Follow backend/infrastructure logs
+make test                         Run backend and frontend tests
+make build                        Validate/build backend and frontend
+make stop                         Stop containers; preserve database data
+```
+
+If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain documented in the Account service and Compose READMEs.
 
 ## Suggested implementation order
 
@@ -121,7 +191,6 @@ Specialized references:
 - [`docs/matchmaking/README.md`](docs/matchmaking/README.md) — deterministic matchmaking rules and pairing algorithm.
 - [`docs/data/README.md`](docs/data/README.md) — database ownership, schemas, migrations, retention, and consistency.
 - [`docs/testing/README.md`](docs/testing/README.md) — mandatory test strategy and CI quality gates.
-- [`docs/change-management/README.md`](docs/change-management/README.md) — required before/after change records.
-- [`docs/change-management/CHANGELOG.md`](docs/change-management/CHANGELOG.md) — chronological project change history.
+- [`docs/change-management/README.md`](docs/change-management/README.md) — documentation synchronization and pull-request change summaries.
 
 Documentation is part of the product. Any change to behavior, APIs, events, data, security, deployment, or workflows must update the relevant documentation in the same pull request.

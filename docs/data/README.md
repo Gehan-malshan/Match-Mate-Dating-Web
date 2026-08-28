@@ -134,10 +134,13 @@ See [`../matchmaking/README.md`](../matchmaking/README.md) for algorithm behavio
 | `locked_pairing` | run/event/round, canonical pair, locked time; participant uniqueness enforced |
 | `match_response` | pairing, account, question/policy version, response, time; unique active response |
 | `reveal_consent` | pairing, account, policy version, decision/revocation, time |
+| `reveal_consent_history` | pairing, account, increasing decision version, grant/revoke decision, policy version, idempotency key, time; append-only |
 | `match_feedback` | pairing/account, structured ratings/flags, restricted free-text reference where approved |
 | `inbox` / `outbox` | idempotent integration |
 
 Rulesets and used snapshots are append-only. Never update history to make a new algorithm appear to have produced an old result.
+
+The implemented prototype adds `event_scope` and `participant_projection` as Matchmaking-owned read models plus `pairing_selection`, `locked_participant`, `audit_log`, and transactional `outbox`. Development seed writes fixture projections only; production writers will be inbox-deduplicated consumers of minimum-safe facts. No Matchmaking query joins another service database.
 
 ## 8. Notification database
 
@@ -283,4 +286,3 @@ Before merging a data change, verify:
 - [ ] PII classification, encryption, logs/events, retention, and deletion are addressed.
 - [ ] Component, concurrency, and recovery tests are updated.
 - [ ] Service README, this guide, contracts, and change log are updated.
-

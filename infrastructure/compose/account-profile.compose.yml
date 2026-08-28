@@ -38,6 +38,43 @@ services:
       account-migrate:
         condition: service_completed_successfully
     restart: "no"
+  account-api:
+    image: matchmate/account-service:development
+    build:
+      context: ../../services/account-service
+    entrypoint: ["/account-api"]
+    environment:
+      APP_ENV: development
+      HTTP_ADDRESS: :8081
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-account:5432/matchmate_account?sslmode=disable
+      JWT_ISSUER: matchmate-account
+      JWT_AUDIENCE: matchmate-api
+      JWT_KEY_ID: account-compose-dev-1
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      COOKIE_SECURE: "false"
+      DEV_EXPOSE_VERIFICATION_TOKEN: "true"
+      CURRENT_CONSENT_VERSION: privacy-2026-08
+    ports: ["8081:8081"]
+    depends_on:
+      account-seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  account-outbox:
+    image: matchmate/account-service:development
+    build:
+      context: ../../services/account-service
+    entrypoint: ["/account-outbox"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-account:5432/matchmate_account?sslmode=disable
+      RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
+      EVENT_EXCHANGE: matchmate.events
+    depends_on:
+      account-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
   rabbitmq:
     image: rabbitmq:4-management-alpine
     environment:

@@ -59,7 +59,7 @@ An exception requires an accepted ADR before implementation.
 For every change:
 
 1. **Understand:** identify the affected user journey, service owners, APIs, events, tables, privacy classes, tests, and operational signals.
-2. **Record the baseline:** add a draft entry to `docs/change-management/CHANGELOG.md` describing the current behavior and problem.
+2. **Record the baseline:** describe the current behavior and problem in the pull-request before/after summary required by `docs/change-management/README.md`.
 3. **Design:** update or add contracts and an ADR when the change affects architecture, ownership, security, consistency, or external behavior.
 4. **Implement a vertical slice:** include domain logic, persistence, API/event integration, frontend behavior where applicable, observability, and error handling.
 5. **Test:** add the required unit, component, contract, integration, end-to-end, performance, failure, or security tests defined in `docs/testing/README.md`.

@@ -1,0 +1,56 @@
+name: matchmate-matchmaking
+services:
+  postgres-matchmaking:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: matchmate_matchmaking
+      POSTGRES_USER: matchmate
+      POSTGRES_PASSWORD: matchmate
+    ports: ["5435:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matchmate -d matchmate_matchmaking"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes: ["matchmaking-postgres:/var/lib/postgresql/data"]
+  matchmaking-migrate:
+    image: matchmate/matchmaking-service:development
+    build:
+      context: ../../services/matchmaking-service
+    entrypoint: ["/matchmaking-migrate"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-matchmaking:5432/matchmate_matchmaking?sslmode=disable
+    depends_on:
+      postgres-matchmaking:
+        condition: service_healthy
+    restart: "no"
+  matchmaking-seed:
+    image: matchmate/matchmaking-service:development
+    build:
+      context: ../../services/matchmaking-service
+    entrypoint: ["/matchmaking-seed-dev"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-matchmaking:5432/matchmate_matchmaking?sslmode=disable
+    depends_on:
+      matchmaking-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+  matchmaking-api:
+    image: matchmate/matchmaking-service:development
+    build:
+      context: ../../services/matchmaking-service
+    environment:
+      APP_ENV: development
+      HTTP_ADDRESS: :8083
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-matchmaking:5432/matchmate_matchmaking?sslmode=disable
+      ACCOUNT_JWKS_URL: http://host.docker.internal:8081/.well-known/jwks.json
+      ALLOWED_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174
+    ports: ["8083:8083"]
+    depends_on:
+      matchmaking-seed:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  matchmaking-postgres:

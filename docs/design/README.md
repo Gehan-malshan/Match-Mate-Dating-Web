@@ -312,7 +312,7 @@ When implementation begins or changes:
 
 A change to a canonical token, typography role, spacing scale, radius, component state, responsive navigation rule, accessibility behavior, or privacy-sensitive presentation requires:
 
-- A before/after entry in `docs/change-management/CHANGELOG.md`.
+- A before/after pull-request summary following `docs/change-management/README.md`.
 - Updates to this guide and affected app/package documentation.
 - A migration note identifying affected components and screenshots/visual tests.
 - Accessibility and privacy impact review.

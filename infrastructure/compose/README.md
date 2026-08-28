@@ -2,8 +2,17 @@
 
 The Account/Profile development topology starts PostgreSQL and RabbitMQ, applies the versioned Account migration, and seeds shared fake logins automatically:
 
+From the repository root, use the standard Docker Compose command:
+
 ```powershell
-docker compose -f infrastructure/compose/account-profile.compose.yml up -d --build
+docker compose up --build -d
+```
+
+The root `compose.yaml` includes this Account/Profile development topology. The
+explicit form remains available when working inside infrastructure:
+
+```powershell
+docker compose -f infrastructure/compose/account-profile.compose.yml up --build -d
 ```
 
 Startup order is `postgres-account (healthy) -> account-migrate (exit 0) -> account-seed (exit 0)`. The migration and seed jobs are idempotent, so the command also works with an existing complete local schema. Inspect the result with:
@@ -24,3 +33,5 @@ docker compose -f infrastructure/compose/event.compose.yml logs event-migrate
 ```
 
 The `api` profile starts Event API on port 8082 and discovers the Account development signing key from the Account API on the host. Start Account API before using protected organizer commands. The optional `messaging` profile starts the Event outbox relay and expects RabbitMQ from the Account development topology on host port 5672. Full commands and checks are documented in `services/event-service/README.md`.
+
+The root command also starts the Matchmaking prototype on port `8083` with its independent PostgreSQL database on development port `5435`. Startup order is `postgres-matchmaking (healthy) -> matchmaking-migrate (exit 0) -> matchmaking-seed (exit 0) -> matchmaking-api`. Its versioned development cohort is service-owned fixture data and never runs in production manifests.

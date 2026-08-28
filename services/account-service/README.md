@@ -100,6 +100,16 @@ Profile approval/hiding requires `moderator` or `admin` and creates an audit rec
 
 Prerequisites: Go 1.26+, Docker Desktop, and ports 5433, 5672, 15672, and 8081 available.
 
+From the repository root, the preferred GNU Make workflow is:
+
+```text
+make setup
+make up
+make status
+```
+
+This starts the Account API and outbox relay in Docker in addition to PostgreSQL/RabbitMQ and the automatic migration/seed jobs. Run `make web` in a second terminal.
+
 ```powershell
 docker compose -f infrastructure/compose/account-profile.compose.yml up -d --build
 Copy-Item services/account-service/.env.example services/account-service/.env
@@ -129,6 +139,8 @@ The development Compose command automatically runs the idempotent migration and 
 
 These are public development fixtures, not secrets. Never copy them into staging or production, never add an authentication bypass for them, and never use real personal information in seed data. Re-running the command restores the known password/state and invalidates existing access tokens by incrementing token versions.
 
+The same seed creates six fictional, approved Community profiles with reserved `.test` identities. They have no credential rows and cannot log in; they exist only so every developer sees a useful Community directory after starting Docker.
+
 ## Configuration
 
 Copy `.env.example` as a reference. The binaries read process environment variables; they do not automatically parse `.env`. `DATABASE_URL` is required. Production also requires a PKCS#8 P-256 `JWT_PRIVATE_KEY_PEM`, `COOKIE_SECURE=true`, approved exact `ALLOWED_ORIGINS`, secret-manager injection, TLS at the gateway, and `DEV_EXPOSE_VERIFICATION_TOKEN=false`.
@@ -144,4 +156,4 @@ Unit tests cover password hashing, ES256/JWK claims, opaque-token hashing, adult
 
 ## Change rule
 
-Any behavior, field, endpoint, event, data, privacy, or security change must update its implementation and tests plus this README, the canonical OpenAPI/AsyncAPI file, affected architecture/data/security docs, and `docs/change-management/CHANGELOG.md`. Record the previous behavior, new behavior, reason, compatibility/migration, privacy/security impact, deployment/rollback, and verification evidence in the same pull request.
+Any behavior, field, endpoint, event, data, privacy, or security change must update its implementation and tests plus this README, the canonical OpenAPI/AsyncAPI file, affected architecture/data/security docs, and the pull-request before/after summary described in `docs/change-management/README.md`.
