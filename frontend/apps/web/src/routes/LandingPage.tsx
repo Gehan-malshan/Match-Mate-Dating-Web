@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -41,35 +41,35 @@ function Icon({ name }: { name: IconName }) {
 const journey = [
   {
     icon: 'profile' as const,
-    title: 'Begin privately',
-    lead: 'Create a verified account and decide what is visible.',
-    detail: 'Your legal identity, contact details, and private preferences never become community profile fields. A preview shows the exact approved public view.',
+    title: 'Create your private profile',
+    detail: 'Share your values, lifestyle, interests, and relationship goals.',
   },
   {
     icon: 'calendar' as const,
-    title: 'Choose the room',
-    lead: 'Discover a curated event with clear policies.',
-    detail: 'Dates, broad location, format, eligibility, price, and safety rules appear only after organizer approval. No invented inventory or vague promises.',
+    title: 'Reserve an event place',
+    detail: 'Choose an approved event and confirm your booking securely.',
   },
   {
-    icon: 'ticket' as const,
-    title: 'Confirm your place',
-    lead: 'A server-confirmed booking unlocks eligibility.',
-    detail: 'Capacity is reserved before payment, price and currency are snapshotted by the server, and PayHere confirmation comes from verified backend state.',
+    icon: 'spark' as const,
+    title: 'Discover compatible introductions',
+    detail: 'Clear rules compare preferences, deal-breakers, and shared values.',
   },
   {
     icon: 'users' as const,
-    title: 'Meet with context',
-    lead: 'Understand the suggestion, then meet in person.',
-    detail: 'Versioned rules create reproducible pairings. Organizers review the run, and any later identity reveal still requires approved policy and explicit consent.',
+    title: 'Meet in guided conversations',
+    detail: 'Meet suitable people through a comfortable, organized event.',
+  },
+  {
+    icon: 'heart' as const,
+    title: 'Connect by mutual choice',
+    detail: 'Contact details stay private unless both people choose to continue.',
   },
 ]
 
-const revealSentence = 'No black box. No inferred traits. Just approved rules you can understand, reviewed before anyone meets.'
+const revealSentence = 'Clear rules. Better introductions. Nothing hidden.'
 
 export function LandingPage() {
   const pageRef = useRef<HTMLElement>(null)
-  const [activeStep, setActiveStep] = useState(0)
 
   useGSAP(() => {
     if (typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -134,39 +134,36 @@ export function LandingPage() {
           <span>MatchMate</span>
         </a>
         <nav aria-label="Primary navigation">
-          <a href="#trust">Why MatchMate</a>
-          <a href="#how-it-works">The journey</a>
+          <a href="#about">About</a>
+          <a href="#how-it-works">How it works</a>
           <a href="#events">Events</a>
         </nav>
-        <a className="button button-small" href="#join">Join the first chapter</a>
+        <a className="button button-small" href="#events">Find your next match</a>
       </header>
 
       <section className="hero" id="top">
         <div className="hero-backdrop" aria-hidden="true" />
         <div className="hero-content">
           <p className="eyebrow"><span /> Sri Lanka's privacy-first dating events</p>
-          <h1>Where mystery<br />meets <em>connection.</em></h1>
-          <p className="hero-copy">Meet with intention through verified profiles, curated gatherings, and transparent compatibility rules - without endless swiping or chat.</p>
+          <h1>Less swiping.<br />More <em>meaningful meetings.</em></h1>
+          <p className="hero-copy">Meet compatible people through thoughtfully organized real-world events.</p>
           <div className="hero-actions">
-            <a className="button" href="#events">Explore events <Icon name="arrow" /></a>
+            <a className="button" href="#events">Find your next match <Icon name="arrow" /></a>
             <a className="button button-ghost" href="#how-it-works">See how it works</a>
           </div>
         </div>
-        <div className="trust-card" aria-label="MatchMate privacy principle"><span className="trust-dot" /><div><strong>Private by design</strong><small>Your sensitive preferences stay private.</small></div></div>
         <a className="scroll-cue" href="#trust"><span /> Discover the experience</a>
       </section>
 
-      <section className="principle-marquee" aria-label="MatchMate principles">
-        <div className="marquee-track">
-          <span>Verified community</span><i />
-          <span>No member chat</span><i />
-          <span>Explainable matching</span><i />
-          <span>Curated real-world events</span><i />
-          <span>Consent before reveal</span><i />
-          <span aria-hidden="true">Verified community</span><i aria-hidden="true" />
-          <span aria-hidden="true">No member chat</span><i aria-hidden="true" />
-          <span aria-hidden="true">Explainable matching</span><i aria-hidden="true" />
+      <section className="about section-shell" id="about" aria-labelledby="about-title">
+        <div className="about-intro">
+          <h2 id="about-title">A more human path from <em>compatibility to conversation.</em></h2>
+          <p className="about-lead">MatchMate turns private compatibility into safe, face-to-face introductions.</p>
         </div>
+        <figure className="about-visual">
+          <img src="/images/matchmate-about-cafe.png" alt="Two young professionals sharing a comfortable conversation in a refined cafe" />
+          <figcaption><strong>No member-to-member chat.</strong><span>Meet through safe, organized events.</span></figcaption>
+        </figure>
       </section>
 
       <section className="trust section-shell" id="trust">
@@ -175,95 +172,118 @@ export function LandingPage() {
           <p>MatchMate is designed around one idea: meeting someone new can feel electric without asking you to surrender privacy, context, or control.</p>
         </header>
 
-        <div className="trust-grid">
+        <div className="trust-grid trust-grid-simple">
           <article className="trust-tile trust-visual">
             <img src="/images/matchmate-event.png" alt="Guests sharing a respectful conversation at an organized event" />
-            <div><Icon name="shield" /><span><strong>Respect is structural</strong>Blocking, reporting, moderation, and organizer review are part of the experience.</span></div>
+            <div><Icon name="shield" /><span><strong>Safe, organized meetings</strong>Guided events with coordinators, reporting, and support.</span></div>
           </article>
-          <article className="trust-tile trust-manifesto">
-            <span className="feature-icon"><Icon name="lock" /></span>
-            <h3>A profile is an invitation, not an exposure.</h3>
-            <p>Only explicitly approved community fields can appear. Legal identity, contact details, verification evidence, and matching inputs stay restricted.</p>
-          </article>
-          <article className="trust-tile trust-compact">
-            <Icon name="spark" />
-            <h3>Rules, not predictions</h3>
-            <p>Deterministic and reproducible. No machine-learning model and no inferred sensitive traits.</p>
-          </article>
-          <article className="trust-tile trust-compact trust-accent">
-            <Icon name="users" />
-            <h3>Meet in the room</h3>
-            <p>No member-to-member chat. The product is designed to move toward safe real-world interaction.</p>
-          </article>
-          <article className="trust-tile trust-compact">
-            <Icon name="heart" />
-            <h3>Reveal requires consent</h3>
-            <p>Interest is structured and private. Identity or contact reveal requires approved policy and explicit consent.</p>
-          </article>
+          <aside className="trust-principles" aria-label="MatchMate privacy principles">
+            <div>
+              <span className="trust-principle-icon"><Icon name="lock" /></span>
+              <span className="trust-principle-number">01</span>
+              <h3>Your private details stay private.</h3>
+              <p>Only approved profile information can be seen by others.</p>
+            </div>
+            <div>
+              <span className="trust-principle-icon"><Icon name="spark" /></span>
+              <span className="trust-principle-number">02</span>
+              <h3>Clear matching. Mutual choice.</h3>
+              <p>No black box and no contact reveal without consent.</p>
+            </div>
+          </aside>
         </div>
       </section>
 
       <section className="journey section-shell" id="how-it-works">
         <header className="section-heading journey-heading">
-          <h2>Four moves.<br /><em>One real meeting.</em></h2>
-          <p>Choose each chapter to see how MatchMate protects the path from first profile to event-day introduction.</p>
+          <h2>From your profile to a <em>real introduction.</em></h2>
+          <p>Five clear steps. No endless swiping and no pressure to share contact details.</p>
         </header>
 
-        <div className="journey-accordion" role="group" aria-label="MatchMate journey steps">
-          {journey.map((step, index) => {
-            const isActive = activeStep === index
-            return (
-              <article className={isActive ? 'journey-step is-active' : 'journey-step'} key={step.title}>
-                <button type="button" aria-expanded={isActive} onClick={() => setActiveStep(index)} onFocus={() => setActiveStep(index)}>
-                  <span className="journey-index">{String(index + 1).padStart(2, '0')}</span>
-                  <span className="journey-icon"><Icon name={step.icon} /></span>
-                  <span className="journey-title">{step.title}</span>
-                  <span className="journey-lead">{step.lead}</span>
-                </button>
-                <div className="journey-detail" aria-hidden={!isActive}><p>{step.detail}</p></div>
-              </article>
-            )
-          })}
+        <div className="journey-story">
+          <div className="journey-visual">
+            <img src="/images/matchmate-event-checkin.png" alt="Young professionals arriving and checking in at an organized MatchMate event" />
+            <span>Profile <Icon name="arrow" /> Event <Icon name="arrow" /> Real meeting</span>
+          </div>
+          <ol className="journey-list" aria-label="How MatchMate works">
+            {journey.map((step, index) => (
+              <li key={step.title}>
+                <span className="journey-index">{String(index + 1).padStart(2, '0')}</span>
+                <span className="journey-icon"><Icon name={step.icon} /></span>
+                <div><h3>{step.title}</h3><p>{step.detail}</p></div>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
       <section className="matching section-shell" aria-labelledby="matching-title">
-        <p className="reveal-statement" id="matching-title">
-          {revealSentence.split(' ').map((word, index) => <span className="reveal-word" key={`${word}-${index}`}>{word}{' '}</span>)}
-        </p>
+        <div className="matching-layout">
+          <div className="matching-copy">
+            <p className="reveal-statement" id="matching-title">
+              {revealSentence.split(' ').map((word, index) => <span className="reveal-word" key={`${word}-${index}`}>{word}{' '}</span>)}
+            </p>
+            <p>Approved, repeatable rules—not inferred traits or machine learning.</p>
+          </div>
+          <div className="rules-orbit" aria-label="Preferences move through approved rules and human review">
+            <span className="orbit-ring orbit-ring-outer" aria-hidden="true" />
+            <span className="orbit-ring orbit-ring-inner" aria-hidden="true" />
+            <div className="orbit-core"><img src="/brand/matchmate-logo-nav.png" alt="" /><strong>MatchMate</strong><small>Explainable matching</small></div>
+            <span className="orbit-node orbit-preferences"><Icon name="check" /> Preferences</span>
+            <span className="orbit-node orbit-rules"><Icon name="spark" /> Rules</span>
+            <span className="orbit-node orbit-review"><Icon name="shield" /> Review</span>
+          </div>
+        </div>
         <div className="matching-proof">
-          <div><span className="feature-icon"><Icon name="check" /></span><h3>Hard filters first</h3><p>Booking status, event eligibility, blocks, restrictions, and approved preferences determine who can enter a run.</p></div>
-          <div><span className="feature-icon"><Icon name="spark" /></span><h3>Versioned scoring</h3><p>Approved components and deterministic tie-breaking make each suggestion reproducible without exposing private answers.</p></div>
-          <div><span className="feature-icon"><Icon name="shield" /></span><h3>Human review</h3><p>Organizers can review and override suggestions, but every override requires a reason and remains auditable.</p></div>
+          <div><span className="matching-number">01</span><h3>Preferences first</h3><p>Eligibility, deal-breakers, and boundaries are respected.</p></div>
+          <div><span className="matching-number">02</span><h3>Explainable results</h3><p>Clear, repeatable rules guide every introduction.</p></div>
+          <div><span className="matching-number">03</span><h3>Human oversight</h3><p>Organizer decisions are reviewed and recorded.</p></div>
         </div>
       </section>
 
       <section className="event-stage" id="events">
-        <img className="event-image" src="/images/matchmate-event.png" alt="A warmly lit rooftop prepared for an organized MatchMate gathering" />
+        <img className="event-image" src="/images/matchmate-rooftop-event.png" alt="Young professionals having guided conversations at a warmly lit rooftop event" />
         <div className="event-wash" aria-hidden="true" />
         <div className="event-content section-shell">
           <span className="event-icon"><Icon name="calendar" /></span>
-          <h2>The room is being<br /><em>prepared with care.</em></h2>
-          <p>Dates, venues, ticket prices, eligibility, cancellation rules, and safety policies will appear only after organizer approval. We will not invent availability before it is confirmed.</p>
-          <a className="inline-link" href="#join">Follow the launch <Icon name="arrow" /></a>
+          <h2>Meet compatible people<br /><em>in the real world.</em></h2>
+          <p>MatchMate events bring compatible introductions together in comfortable Colombo venues. Dates, prices, eligibility, and safety details are published after every event is confirmed.</p>
+          <a className="button event-action" href="#event-updates">
+            View event announcements <Icon name="arrow" />
+          </a>
         </div>
       </section>
 
-      <section className="final-cta" id="join">
-        <img className="cta-mark" src="/brand/matchmate-logo-mark.png" alt="" aria-hidden="true" />
-        <p>Registration opens after identity, booking, privacy, and safety workflows are ready.</p>
-        <h2>Something more real<br />is worth <em>waiting for.</em></h2>
-        <span className="button button-muted" aria-disabled="true">Member access coming soon</span>
-      </section>
-
-      <footer>
-        <a className="brand footer-brand" href="#top" aria-label="Back to the top">
-          <img className="brand-mark" src="/brand/matchmate-logo-nav.png" alt="" width="44" height="44" />
-          <span>MatchMate</span>
-        </a>
-        <p>Privacy-first blind-dating events for Sri Lanka.</p>
-        <nav aria-label="Footer navigation"><a href="#trust">Why MatchMate</a><a href="#how-it-works">The journey</a><a href="#events">Events</a></nav>
-        <small>© 2026 MatchMate. Product policies are under development.</small>
+      <footer className="site-footer">
+        <div className="footer-content">
+          <div className="footer-intro">
+            <a className="brand footer-brand" href="#top" aria-label="Back to the top">
+              <img className="brand-mark" src="/brand/matchmate-logo-nav.png" alt="" width="44" height="44" />
+              <span>MatchMate</span>
+            </a>
+            <p>Privacy-first matchmaking that leads to safe, real-world conversations.</p>
+          </div>
+          <nav aria-label="Footer navigation">
+            <strong>Explore</strong>
+            <a href="#about">About MatchMate</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#events">Events</a>
+          </nav>
+          <nav aria-label="Trust and safety navigation">
+            <strong>Trust</strong>
+            <a href="#trust">Privacy and safety</a>
+            <a href="#matching-title">How matching works</a>
+          </nav>
+          <div className="footer-status" id="event-updates">
+            <strong>Event updates</strong>
+            <span><i /> Colombo event announcements</span>
+            <p>New dates and booking details will be published here after confirmation.</p>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <small>© 2026 MatchMate. All rights reserved.</small>
+          <a href="#top">Back to top <Icon name="arrow" /></a>
+        </div>
       </footer>
     </main>
   )

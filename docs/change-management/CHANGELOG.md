@@ -4,6 +4,52 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-007 — Simplify the landing-page story and matchmaking process
+
+- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Member landing-page content, image-led About section, matchmaking-process presentation, trust composition, navigation, responsive styling, component tests, design guidance, member-web documentation, and removal of the repository-local agent skill
+- **Decision/ADR:** No ADR required; this clarifies public presentation without changing product behavior, architecture, contracts, or the Midnight Chemistry design system
+
+#### Before
+
+The landing page moved directly from its hero and principle marquee into privacy benefits. It did not contain a dedicated explanation of the product, the problem it addresses, or how event-based matchmaking differs from endless browsing. Its four-part journey used short phrases such as `Begin privately`, `Choose the room`, and `Meet with context`, omitted compatibility analysis and the post-event mutual-choice stage as distinct steps, and required visitors to infer too much from the headings.
+
+#### After
+
+The landing page introduces MatchMate with the clear `Less swiping. More meaningful meetings.` promise and a concise image-led About composition. The hero uses new original happy-couple rooftop artwork, a calm left-aligned composition, one short supporting sentence, restrained actions, and no floating privacy card. Navigation uses `About` and `How it works`. The former five-box accordion is replaced by one event image beside a fully visible five-stage path covering a private profile, approved event booking, deterministic compatibility-based introductions, guided conversations, and mutual choice. The trust area retains its dominant photograph but replaces the two uneven stacked cards with one open editorial principles column for privacy and mutual choice. Three new project-local images provide distinct café-conversation, event-check-in, and rooftop-event scenes so visual storytelling replaces repeated artwork and unnecessary explanation. The matching explanation uses a short statement, a simplified preferences/rules/review visual, and a lightweight three-stage sequence. Decorative marquees, background grid lines, dashed rings, repeated dividers, sticky oversized media, excessive black surfaces, and mismatched vertical gaps are removed. Section spacing follows a tighter shared rhythm and warm plum tonal surfaces separate major chapters. The vague standalone coming-soon callout is removed. Public copy now speaks as the MatchMate business rather than describing software development: the event stage presents the real-world value, explains when event information is published, and uses a disabled `New event dates will be announced` action until dates are confirmed. The footer uses `Event updates` and `Colombo event announcements` instead of developer-status language. A structured footer provides brand context, product links, trust links, truthful event status, copyright, and a back-to-top action without inventing unavailable policy, contact, or social destinations. Headings remain descriptive while supporting copy is reduced to direct, scannable sentences. The repository-local `.agents/skills/gpt-taste` instruction file and its developer-guide section are removed as requested; the canonical MatchMate design guide remains authoritative.
+
+The final event action is an active `View event announcements` anchor to the truthful event-updates area; it does not remain disabled or link to an unimplemented route.
+
+#### Reason
+
+Visitors should understand what MatchMate does, how it helps them progress toward a potential life partner, and what happens at every stage without decoding abstract or overly short labels.
+
+#### Compatibility and migration
+
+Presentation, content, and developer-instruction cleanup only. No API, event, database, route, authentication, booking, payment, or deployment contract changes. Existing anchor links for trust, how-it-works, events, and join remain valid; the new About section adds the `#about` anchor. Removing the optional repository-local skill introduces no runtime dependency change.
+
+#### Security, privacy, and moderation impact
+
+The revised copy preserves no member chat, private matching inputs, eligibility checks, deterministic no-ML matching, organizer support, and mutual-consent reveal. It does not expose attendee data, invent event inventory, promise a compatible outcome, collect personal information, or activate unfinished registration/payment behavior. Generated scenes contain fictional adults and no readable participant identifiers, contact details, logos, or private information.
+
+#### Deployment and rollback
+
+Rebuild and redeploy the independently deployable member web application. Rollback restores the previous landing component, stylesheet, tests, and documentation; no data or backend rollback is required.
+
+#### Verification
+
+- `bun run typecheck:web` passed.
+- `bun run test:web` covers the fully visible five-stage process, product boundaries, navigation, and approved logo use.
+- `bun run build:web` produces the production bundle.
+- Responsive desktop/tablet/mobile rules, semantic heading order, keyboard interaction, overflow containment, and reduced-motion behavior were reviewed in source.
+
+#### Documentation updated
+
+Member-web README, canonical design guide, developer setup guide, and this change history.
+
 ### CHG-20260828-006 — Recompose the member landing page
 
 - **Status:** In progress (implementation complete; awaiting review/merge)
@@ -99,7 +145,7 @@ Canonical design guide, member web README, member web metadata/component/test/st
 
 ### CHG-20260828-005 — Add project-scoped `gpt-taste` skill
 
-- **Status:** In progress (implementation complete; awaiting review/merge)
+- **Status:** Superseded by CHG-20260828-007; repository-local skill removed
 - **Date:** 2026-08-28
 - **Owner:** Project team
 - **Issue/PR:** Pending
