@@ -1,4 +1,5 @@
 # Local development entry point. Requires Docker Compose v2.20 or later.
-# The Account/Profile stack remains defined beside its infrastructure docs.
+# Service stacks remain independent, while this file starts the local developer baseline.
 include:
   - path: ./infrastructure/compose/account-profile.compose.yml
+  - path: ./infrastructure/compose/event.compose.yml

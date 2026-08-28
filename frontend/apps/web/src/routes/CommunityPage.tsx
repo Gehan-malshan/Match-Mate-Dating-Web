@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ApiProblem, CommunityProfile, listCommunityProfiles } from '../lib/account-api'
+import { MemberNavigation } from '../components/MemberNavigation'
 import './CommunityPage.css'
 
 const initials = (nickname: string) => nickname.split(/\s+|_/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'M'
@@ -30,7 +31,7 @@ export function CommunityPage() {
   useEffect(() => { void load() }, [])
 
   return <main className="community-page">
-    <CommunityHeader />
+    <MemberNavigation active="community" />
     <section className="community-shell" aria-labelledby="community-title">
       <header className="community-intro">
         <div><p className="community-kicker">The directory</p><h1 id="community-title">Discovery through <em>privacy.</em></h1><p>Meet approved members through what they choose to share. Identity, contact details, and private matching preferences remain protected.</p></div>
@@ -54,14 +55,5 @@ export function CommunityPage() {
 
       {cursor && <button className="community-more" type="button" disabled={loading} onClick={() => void load(cursor)}><span>{loading ? 'Seeking…' : 'Seek further'}</span><b aria-hidden="true">⌄</b></button>}
     </section>
-    <CommunityMobileNav />
   </main>
-}
-
-export function CommunityHeader() {
-  return <header className="community-header"><Link className="community-brand" to="/" aria-label="MatchMate home"><img src="/brand/matchmate-logo-nav.png" alt="" /><span>MatchMate</span></Link><nav aria-label="Member navigation"><Link to="/events">Events</Link><Link className="is-active" to="/community" aria-current="page">Community</Link><Link to="/app/profile">Profile</Link></nav><Link className="community-account" to="/app/profile" aria-label="Open my profile"><span aria-hidden="true">M</span></Link></header>
-}
-
-export function CommunityMobileNav() {
-  return <nav className="community-mobile-nav" aria-label="Mobile member navigation"><Link to="/events"><span aria-hidden="true">◇</span>Events</Link><Link className="is-active" to="/community"><span aria-hidden="true">●</span>Community</Link><Link to="/app/profile"><span aria-hidden="true">○</span>Profile</Link></nav>
 }

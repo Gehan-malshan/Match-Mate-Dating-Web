@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ApiProblem, getMe, logout, Me, updatePreferences, updateProfile } from '../lib/account-api'
+import { MemberNavigation } from '../components/MemberNavigation'
 import './ProfilePage.css'
 
 const splitList = (value: FormDataEntryValue | null) => String(value ?? '').split(',').map((item) => item.trim()).filter(Boolean)
@@ -30,21 +31,14 @@ export function ProfilePage() {
   const communityEnabled = profile.visibility === 'COMMUNITY' && profile.approval === 'APPROVED'
 
   return <main className="veil-page">
-    <header className="veil-header">
-      <Link className="veil-brand" to="/" aria-label="MatchMate home"><img src="/brand/matchmate-logo-nav.png" alt="" /><span>MatchMate</span></Link>
-      <nav aria-label="Member navigation">
-        <Link to="/events">Events</Link>
-        <Link to="/community">Community</Link>
-        <a className="is-active" href="#profile-introduction" aria-current="page">Profile</a>
-      </nav>
-      <button className="veil-signout" type="button" onClick={async () => { await logout(); await navigate({ to: '/' }) }}>Sign out</button>
-    </header>
+    <MemberNavigation active="profile" />
 
     <section className="veil-shell" aria-labelledby="veil-title">
       <div className="veil-intro">
         <p className="eyebrow">Private profile workspace</p>
         <h1 id="veil-title">My <em>veil.</em></h1>
         <p>Shape the introduction members may eventually see while keeping your identity and matching choices protected.</p>
+        <button className="veil-signout" type="button" onClick={async () => { await logout(); await navigate({ to: '/' }) }}>Sign out</button>
       </div>
 
       {message && <p className="veil-message" role="status">{message}</p>}
@@ -139,10 +133,5 @@ export function ProfilePage() {
       </div>
     </section>
 
-    <nav className="veil-mobile-nav" aria-label="Mobile member navigation">
-      <Link to="/events"><span aria-hidden="true">◇</span>Events</Link>
-      <Link to="/community"><span aria-hidden="true">○</span>Community</Link>
-      <a className="is-active" href="#profile-introduction"><span aria-hidden="true">●</span>Profile</a>
-    </nav>
   </main>
 }

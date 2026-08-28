@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ApiProblem, blockMember, CommunityProfile, getCommunityProfile } from '../lib/account-api'
-import { CommunityHeader, CommunityMobileNav } from './CommunityPage'
+import { MemberNavigation } from '../components/MemberNavigation'
 import './CommunityPage.css'
 
 const initials = (nickname: string) => nickname.split(/\s+|_/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'M'
@@ -19,7 +19,7 @@ export function CommunityProfilePage() {
   }, [profileId])
 
   return <main className="community-page">
-    <CommunityHeader />
+    <MemberNavigation active="community" />
     <section className="community-detail-shell">
       <Link className="community-back" to="/community">← Back to community</Link>
       {!profile ? <section className="community-state" role={failed ? 'alert' : 'status'}>{!failed && <div className="community-loader" aria-hidden="true" />}<p>{message}</p>{failed && <Link className="button button-ghost" to="/community">Return to community</Link>}</section> : <article className="community-detail">
@@ -42,6 +42,5 @@ export function CommunityProfilePage() {
         </section>
       </article>}
     </section>
-    <CommunityMobileNav />
   </main>
 }

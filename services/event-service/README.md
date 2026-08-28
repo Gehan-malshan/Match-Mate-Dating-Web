@@ -72,7 +72,7 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 
 An organizer can manage an event through approved states and a member can discover only eligible published events. Configuration is versioned, authorized, auditable, observable, and safe for Booking/Matchmaking consumers.
 
-Update this README, architecture/data docs, contracts, tests, and change history whenever behavior changes.
+Update this README, architecture/data docs, contracts, and tests whenever behavior changes. Record the before/after impact in the pull request; this repository deliberately does not maintain a merge-prone shared change-log file.
 
 ## Current implementation boundary
 
@@ -93,10 +93,18 @@ go test ./...
 go vet ./...
 ```
 
-Start the Event database and migration from the repository root:
+Start the complete local baseline (Account/Profile, Event, their databases, and four shared development events) from the repository root:
 
 ```powershell
-docker compose -f infrastructure/compose/event.compose.yml --profile api up -d --build
+docker compose up --build -d
+```
+
+`event-seed` runs only with `APP_ENV=development`, after migrations. It inserts or refreshes four fixed-ID upcoming catalogue fixtures so all developers see the same event names and fields; it never runs in a production topology and does not create bookings or payments.
+
+For the Event stack alone:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml up -d --build
 $env:DATABASE_URL='postgres://matchmate:matchmate@localhost:5434/matchmate_event?sslmode=disable'
 go run ./services/event-service/cmd/migrate
 ```
@@ -147,4 +155,3 @@ Start the relay after the Account development Compose stack has started RabbitMQ
 ```powershell
 docker compose -f infrastructure/compose/event.compose.yml --profile messaging up -d --build event-outbox-relay
 ```
-
