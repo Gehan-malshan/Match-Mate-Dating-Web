@@ -29,7 +29,7 @@ POST   /api/v1/events/{eventId}/close-registration
 POST   /api/v1/events/{eventId}/cancel
 ```
 
-Mutations require assigned organizer/admin scope, optimistic concurrency, reason/audit where appropriate, and valid state transitions.
+Draft creation requires the `admin` role. Existing-event updates and lifecycle transitions retain assigned-organizer/admin scope, optimistic concurrency, reason/audit where appropriate, and valid state transitions.
 
 ## Implemented data
 
@@ -60,7 +60,7 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 ## Required tests
 
 - All lifecycle transitions and invalid transitions.
-- Organizer/admin scope and unrelated organizer denial.
+- Administrator-only creation, assigned organizer/admin update scope, and unrelated organizer denial.
 - Optimistic concurrency/stale update.
 - Date/time-zone/registration boundaries.
 - Decimal price/currency and policy versioning.
@@ -70,17 +70,17 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 
 ## Completion criteria
 
-An organizer can manage an event through approved states and a member can discover only eligible published events. Configuration is versioned, authorized, auditable, observable, and safe for Booking/Matchmaking consumers.
+An administrator can create an event, an assigned organizer or administrator can manage approved later states, and a member can discover only eligible published events. Configuration is versioned, authorized, auditable, observable, and safe for Booking/Matchmaking consumers.
 
 Update this README, architecture/data docs, contracts, and tests whenever behavior changes. Record the before/after impact in the pull request; this repository deliberately does not maintain a merge-prone shared change-log file.
 
 ## Current implementation boundary
 
-The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL database. Draft creation/replacement, assigned-organizer listing, publish, open registration, close registration, cancellation, public discovery, and public detail are implemented. Every update uses `expectedVersion`; stale writes return `EVENT_VERSION_CONFLICT`. Mutation authorization validates an ES256 access token using Account Service JWK discovery or a configured static public key, then permits only the assigned organizer or an administrator. Lifecycle changes create audit and transactional outbox records. `cmd/outbox-relay` claims unpublished records safely, publishes persistent messages with RabbitMQ publisher confirms, and marks them published only after acknowledgement.
+The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL database. Administrator-only draft creation, draft replacement, assigned-organizer listing, publish, open registration, close registration, cancellation, public discovery, and public detail are implemented. Every update uses `expectedVersion`; stale writes return `EVENT_VERSION_CONFLICT`. Mutation authorization validates an ES256 access token using Account Service JWK discovery or a configured static public key. Creation requires `admin`; later updates remain limited to the assigned organizer or an administrator. Lifecycle changes create audit and transactional outbox records. `cmd/outbox-relay` claims unpublished records safely, publishes persistent messages with RabbitMQ publisher confirms, and marks them published only after acknowledgement.
 
 Discovery intentionally omits organizer IDs and the exact venue name. It returns only future events in `PUBLISHED`, `REGISTRATION_OPEN`, or `REGISTRATION_CLOSED` state. Configured capacity is a catalog value and is not an availability promise; Booking remains authoritative for holds and consumed seats.
 
-The first organizer UI is in `frontend/apps/admin`; member discovery/detail is in `frontend/apps/web`. A real-PostgreSQL component suite is available when `EVENT_TEST_DATABASE_URL` is set, and `tests/e2e/event-service-smoke.ps1` verifies the local authenticated create/publish/public-discovery path.
+The protected administrator UI is in `frontend/apps/admin`; member discovery/detail is in `frontend/apps/web`. A real-PostgreSQL component suite is available when `EVENT_TEST_DATABASE_URL` is set, and `tests/e2e/event-service-smoke.ps1` verifies the local authenticated administrator create/publish/public-discovery path.
 
 Still open for Phase 2: separate policy history/replacement endpoints, Booking validation before capacity reduction, later lifecycle states, production gateway integration, automated browser E2E, RabbitMQ failure/DLQ tests, and production operational evidence. The service is not production complete until these items and related policy decisions are resolved.
 

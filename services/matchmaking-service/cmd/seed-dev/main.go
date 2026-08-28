@@ -41,7 +41,7 @@ func main() {
 	if _, err = tx.Exec(ctx, `INSERT INTO ruleset(version,status,configuration,approved_by,approved_at) VALUES($1,'APPROVED',$2,'development-product-owner',$3) ON CONFLICT(version) DO NOTHING`, rules.Version, rawRules, now); err != nil {
 		panic(err)
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO event_scope(event_id,organizer_id,event_status,ruleset_version,source_version,updated_at) VALUES($1,$2,'MATCHING',$3,1,$4) ON CONFLICT(event_id) DO UPDATE SET organizer_id=EXCLUDED.organizer_id,event_status=EXCLUDED.event_status,ruleset_version=EXCLUDED.ruleset_version,source_version=event_scope.source_version+1,updated_at=EXCLUDED.updated_at`, fixtureEventID, "00000000-0000-4000-8000-000000000005", rules.Version, now); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO event_scope(event_id,organizer_id,event_status,ruleset_version,source_version,updated_at) VALUES($1,$2,'MATCHING',$3,1,$4) ON CONFLICT(event_id) DO UPDATE SET organizer_id=EXCLUDED.organizer_id,event_status=EXCLUDED.event_status,ruleset_version=EXCLUDED.ruleset_version,source_version=event_scope.source_version+1,updated_at=EXCLUDED.updated_at`, fixtureEventID, "00000000-0000-4000-8000-000000000006", rules.Version, now); err != nil {
 		panic(err)
 	}
 	for index, p := range fixtures() {

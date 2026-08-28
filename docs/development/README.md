@@ -204,28 +204,33 @@ The root `package.json` defines npm-compatible workspaces:
 
 The only frontend lockfile is `bun.lock`. Do not add `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package-lock.json`, or `yarn.lock`.
 
-Install and verify the implemented member application from the repository root:
+Install and verify the implemented frontend workspace from the repository root:
 
 ```powershell
 bun install --frozen-lockfile
 bun run typecheck:web
 bun run test:web
 bun run build:web
-bun run dev:web
-```
-
-The organizer application uses the same Bun workspace and runs separately:
-
-```powershell
 bun run typecheck:admin
 bun run test:admin
 bun run build:admin
+bun run dev
+```
+
+`bun run dev` starts both the member web application on `http://localhost:5173` and
+the protected administrator application on `http://localhost:5174` in one terminal.
+Use the role-based member login at `http://localhost:5173/login`; administrators are
+redirected to the administration app. Individual commands remain available when
+needed:
+
+```powershell
+bun run dev:web
 bun run dev:admin
 ```
 
 Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.
 
-Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. An admin command will be added only when `frontend/apps/admin` becomes executable. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
+Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
 
 ## 11. Docker and local dependencies
 

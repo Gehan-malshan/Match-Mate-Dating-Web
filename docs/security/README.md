@@ -31,11 +31,12 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Hash passwords with approved Argon2id or bcrypt parameters and unique salts.
 - Short-lived RS256/ES256 access tokens; publish JWKs and support overlapping key rotation.
 - Rotating refresh sessions stored as non-reusable hashes; detect reuse and revoke family.
+- Each frontend deduplicates concurrent refresh attempts into one in-flight request; one browser context must never submit the same rotating token concurrently.
 - Validate issuer, audience, signature, expiry, issued/not-before times, and token version.
 - Revoke sessions on password reset, deactivation, serious moderation action, and suspected compromise.
 - Rate-limit registration, login, refresh, verification, password reset, and email-availability behavior.
 - Reduce account enumeration through consistent responses/timing where practical.
-- Multi-factor authentication is strongly recommended for organizer, moderator, finance, support, and admin roles before production.
+- Multi-factor authentication is strongly recommended for organizer, moderator, finance, support, and admin roles before production; it is mandatory policy work for event-creation and matchmaking administrators.
 
 ## 4. Authorization baseline
 
@@ -56,7 +57,8 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Private preferences may produce generalized explanation reasons but not reveal exact answers.
 - Blocks apply to discovery, eligibility, pairing, reveal, and relevant notifications.
 - Consent purpose/version/time is stored for reveal and other sensitive processing.
-- Event discovery exposes broad location and approved catalog fields only; assigned organizer identifiers and exact venue names remain operational fields. Event mutations validate the Account-issued ES256 token again inside Event Service and enforce assigned-organizer/admin scope.
+- Event discovery exposes broad location and approved catalog fields only; assigned organizer identifiers and exact venue names remain operational fields. Event mutations validate the Account-issued ES256 token again inside Event Service. Creation requires `admin`; existing-event changes enforce assigned-organizer/admin scope.
+- Matching-run listing, generation, review, override, lock, and publication require `admin` inside Matchmaking Service. Organizer accounts are denied even if the frontend is bypassed. Member match actions remain pairing-participant scoped.
 
 ## 6. Payment controls
 
@@ -101,7 +103,7 @@ Business audit records include actor, target, action, prior/new state, reason, t
 - Risk triage and temporary action available for urgent safety cases.
 - Moderation actions can hide profiles, suspend accounts, exclude events/matching, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is protected from the target.
-- Organizer cannot override block/safety/hard consent controls.
+- Organizers cannot access matching-run controls; administrators still cannot override block, safety, account, booking, reciprocal preference, age, deal-breaker, repeat-pair, or hard consent controls.
 - Event-day check-in, emergency escalation, venue conduct, evidence, law-enforcement/legal request, and support SLA require approved operational policies before launch.
 
 ## 11. Data lifecycle
@@ -133,4 +135,3 @@ Business audit records include actor, target, action, prior/new state, reason, t
 - [ ] Retention/deletion/backup effects are defined.
 - [ ] Audit, alerts, incident/runbook, and rollback are ready.
 - [ ] Security/privacy/safety changes have complete before/after documentation.
-

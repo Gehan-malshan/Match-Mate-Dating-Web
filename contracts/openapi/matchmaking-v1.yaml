@@ -2,14 +2,14 @@ openapi: 3.1.0
 info:
   title: MatchMate Matchmaking API
   version: 1.0.0
-  description: Deterministic, explainable, non-ML event matchmaking prototype. Organizer responses contain participant codes and internal eligibility summaries; member responses expose only the authenticated member's published match.
+  description: Deterministic, explainable, non-ML event matchmaking prototype. Administrator responses contain participant codes and internal eligibility summaries; member responses expose only the authenticated member's published match. Matching-run management requires the admin role.
 servers: [{url: /api/v1}]
 security: [{bearerAuth: []}]
 paths:
   /events/{eventId}/matching-runs:
     parameters: [{$ref: "#/components/parameters/EventId"}]
     get:
-      summary: List matching runs for the assigned organizer event
+      summary: List matching runs for an administrator-managed event
       responses: {"200": {description: Matching runs}, "401": {$ref: "#/components/responses/Problem"}, "403": {$ref: "#/components/responses/Problem"}}
     post:
       summary: Generate a deterministic matching run from immutable fixture snapshots
@@ -18,12 +18,12 @@ paths:
   /matching-runs/{runId}:
     parameters: [{$ref: "#/components/parameters/RunId"}]
     get:
-      summary: Read organizer-safe run details, candidates, scores, explanations, selections and unmatched reasons
+      summary: Read administrator-only run details, candidates, scores, explanations, selections and unmatched reasons
       responses: {"200": {description: Matching run, content: {application/json: {schema: {$ref: "#/components/schemas/Run"}}}}, "404": {$ref: "#/components/responses/Problem"}}
   /matching-runs/{runId}/review:
     parameters: [{$ref: "#/components/parameters/RunId"}]
     post:
-      summary: Move a generated run under organizer review
+      summary: Move a generated run under administrator review
       requestBody: {$ref: "#/components/requestBodies/VersionCommand"}
       responses: {"200": {description: Updated run}, "409": {$ref: "#/components/responses/Problem"}}
   /matching-runs/{runId}/overrides:

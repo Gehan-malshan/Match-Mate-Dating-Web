@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { blockMember, getCommunityProfile, listCommunityProfiles } from './account-api'
+import { blockMember, getCommunityProfile, listCommunityProfiles, refresh } from './account-api'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -25,5 +25,17 @@ describe('community profile API client', () => {
     await blockMember('profile-1')
     expect(fetchMock.mock.calls[0][0]).toContain('/users/me/blocks')
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST', body: JSON.stringify({ accountId: 'profile-1' }) })
+  })
+})
+
+describe('account session API client', () => {
+  it('shares one rotating refresh request across concurrent callers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ accessToken: 'refreshed-token' }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(Promise.all([refresh(), refresh()])).resolves.toEqual([true, true])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

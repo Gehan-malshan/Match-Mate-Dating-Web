@@ -6,7 +6,7 @@ This directory contains every MatchMate frontend application and frontend-only s
 frontend/
 |-- apps/
 |   |-- web/                 Member-facing React/TanStack application
-|   `-- admin/               Organizer and moderation application
+|   `-- admin/               Protected event and matchmaking administration
 `-- packages/
     |-- ui/                  Shared design tokens and React components
     |-- validation/          Zod schemas and generated client helpers
@@ -24,7 +24,18 @@ Before changing frontend code, read:
 3. The affected application/package README.
 4. Relevant architecture, security, testing, and change-management guides.
 
-Run supported commands from the repository root. For the member web application:
+Run both local frontend applications together from the repository root:
+
+```powershell
+bun run dev
+```
+
+This starts the member application at `http://localhost:5173` and the protected
+administrator application at `http://localhost:5174`. Stop both with `Ctrl+C` in
+that terminal. The fixed ports prevent an accidental second instance from silently
+moving to another URL.
+
+For the member web application only:
 
 ```powershell
 bun install --frozen-lockfile
@@ -34,3 +45,13 @@ bun run test:web
 bun run build:web
 ```
 
+For the administrator application only:
+
+```powershell
+bun run dev:admin
+bun run typecheck:admin
+bun run test:admin
+bun run build:admin
+```
+
+The applications are separately deployed. Logging in through the member web app redirects an authenticated `admin` session to the administration app; backend authorization remains authoritative.

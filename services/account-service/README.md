@@ -136,6 +136,7 @@ The development Compose command automatically runs the idempotent migration and 
 | `moderator@example.test` | Moderator API testing |
 | `suspended@example.test` | Suspended-account denial testing |
 | `organizer@example.test` | Event organizer UI/API testing |
+| `admin@example.test` | Administrator-only event creation and matchmaking management |
 
 These are public development fixtures, not secrets. Never copy them into staging or production, never add an authentication bypass for them, and never use real personal information in seed data. Re-running the command restores the known password/state and invalidates existing access tokens by incrementing token versions.
 

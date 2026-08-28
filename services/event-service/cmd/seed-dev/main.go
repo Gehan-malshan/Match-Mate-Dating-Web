@@ -47,8 +47,8 @@ func main() {
 		{"11111111-1111-4111-8111-000000000004", "Seaside Sunset Circle", "A relaxed sunset event with facilitated conversation and no pressure to share personal contact details.", "Mount Lavinia", "Development Seaside Venue", "PUBLISHED", "3000.00", 21, -1, 36},
 	}
 	const statement = `INSERT INTO event (event_id, organizer_id, name, description, venue_name, broad_location, venue_time_zone, starts_at, ends_at, registration_opens_at, registration_closes_at, price, currency, configured_capacity, matching_ruleset_version, status, created_at, updated_at)
-VALUES ($1::uuid, 'development-organizer', $2, $3, $4, $5, 'Asia/Colombo', $6, $7, $8, $9, $10::numeric, 'LKR', $11, 'development-v1', $12, $13, $13)
-ON CONFLICT (event_id) DO UPDATE SET name=EXCLUDED.name, description=EXCLUDED.description, venue_name=EXCLUDED.venue_name, broad_location=EXCLUDED.broad_location, starts_at=EXCLUDED.starts_at, ends_at=EXCLUDED.ends_at, registration_opens_at=EXCLUDED.registration_opens_at, registration_closes_at=EXCLUDED.registration_closes_at, price=EXCLUDED.price, configured_capacity=EXCLUDED.configured_capacity, status=EXCLUDED.status, updated_at=EXCLUDED.updated_at`
+VALUES ($1::uuid, '00000000-0000-4000-8000-000000000006', $2, $3, $4, $5, 'Asia/Colombo', $6, $7, $8, $9, $10::numeric, 'LKR', $11, 'development-v1', $12, $13, $13)
+ON CONFLICT (event_id) DO UPDATE SET organizer_id=EXCLUDED.organizer_id, name=EXCLUDED.name, description=EXCLUDED.description, venue_name=EXCLUDED.venue_name, broad_location=EXCLUDED.broad_location, starts_at=EXCLUDED.starts_at, ends_at=EXCLUDED.ends_at, registration_opens_at=EXCLUDED.registration_opens_at, registration_closes_at=EXCLUDED.registration_closes_at, price=EXCLUDED.price, configured_capacity=EXCLUDED.configured_capacity, status=EXCLUDED.status, updated_at=EXCLUDED.updated_at`
 	for _, f := range fixtures {
 		starts := base.AddDate(0, 0, f.dayOffset).Add(time.Duration(f.hour) * time.Hour)
 		ends := starts.Add(3 * time.Hour)

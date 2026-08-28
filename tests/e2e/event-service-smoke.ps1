@@ -1,8 +1,8 @@
 param(
     [string]$AccountApi = 'http://localhost:8081/api/v1',
     [string]$EventApi = 'http://localhost:8082/api/v1',
-    [string]$OrganizerEmail = 'organizer@example.test',
-    [string]$OrganizerPassword = 'MatchMateDev123!'
+    [string]$AdminEmail = 'admin@example.test',
+    [string]$AdminPassword = 'MatchMateDev123!'
 )
 
 function Assert-ApiReady {
@@ -26,11 +26,11 @@ function Assert-ApiReady {
 Assert-ApiReady -Name 'Account API' -HealthUrl ($AccountApi -replace '/api/v1$', '/health/ready') -StartHint 'Start Account PostgreSQL/migrations and run Account API on port 8081.'
 Assert-ApiReady -Name 'Event API' -HealthUrl ($EventApi -replace '/api/v1$', '/health/ready') -StartHint 'Start the Event Compose api profile on port 8082.'
 
-$loginBody = @{ email = $OrganizerEmail; password = $OrganizerPassword } | ConvertTo-Json
+$loginBody = @{ email = $AdminEmail; password = $AdminPassword } | ConvertTo-Json
 $login = Invoke-RestMethod -Method Post -Uri "$AccountApi/auth/login" -ContentType 'application/json' -Body $loginBody -ErrorAction Stop
 $authHeaders = @{ Authorization = "Bearer $($login.accessToken)"; 'X-Correlation-ID' = "event-smoke-$([guid]::NewGuid())" }
 $me = Invoke-RestMethod -Method Get -Uri "$AccountApi/users/me" -Headers $authHeaders -ErrorAction Stop
-if ($me.account.roles -notcontains 'organizer' -and $me.account.roles -notcontains 'admin') { throw 'Development account does not have organizer scope.' }
+if ($me.account.roles -notcontains 'admin') { throw 'Development account does not have administrator authority.' }
 
 $start = [DateTime]::UtcNow.AddDays(14)
 $createBody = @{

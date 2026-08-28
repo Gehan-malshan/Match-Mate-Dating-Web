@@ -5,11 +5,11 @@
 - **Owners:** MatchMate project team
 - **Related change:** Matchmaking Phase 5 prototype vertical slice
 - **Supersedes:** None
-- **Superseded by:** None
+- **Amended by:** ADR-0003 for operator authorization; the algorithm decision remains active
 
 ## Context
 
-MatchMate requires transparent event-wide pairing without machine learning. The canonical specification requires reciprocal hard constraints, weighted component scores, deterministic optimization, immutable snapshots, organizer review, and privacy-safe member results. Booking and production event-consumer integrations are not yet implemented, so a fixture-backed projection is required to validate the engine and workflow independently.
+MatchMate requires transparent event-wide pairing without machine learning. The canonical specification requires reciprocal hard constraints, weighted component scores, deterministic optimization, immutable snapshots, privileged review, and privacy-safe member results. Booking and production event-consumer integrations are not yet implemented, so a fixture-backed projection is required to validate the engine and workflow independently.
 
 ## Decision drivers
 
@@ -63,7 +63,7 @@ Rollback stops Matchmaking API and preserves its independent PostgreSQL volume. 
 
 ## Security, privacy, safety, and operations
 
-Account ES256 tokens are validated inside Matchmaking. Organizer access is event-scoped. Member queries are participant-scoped and return only published partner codes plus generalized reasons. Blocks, safety exclusions, deal-breakers, questionnaire inputs, and exact locations are excluded from member DTOs and outbox payloads. Lock revalidates hard rules; organizer overrides cannot bypass them.
+Account ES256 tokens are validated inside Matchmaking. As amended by ADR-0003, listing, generation, review, override, lock, and publication are administrator-only; organizer accounts cannot access these operations. Member queries are participant-scoped and return only published partner codes plus generalized reasons. Blocks, safety exclusions, deal-breakers, questionnaire inputs, and exact locations are excluded from member DTOs and outbox payloads. Lock revalidates hard rules; administrator overrides cannot bypass them.
 
 Production requires rate limiting, inbox and outbox relay operations, telemetry, backup/restore, retention, and incident runbooks.
 

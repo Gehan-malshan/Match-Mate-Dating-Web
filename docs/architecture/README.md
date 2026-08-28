@@ -6,7 +6,7 @@ This is the canonical architecture description for MatchMate. It must remain syn
 
 MatchMate is a privacy-first, community-driven blind-dating platform for Sri Lanka, initially focused on Colombo. Its purpose is to move relationship-minded adults from safe online discovery to curated real-world interaction instead of prolonged chatting or swiping.
 
-The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, organizer controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
+The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, protected administrator controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
 
 ## 2. Requirement and decision labels
 
@@ -22,10 +22,10 @@ Important open questions include exact age policy, verification method, gender/g
 |---|---|
 | Visitor | Public marketing and permitted event summaries; no community profiles |
 | Member | Account/profile/preferences, safe discovery, bookings, own matches/responses, feedback, block/report |
-| Organizer | Assigned events, participants, matching runs, overrides, locks, attendance, exceptions |
+| Organizer | Assigned existing-event lifecycle and attendance operations; no event creation or matchmaking-run access |
 | Moderator | Reports/content, safety actions, profile hiding, restrictions, suspension, appeals |
 | Support/Finance | Constrained support and reconciliation without broad profile access |
-| Administrator | Roles, configuration, rulesets, audit access, emergency controls |
+| Administrator | Event creation, matching runs/overrides/locks/publication, roles, configuration, rulesets, audit access, emergency controls |
 | Service account | Machine identity with only required integration scopes |
 
 Possession of a role never bypasses ownership, event scope, resource state, privacy policy, or audit requirements.
@@ -50,7 +50,7 @@ Discover -> register/consent -> verify -> complete safe profile
 -> supply private preferences/questionnaire -> moderation/approval
 -> community discovery -> discover event -> time-limited ticket hold
 -> PayHere payment -> confirmed booking -> eligible matching pool
--> deterministic matching run -> organizer review/override/lock
+-> deterministic matching run -> administrator review/override/lock
 -> policy-limited pairing information -> attend event
 -> structured continue/switch/interest response
 -> consent-controlled reveal -> feedback/report/safety follow-up
@@ -61,7 +61,7 @@ At each sensitive step, revalidate account status, blocks, reports, event eligib
 ## 6. Logical architecture
 
 ```text
-Member Web                 Organizer/Admin Web
+Member Web                 Protected Admin Web
      \                           /
       +-- WAF / Load Balancer / API Gateway --+
                            |
@@ -119,9 +119,9 @@ Owns PayHere initiation, provider orders, state, callback fingerprints, verifica
 
 ### Matchmaking Service
 
-Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, organizer overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
+Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, administrator overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
 
-The current executable prototype uses Matchmaking-owned deterministic fixtures to simulate future consumed Account/Event/Booking/Moderation facts. It validates Account-issued ES256 tokens, stores data in its independent PostgreSQL database, and exposes organizer-scoped run lifecycle plus participant-scoped published results. Production integration will replace fixture projection writes with inbox-deduplicated events without changing ownership.
+The current executable prototype uses Matchmaking-owned deterministic fixtures to simulate future consumed Account/Event/Booking/Moderation facts. It validates Account-issued ES256 tokens, stores data in its independent PostgreSQL database, and exposes an administrator-only run lifecycle plus participant-scoped published results. Production integration will replace fixture projection writes with inbox-deduplicated events without changing ownership.
 
 ### Notification Service
 
@@ -251,7 +251,7 @@ The complete specification is [`../matchmaking/README.md`](../matchmaking/README
 
 ```text
 Confirmed participants -> hard filters -> component scores -> weighted total
--> event-wide optimizer -> organizer review/override -> immutable lock
+-> event-wide optimizer -> administrator review/override -> immutable lock
 -> responses -> consent-controlled reveal -> feedback
 ```
 
