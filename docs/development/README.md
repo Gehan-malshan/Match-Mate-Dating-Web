@@ -152,13 +152,7 @@ Before implementation work, read:
 
 Opening the repository successfully is not authorization to ignore architecture or documentation rules.
 
-## 9. Project-scoped agent skill
-
-The repository-local [`.agents/skills/gpt-taste/SKILL.md`](../../.agents/skills/gpt-taste/SKILL.md) provides optional frontend design and GSAP motion guidance for relevant UI work. It is stored with MatchMate and is not installed in a developer's global Codex configuration.
-
-`AGENTS.md`, accepted ADRs, security and privacy requirements, accessibility requirements, [`docs/design/README.md`](../design/README.md), and affected frontend documentation take precedence over the skill. Using the skill adds no runtime dependency or permission; any suggested library, asset, or external request still requires normal project review and implementation.
-
-## 10. Go workspace setup when implementation begins
+## 9. Go workspace setup when implementation begins
 
 Each service will have its own `go.mod`. A root `go.work` will reference local modules:
 
@@ -182,7 +176,7 @@ go test ./...
 
 The exact test/lint commands will be documented and wrapped in repository tasks/scripts before they become required. Do not invent different local commands that bypass CI options.
 
-## 11. Bun frontend workspace
+## 10. Bun frontend workspace
 
 The root Bun workspace groups all frontend applications and frontend-only packages under `frontend/`:
 
@@ -224,7 +218,7 @@ Only run commands actually defined in the checked-in root `package.json`. ESLint
 
 Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. An admin command will be added only when `frontend/apps/admin` becomes executable. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
 
-## 12. Docker and local dependencies
+## 11. Docker and local dependencies
 
 Docker Desktop must be running before Compose commands. After checked-in Compose files exist:
 
@@ -239,7 +233,7 @@ Planned local containers include PostgreSQL databases, RabbitMQ, optional Redis,
 
 Use named development volumes and fictional seed data. Never mount or import production data. Do not delete shared volumes or databases unless the target and recovery effect are understood.
 
-## 13. PostgreSQL extension use
+## 12. PostgreSQL extension use
 
 Connect only to local/development databases using non-production credentials. Name connections clearly by environment and service, for example:
 
@@ -251,7 +245,7 @@ matchmate-local-payment
 
 Do not connect one service with another service's credential. Do not edit schema manually; migrations are authoritative. Do not save passwords in repository files or screenshots.
 
-## 14. Secrets and environment configuration
+## 13. Secrets and environment configuration
 
 - Commit only `.env.example` templates containing safe variable names and non-secret examples.
 - Keep real `.env` files ignored.
@@ -261,7 +255,7 @@ Do not connect one service with another service's credential. Do not edit schema
 
 If a secret is committed, treat it as compromised: rotate/revoke it, remove exposure safely, and follow the incident/change process. Deleting the latest line is not sufficient.
 
-## 15. Daily developer workflow
+## 14. Daily developer workflow
 
 ```text
 git switch main
@@ -279,7 +273,7 @@ git switch main
 
 Do not work directly on `main` for feature changes.
 
-## 16. First-time setup checklist
+## 15. First-time setup checklist
 
 - [ ] Correct repository opened and Git remote verified.
 - [ ] `MatchMate Development` VS Code profile created.
@@ -291,7 +285,7 @@ Do not work directly on `main` for feature changes.
 - [ ] No real secrets or production connections configured.
 - [ ] Local build/test/Compose commands verified once they exist.
 
-## 17. Troubleshooting
+## 16. Troubleshooting
 
 ### Go features are unavailable
 
@@ -331,7 +325,7 @@ Do not work directly on `main` for feature changes.
 
 Quote the path: `"D:\My projects\Match-Mate-Dating-Web"`. Repository scripts must handle quoted paths. Do not hard-code one developer's absolute path.
 
-## 18. Updating this setup
+## 17. Updating this setup
 
 Changing required tool versions, extensions, workspace settings, package manager, Go workspace, Compose environment, Dev Container, tasks, or debug configuration requires:
 

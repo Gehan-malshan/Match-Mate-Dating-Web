@@ -248,9 +248,11 @@ Icons use rounded caps and corners. Rounded shapes should support hierarchy and 
 The member landing page applies Midnight Chemistry as a cinematic AIDA narrative rather than a repeated card template:
 
 - Attention uses the approved full-bleed event image, a strong left editorial gradient, a two-line headline, a restrained privacy note, and a glass navigation surface. Do not replace it with a detached portrait or partially visible decorative image.
-- Interest uses a complete 12-column trust grid: `7 + 5` columns followed by `4 + 4 + 4`, with no empty cells or decorative placeholders.
-- Desire uses an accessible horizontal journey accordion, a scrubbed explanation statement, and local event imagery that scales into view.
+- Interest introduces the product through a concise image-led About composition, then pairs one large visual with one open editorial column containing the privacy and mutual-choice principles instead of stacking separate cards. Sections use warm tonal changes rather than decorative grid lines or large empty gaps.
+- Desire places local event imagery beside a fully visible five-stage process list with short, understandable headings and descriptions. A simple matching visual shows preferences moving through approved rules and human review, followed by event imagery that scales into view; decorative marquees and dashboard-like dividers are avoided.
 - Action uses a truthful pre-launch state instead of an operational registration form or invented event inventory.
+
+The public footer provides only real in-page navigation, trust guidance, development status, copyright, and a back-to-top action. Do not add placeholder social, contact, policy, or legal destinations before those routes and owners exist.
 
 GSAP motion is progressive enhancement. Entrance, text-reveal, and image-scale effects must be scoped to the landing page, cleaned up with the owning React lifecycle, and skipped when reduced motion is requested. CSS animation must also stop under the same preference. Content cannot begin hidden in the reduced-motion or no-animation experience.
 
