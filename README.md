@@ -87,15 +87,33 @@ The repository contains the member landing page plus the first Account/Profile v
 
 Prerequisites are Go 1.26+, Bun 1.3+, Docker Desktop with Docker Compose, and GNU Make. On Windows, run these commands from a terminal where `make --version` succeeds (for example Git Bash or a GNU Make installation). Keep Docker Desktop running.
 
-First-time setup:
+First-time setup on Windows:
 
-```bash
-make doctor
-make setup
-make up
+```powershell
+bun install --frozen-lockfile
+go -C services/account-service mod download
 ```
 
-`make up` builds and starts PostgreSQL, RabbitMQ, the Account API, and outbox relay. It automatically runs the idempotent database migration and creates the shared development users. Verify startup:
+Start the backend from the repository root:
+
+```powershell
+docker compose up --build -d
+```
+
+In a second terminal, start the frontend:
+
+```powershell
+bun run dev:web
+```
+
+Open `http://localhost:5173` after Bun prints the Vite URL. Docker automatically
+runs the idempotent database migration and creates the shared development users.
+
+If GNU Make is installed, `make start` performs those two startup steps for you:
+it starts the Docker backend, then keeps the frontend development server running in
+the same terminal.
+
+Verify backend startup:
 
 ```bash
 make status
@@ -124,22 +142,16 @@ Additional development users are `community@example.test`, `moderator@example.te
 
 ```text
 make help                         Show all commands
-make doctor                       Check Go, Bun, Docker, and Compose
 make setup                        Install Bun and Go dependencies
-make up                           Start/rebuild the local backend
-make web                          Start the frontend in the current terminal
+make start                        Start backend, then frontend in one terminal
+make backend                      Start/rebuild the local backend
+make frontend                     Start the frontend only
 make status                       Show running and completed containers
 make logs                         Follow backend/infrastructure logs
-make migrate                      Re-run the safe migration job
-make seed                         Restore shared development accounts
 make test                         Run backend and frontend tests
-make vet                          Run Go vet and TypeScript checking
 make build                        Validate/build backend and frontend
-make down                         Stop containers; preserve database data
-make reset-local CONFIRM=YES      Delete and recreate local data on next start
+make stop                         Stop containers; preserve database data
 ```
-
-`make reset-local CONFIRM=YES` permanently deletes the local Account PostgreSQL volume. Do not use it when local data must be retained, and never adapt it for production.
 
 If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain documented in the Account service and Compose READMEs.
 

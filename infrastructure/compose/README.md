@@ -2,8 +2,17 @@
 
 The Account/Profile development topology starts PostgreSQL and RabbitMQ, applies the versioned Account migration, and seeds shared fake logins automatically:
 
+From the repository root, use the standard Docker Compose command:
+
 ```powershell
-docker compose -f infrastructure/compose/account-profile.compose.yml up -d --build
+docker compose up --build -d
+```
+
+The root `compose.yaml` includes this Account/Profile development topology. The
+explicit form remains available when working inside infrastructure:
+
+```powershell
+docker compose -f infrastructure/compose/account-profile.compose.yml up --build -d
 ```
 
 Startup order is `postgres-account (healthy) -> account-migrate (exit 0) -> account-seed (exit 0)`. The migration and seed jobs are idempotent, so the command also works with an existing complete local schema. Inspect the result with:
