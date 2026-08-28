@@ -100,6 +100,16 @@ Profile approval/hiding requires `moderator` or `admin` and creates an audit rec
 
 Prerequisites: Go 1.26+, Docker Desktop, and ports 5433, 5672, 15672, and 8081 available.
 
+From the repository root, the preferred GNU Make workflow is:
+
+```text
+make setup
+make up
+make status
+```
+
+This starts the Account API and outbox relay in Docker in addition to PostgreSQL/RabbitMQ and the automatic migration/seed jobs. Run `make web` in a second terminal.
+
 ```powershell
 docker compose -f infrastructure/compose/account-profile.compose.yml up -d --build
 Copy-Item services/account-service/.env.example services/account-service/.env
@@ -143,4 +153,4 @@ Unit tests cover password hashing, ES256/JWK claims, opaque-token hashing, adult
 
 ## Change rule
 
-Any behavior, field, endpoint, event, data, privacy, or security change must update its implementation and tests plus this README, the canonical OpenAPI/AsyncAPI file, affected architecture/data/security docs, and `docs/change-management/CHANGELOG.md`. Record the previous behavior, new behavior, reason, compatibility/migration, privacy/security impact, deployment/rollback, and verification evidence in the same pull request.
+Any behavior, field, endpoint, event, data, privacy, or security change must update its implementation and tests plus this README, the canonical OpenAPI/AsyncAPI file, affected architecture/data/security docs, and the pull-request before/after summary described in `docs/change-management/README.md`.

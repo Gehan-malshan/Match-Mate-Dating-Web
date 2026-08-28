@@ -65,6 +65,7 @@ Match-Mate-Dating-Web/
 |-- .vscode/                       Shared extension recommendations and workspace settings
 |-- .editorconfig                  Cross-editor formatting conventions
 |-- .gitattributes                 Repository line-ending and binary-file rules
+|-- Makefile                       Common setup, run, test, build, and cleanup commands
 `-- .github/                       Repository governance and future GitHub Actions
 ```
 
@@ -80,18 +81,67 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository now contains its first executable application slice: a responsive, public member landing page under `frontend/apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
+The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event, Booking, Payment, Matchmaking, Notification, and full Moderation services remain planned.
 
-Backend services, authentication, live event data, booking/payment flows, versioned API/event contracts, migrations, and production deployment definitions remain unimplemented and must be added incrementally by following `AGENTS.md` and the implementation guide.
+## Quick start with Make
 
-Run the web application from the repository root:
+Prerequisites are Go 1.26+, Bun 1.3+, Docker Desktop with Docker Compose, and GNU Make. On Windows, run these commands from a terminal where `make --version` succeeds (for example Git Bash or a GNU Make installation). Keep Docker Desktop running.
 
-```powershell
-bun install --frozen-lockfile
-bun run dev:web
+First-time setup:
+
+```bash
+make doctor
+make setup
+make up
 ```
 
-Open `http://127.0.0.1:5173`. Use `bun run typecheck:web`, `bun run test:web`, and `bun run build:web` before submitting frontend changes.
+`make up` builds and starts PostgreSQL, RabbitMQ, the Account API, and outbox relay. It automatically runs the idempotent database migration and creates the shared development users. Verify startup:
+
+```bash
+make status
+```
+
+The `account-migrate` and `account-seed` jobs should show `Exited (0)`, which means success. `postgres-account`, `rabbitmq`, `account-api`, and `account-outbox` should be running.
+
+In a second terminal, start the web application:
+
+```bash
+make web
+```
+
+Open `http://127.0.0.1:5173`. The API is available at `http://localhost:8081`, and RabbitMQ management is at `http://localhost:15672` using `matchmate` / `matchmate`.
+
+Shared web login:
+
+```text
+Email: member@example.test
+Password: MatchMateDev123!
+```
+
+Additional development users are `community@example.test`, `moderator@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production.
+
+## Make command reference
+
+```text
+make help                         Show all commands
+make doctor                       Check Go, Bun, Docker, and Compose
+make setup                        Install Bun and Go dependencies
+make up                           Start/rebuild the local backend
+make web                          Start the frontend in the current terminal
+make status                       Show running and completed containers
+make logs                         Follow backend/infrastructure logs
+make migrate                      Re-run the safe migration job
+make seed                         Restore shared development accounts
+make test                         Run backend and frontend tests
+make vet                          Run Go vet and TypeScript checking
+make build                        Validate/build backend and frontend
+make down                         Stop containers; preserve database data
+make reset-local CONFIRM=YES      Delete and recreate local data on next start
+```
+
+`make reset-local CONFIRM=YES` permanently deletes the local Account PostgreSQL volume. Do not use it when local data must be retained, and never adapt it for production.
+
+If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain documented in the Account service and Compose READMEs.
 
 ## Suggested implementation order
 
@@ -121,7 +171,6 @@ Specialized references:
 - [`docs/matchmaking/README.md`](docs/matchmaking/README.md) — deterministic matchmaking rules and pairing algorithm.
 - [`docs/data/README.md`](docs/data/README.md) — database ownership, schemas, migrations, retention, and consistency.
 - [`docs/testing/README.md`](docs/testing/README.md) — mandatory test strategy and CI quality gates.
-- [`docs/change-management/README.md`](docs/change-management/README.md) — required before/after change records.
-- [`docs/change-management/CHANGELOG.md`](docs/change-management/CHANGELOG.md) — chronological project change history.
+- [`docs/change-management/README.md`](docs/change-management/README.md) — documentation synchronization and pull-request change summaries.
 
 Documentation is part of the product. Any change to behavior, APIs, events, data, security, deployment, or workflows must update the relevant documentation in the same pull request.
