@@ -121,6 +121,8 @@ Owns PayHere initiation, provider orders, state, callback fingerprints, verifica
 
 Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, organizer overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
 
+The current executable prototype uses Matchmaking-owned deterministic fixtures to simulate future consumed Account/Event/Booking/Moderation facts. It validates Account-issued ES256 tokens, stores data in its independent PostgreSQL database, and exposes organizer-scoped run lifecycle plus participant-scoped published results. Production integration will replace fixture projection writes with inbox-deduplicated events without changing ownership.
+
 ### Notification Service
 
 Owns templates, delivery requests/attempts, provider results, retries, suppression, and channel preferences. It normally consumes facts outside the critical transaction path.

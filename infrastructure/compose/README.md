@@ -33,3 +33,5 @@ docker compose -f infrastructure/compose/event.compose.yml logs event-migrate
 ```
 
 The `api` profile starts Event API on port 8082 and discovers the Account development signing key from the Account API on the host. Start Account API before using protected organizer commands. The optional `messaging` profile starts the Event outbox relay and expects RabbitMQ from the Account development topology on host port 5672. Full commands and checks are documented in `services/event-service/README.md`.
+
+The root command also starts the Matchmaking prototype on port `8083` with its independent PostgreSQL database on development port `5435`. Startup order is `postgres-matchmaking (healthy) -> matchmaking-migrate (exit 0) -> matchmaking-seed (exit 0) -> matchmaking-api`. Its versioned development cohort is service-owned fixture data and never runs in production manifests.

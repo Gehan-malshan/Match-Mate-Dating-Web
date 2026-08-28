@@ -254,6 +254,7 @@ Suggested Matchmaking-owned tables/aggregates:
 | `locked_pairing` | Immutable selected pairing per run/round |
 | `match_response` | Member continue/switch/interest response and deadline |
 | `reveal_consent` | Versioned consent decision and policy context |
+| `reveal_consent_history` | Append-only grant/revoke decision versions; current consent remains a query projection |
 | `match_feedback` | Structured quality, comfort, safety, and product feedback |
 | `inbox` / `outbox` | Idempotent integration |
 
@@ -376,3 +377,8 @@ Changing questions, eligibility, weights, matrices, thresholds, optimizer object
 
 Never modify a ruleset already used by a generated run.
 
+## 15. Implemented prototype profile
+
+The executable Go prototype in `services/matchmaking-service` implements the two-group strategy in ADR-0002 with immutable `prototype-v1`, the initial weights in section 4, `IGNORE_AND_RENORMALIZE`, a minimum selectable score of 45, Hungarian maximum-weight assignment, cardinality priority, and lexicographic account-ID tie-breaking. Development fixtures represent future consumed eligibility facts and are never treated as source Account, Booking, Event, or Moderation records.
+
+This profile is reversible development evidence. **OPEN QUESTION — Product owner:** approve questionnaire dimensions, group policy, compatibility matrices, minimum score, repeat window, response question, and reveal policy before production. Any answer that changes behavior creates a new ruleset version; `prototype-v1` is never edited after use.
