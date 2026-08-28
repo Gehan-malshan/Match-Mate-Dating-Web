@@ -3,6 +3,8 @@ let accessToken = ''
 
 export type ApiProblem = { code: string; detail: string; fields?: Record<string,string> }
 export type Me = { account:{id:string;email:string;status:string;verification:string;roles:string[]};profile:{accountID:string;nickname:string;dateOfBirth:string;broadLocation:string;bio:string;visibility:string;approval:string;interests:string[];version:number};preferences?:{minAge:number;maxAge:number;intentions:string[];interestedIn:string[];languages:string[];dealBreakers:string[]} }
+export type CommunityProfile = { profileId:string;nickname:string;ageBand:string;broadLocation:string;bio:string;interests:string[] }
+export type CommunityPage = { items:CommunityProfile[];nextCursor?:string }
 
 async function request<T>(path:string,init:RequestInit={},retry=true):Promise<T>{
   const headers = new Headers(init.headers); headers.set('Content-Type','application/json'); if(accessToken) headers.set('Authorization',`Bearer ${accessToken}`)
@@ -19,3 +21,6 @@ export async function logout(){await request('/auth/logout',{method:'POST'},fals
 export const getMe=()=>request<Me>('/users/me')
 export const updateProfile=(profile:Record<string,unknown>)=>request<Me['profile']>('/users/me/profile',{method:'PATCH',body:JSON.stringify(profile)})
 export const updatePreferences=(preferences:Record<string,unknown>)=>request<Me['preferences']>('/users/me/matching-preferences',{method:'PUT',body:JSON.stringify(preferences)})
+export const listCommunityProfiles=(cursor='')=>request<CommunityPage>(`/community/profiles?limit=8${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
+export const getCommunityProfile=(profileId:string)=>request<CommunityProfile>(`/community/profiles/${encodeURIComponent(profileId)}`)
+export const blockMember=(profileId:string)=>request<void>('/users/me/blocks',{method:'POST',body:JSON.stringify({accountId:profileId})})
