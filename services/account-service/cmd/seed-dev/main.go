@@ -24,6 +24,7 @@ var developmentAccounts = []seedAccount{
 	{"00000000-0000-4000-8000-000000000002", "community@example.test", "Community Member", "ACTIVE", "COMMUNITY", "APPROVED", "member"},
 	{"00000000-0000-4000-8000-000000000003", "moderator@example.test", "Test Moderator", "ACTIVE", "PRIVATE", "APPROVED", "moderator"},
 	{"00000000-0000-4000-8000-000000000004", "suspended@example.test", "Suspended Member", "SUSPENDED", "HIDDEN", "HIDDEN", "member"},
+	{"00000000-0000-4000-8000-000000000005", "organizer@example.test", "Test Organizer", "ACTIVE", "PRIVATE", "APPROVED", "organizer"},
 }
 
 func main() {

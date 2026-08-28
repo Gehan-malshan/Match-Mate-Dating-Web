@@ -1,0 +1,121 @@
+openapi: 3.1.0
+info:
+  title: MatchMate Event API
+  version: 1.0.0
+servers: [{url: /api/v1}]
+paths:
+  /organizer/events:
+    get:
+      summary: List events in the authenticated organizer scope; administrators may list all events
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        "200": {description: Managed event page, content: {application/json: {schema: {$ref: "#/components/schemas/ManagedEventPage"}}}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+  /events:
+    get:
+      summary: Discover future published events
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        "200": {description: Event page, content: {application/json: {schema: {$ref: "#/components/schemas/EventPage"}}}}
+        "422": {$ref: "#/components/responses/Problem"}
+    post:
+      summary: Create a draft event
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/EventInput"}}}}
+      responses:
+        "201": {description: Created event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "401": {$ref: "#/components/responses/Problem"}
+        "403": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /events/{eventId}:
+    parameters: [{name: eventId, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Read a discoverable event
+      responses:
+        "200": {description: Public event, content: {application/json: {schema: {$ref: "#/components/schemas/PublicEvent"}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+    patch:
+      summary: Replace editable draft configuration using optimistic concurrency
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/EventUpdate"}}}}
+      responses:
+        "200": {description: Updated event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+  /events/{eventId}/{action}:
+    parameters:
+      - {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: action, in: path, required: true, schema: {type: string, enum: [publish, open-registration, close-registration, cancel]}}
+    post:
+      summary: Apply an event lifecycle command
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/TransitionInput"}}}}
+      responses:
+        "200": {description: Updated event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "409": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  responses:
+    Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}
+  schemas:
+    EventInput:
+      type: object
+      required: [organizerId,name,description,venueName,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,configuredCapacity,matchingRulesetVersion]
+      properties:
+        organizerId: {type: string}
+        name: {type: string, minLength: 3, maxLength: 120}
+        description: {type: string, maxLength: 2000}
+        venueName: {type: string}
+        broadLocation: {type: string, maxLength: 120}
+        timeZone: {type: string, example: Asia/Colombo}
+        startsAt: {type: string, format: date-time}
+        endsAt: {type: string, format: date-time}
+        registrationOpensAt: {type: string, format: date-time}
+        registrationClosesAt: {type: string, format: date-time}
+        price: {type: string, pattern: "^(0|[1-9][0-9]{0,9})(\\.[0-9]{1,2})?$", example: "4500.00"}
+        currency: {type: string, pattern: "^[A-Z]{3}$", example: LKR}
+        configuredCapacity: {type: integer, minimum: 1, maximum: 10000}
+        matchingRulesetVersion: {type: string}
+    EventUpdate: {allOf: [{$ref: "#/components/schemas/EventInput"}, {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}]}
+    Event:
+      allOf:
+        - {$ref: "#/components/schemas/EventInput"}
+        - type: object
+          required: [eventId,status,version,capacityPolicyVersion,createdAt,updatedAt]
+          properties:
+            eventId: {type: string, format: uuid}
+            status: {type: string, enum: [DRAFT,PUBLISHED,REGISTRATION_OPEN,REGISTRATION_CLOSED,CANCELLED]}
+            version: {type: integer}
+            capacityPolicyVersion: {type: integer}
+            createdAt: {type: string, format: date-time}
+            updatedAt: {type: string, format: date-time}
+    PublicEvent:
+      type: object
+      required: [eventId,name,description,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,configuredCapacity,matchingRulesetVersion,status,version]
+      properties:
+        eventId: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: string}
+        broadLocation: {type: string}
+        timeZone: {type: string}
+        startsAt: {type: string, format: date-time}
+        endsAt: {type: string, format: date-time}
+        registrationOpensAt: {type: string, format: date-time}
+        registrationClosesAt: {type: string, format: date-time}
+        price: {type: string}
+        currency: {type: string}
+        configuredCapacity: {type: integer}
+        matchingRulesetVersion: {type: string}
+        status: {type: string}
+        version: {type: integer}
+    EventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/PublicEvent"}}, nextCursor: {type: string}, limit: {type: integer}}}
+    ManagedEventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/Event"}}, nextCursor: {type: string}, limit: {type: integer}}}
+    TransitionInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}, reason: {type: string}}}
+    Problem: {type: object, required: [type,title,status,code,detail,instance,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, instance: {type: string}, traceId: {type: string}, fieldErrors: {type: object, additionalProperties: {type: string}}}}

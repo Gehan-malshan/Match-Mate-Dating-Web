@@ -55,6 +55,8 @@ Constraints and privacy:
 
 ## 4. Event database
 
+The first executable slice implements an Event-owned `event` aggregate table, `event_audit`, and transactional `outbox`. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
+
 Suggested tables:
 
 | Table | Important fields/constraints |

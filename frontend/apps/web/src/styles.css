@@ -237,7 +237,28 @@ h2 em { color: var(--primary); font-family: Georgia, "Times New Roman", serif; f
 
 :focus-visible { outline: 3px solid var(--secondary); outline-offset: 4px; border-radius: 6px; }
 
+.events-page,.event-detail{min-height:100vh;background:radial-gradient(circle at 80% 0,rgba(255,78,124,.12),transparent 32%),var(--background);}
+.app-header{width:var(--container);min-height:82px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.1);}
+.events-hero{width:var(--container);padding:88px 0 56px;}
+.events-hero h1,.event-detail h1{max-width:850px;margin:20px 0 0;font-size:clamp(48px,7vw,86px);line-height:1;letter-spacing:-.055em;}
+.events-hero>p:last-child{max-width:650px;margin:24px 0 0;color:var(--on-surface-warm);font-size:18px;line-height:1.7;}
+.event-catalog{width:var(--container);padding-bottom:100px;}
+.event-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;}
+.event-card{min-height:460px;display:flex;flex-direction:column;padding:28px;border:1px solid rgba(255,255,255,.09);border-radius:20px;background:rgba(31,31,34,.9);box-shadow:0 20px 60px rgba(0,0,0,.16);}
+.event-card-status{display:flex;align-items:center;gap:9px;color:var(--secondary);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.event-card-status span{width:9px;height:9px;border-radius:50%;background:var(--secondary);box-shadow:0 0 0 5px rgba(255,191,129,.09);}
+.event-date{margin:26px 0 0;color:var(--on-surface-warm);font-size:14px;}
+.event-card h2{margin:14px 0 0;font-size:28px;line-height:1.2;letter-spacing:-.035em;}
+.event-card>p:not(.event-date,.availability-note){color:var(--muted);line-height:1.65;}
+.event-card dl{display:grid;gap:12px;margin:12px 0 0;padding:18px 0;border-block:1px solid rgba(255,255,255,.08);}
+.event-card dl div{display:flex;justify-content:space-between;gap:16px}.event-card dt{color:var(--muted);font-size:13px}.event-card dd{margin:0;text-align:right;font-weight:650}
+.availability-note{color:#cbbfc3;font-size:12px;line-height:1.55}.event-link{margin-top:auto;padding-top:18px;color:var(--primary);font-weight:750}.event-link span{margin-left:6px}
+.catalog-message{display:grid;justify-items:start;gap:12px;padding:28px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:var(--surface-low)}.catalog-message span{color:var(--muted)}
+.event-detail{padding:64px max(24px,calc((100vw - 1000px)/2)) 100px}.back-link{display:inline-block;margin-bottom:72px;color:var(--on-surface-warm)}.event-detail-lead{max-width:720px;color:var(--on-surface-warm);font-size:18px;line-height:1.7}
+.event-detail-panel{display:grid;grid-template-columns:1.3fr .7fr;gap:40px;margin:48px 0;padding:32px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:var(--surface)}.event-detail-panel dl{margin:0}.event-detail-panel dl div{display:grid;grid-template-columns:180px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.08)}.event-detail-panel dt{color:var(--muted)}.event-detail-panel dd{margin:0}.event-detail-panel aside{padding:24px;border-radius:16px;background:rgba(255,178,190,.07)}.event-detail-panel aside p{color:var(--on-surface-warm);line-height:1.65}
+
 @media (max-width: 1040px) {
+	.event-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .hero { min-height: 740px; }
   .hero-content { width: min(620px, 64vw); }
   .site-header nav { gap: 20px; }
@@ -288,6 +309,8 @@ h2 em { color: var(--primary); font-family: Georgia, "Times New Roman", serif; f
   .footer-content { grid-template-columns: 1.4fr 1fr 1fr; }
   .footer-status { grid-column: 1 / -1; }
 }
+
+@media (max-width: 640px){.app-header{width:calc(100% - 32px)}.app-header .button{min-height:44px;padding-inline:14px}.events-hero,.event-catalog{width:calc(100% - 32px)}.events-hero{padding-top:64px}.event-card-grid{grid-template-columns:1fr}.event-detail{padding-inline:16px}.event-detail-panel{grid-template-columns:1fr;padding:20px}.event-detail-panel dl div{grid-template-columns:1fr;gap:6px}}
 
 @media (max-width: 560px) {
   :root { --container: min(100% - 32px, 1200px); }

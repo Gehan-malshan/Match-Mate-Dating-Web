@@ -83,9 +83,17 @@ Match-Mate-Dating-Web/
 
 The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event, Booking, Payment, Matchmaking, Notification, and full Moderation services remain planned.
 
-## Quick start with Make
+The Account/Profile slice and the initial Event vertical slice are executable.
+Event provides scoped draft management, lifecycle commands, safe future-event
+discovery, optimistic concurrency, a service-owned PostgreSQL migration,
+audit/outbox relay, v1 contracts, member discovery pages, and an organizer
+workspace. Booking, payment, matchmaking, notification, and production
+delivery remain planned incremental work.
 
-Prerequisites are Go 1.26+, Bun 1.3+, Docker Desktop with Docker Compose, and GNU Make. On Windows, run these commands from a terminal where `make --version` succeeds (for example Git Bash or a GNU Make installation). Keep Docker Desktop running.
+## Quick start
+
+Prerequisites are Go 1.26+, Bun 1.3+, and Docker Desktop with Docker Compose.
+GNU Make is optional. Keep Docker Desktop running.
 
 First-time setup on Windows:
 
