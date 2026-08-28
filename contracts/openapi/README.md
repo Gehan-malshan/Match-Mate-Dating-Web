@@ -1,5 +1,7 @@
 # OpenAPI Contracts
 
+Implemented specifications: `account-v1.yaml` and the first Event Service slice in `event-v1.yaml`. Later service specifications remain planned.
+
 This directory contains canonical versioned REST contracts. `account-v1.yaml` is implemented; later service files remain planned. API implementation and generated clients must conform to these files.
 
 ## Planned organization

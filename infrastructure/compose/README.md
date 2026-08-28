@@ -14,3 +14,13 @@ docker compose -f infrastructure/compose/account-profile.compose.yml logs accoun
 ```
 
 `account-migrate` and `account-seed` should show `Exited (0)`; this is successful for one-shot jobs. Shared login details are documented in `services/account-service/README.md`. This automatic seed exists only in the development Compose file and must never be copied into staging or production manifests.
+
+The Event Service has an independent PostgreSQL database and migration job:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml --profile api up -d --build
+docker compose -f infrastructure/compose/event.compose.yml ps -a
+docker compose -f infrastructure/compose/event.compose.yml logs event-migrate
+```
+
+The `api` profile starts Event API on port 8082 and discovers the Account development signing key from the Account API on the host. Start Account API before using protected organizer commands. The optional `messaging` profile starts the Event outbox relay and expects RabbitMQ from the Account development topology on host port 5672. Full commands and checks are documented in `services/event-service/README.md`.

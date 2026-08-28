@@ -2,6 +2,10 @@
 
 Every production service and critical cross-service workflow must have a runnable procedure that an operator unfamiliar with its implementation can follow safely.
 
+Implemented initial runbooks:
+
+- [`event-outbox-relay.md`](event-outbox-relay.md) — diagnose and recover Event lifecycle-fact publication without deleting or rewriting outbox data.
+
 ## Required runbooks
 
 - Service health/degraded/unavailable response.

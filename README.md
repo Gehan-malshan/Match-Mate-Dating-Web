@@ -82,7 +82,7 @@ Match-Mate-Dating-Web/
 
 The repository now contains its first executable application slice: a responsive, public member landing page under `frontend/apps/web`, built with Bun, Vite, React, TypeScript, TanStack Router, and TanStack Query. It communicates the approved privacy-first, curated-event, and deterministic no-ML matchmaking boundaries without connecting to backend services or collecting user data.
 
-Backend services, authentication, live event data, booking/payment flows, versioned API/event contracts, migrations, and production deployment definitions remain unimplemented and must be added incrementally by following `AGENTS.md` and the implementation guide.
+The Account/Profile slice and the initial Event vertical slice are executable. Event provides scoped draft management, initial lifecycle commands, safe future-event discovery, optimistic concurrency, a service-owned PostgreSQL migration, audit/outbox relay, v1 contracts, member discovery pages, and an organizer workspace. Later Event policy/lifecycle work, booking/payment flows, and production delivery remain incremental work.
 
 Run the web application from the repository root:
 

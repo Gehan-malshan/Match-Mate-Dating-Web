@@ -56,6 +56,7 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Private preferences may produce generalized explanation reasons but not reveal exact answers.
 - Blocks apply to discovery, eligibility, pairing, reveal, and relevant notifications.
 - Consent purpose/version/time is stored for reveal and other sensitive processing.
+- Event discovery exposes broad location and approved catalog fields only; assigned organizer identifiers and exact venue names remain operational fields. Event mutations validate the Account-issued ES256 token again inside Event Service and enforce assigned-organizer/admin scope.
 
 ## 6. Payment controls
 

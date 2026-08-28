@@ -148,7 +148,7 @@ export function LandingPage() {
           <h1>Less swiping.<br />More <em>meaningful meetings.</em></h1>
           <p className="hero-copy">Meet compatible people through thoughtfully organized real-world events.</p>
           <div className="hero-actions">
-            <a className="button" href="#events">Find your next match <Icon name="arrow" /></a>
+          <a className="button" href="/events">Browse confirmed events <Icon name="arrow" /></a>
             <a className="button button-ghost" href="#how-it-works">See how it works</a>
           </div>
         </div>
@@ -248,8 +248,8 @@ export function LandingPage() {
           <span className="event-icon"><Icon name="calendar" /></span>
           <h2>Meet compatible people<br /><em>in the real world.</em></h2>
           <p>MatchMate events bring compatible introductions together in comfortable Colombo venues. Dates, prices, eligibility, and safety details are published after every event is confirmed.</p>
-          <a className="button event-action" href="#event-updates">
-            View event announcements <Icon name="arrow" />
+          <a className="button event-action" href="/events">
+            Browse confirmed events <Icon name="arrow" />
           </a>
         </div>
       </section>

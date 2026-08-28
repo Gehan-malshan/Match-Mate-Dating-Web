@@ -1,0 +1,35 @@
+asyncapi: 3.0.0
+info: {title: MatchMate Event Facts, version: 1.0.0}
+channels:
+  eventFacts:
+    address: matchmate.events
+    messages:
+      lifecycle: {$ref: "#/components/messages/EventLifecycleFact"}
+operations:
+  publishLifecycle:
+    action: send
+    channel: {$ref: "#/channels/eventFacts"}
+    summary: Event Service publishes transactionally persisted facts with routing keys event.EventCreated, event.EventUpdated, event.EventPublished, event.EventRegistrationOpened, event.EventRegistrationClosed, and event.EventCancelled.
+components:
+  messages:
+    EventLifecycleFact:
+      payload:
+        type: object
+        additionalProperties: false
+        required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,causationId,actorId,payload]
+        properties:
+          eventId: {type: string, format: uuid}
+          eventType: {type: string, enum: [EventCreated,EventUpdated,EventPublished,EventRegistrationOpened,EventRegistrationClosed,EventCancelled]}
+          schemaVersion: {type: integer, const: 1}
+          occurredAt: {type: string, format: date-time}
+          aggregateId: {type: string, format: uuid}
+          correlationId: {type: string}
+          causationId: {type: string}
+          actorId: {type: string}
+          payload:
+            type: object
+            required: [eventId,version]
+            properties:
+              eventId: {type: string, format: uuid}
+              status: {type: string}
+              version: {type: integer}

@@ -5,6 +5,26 @@
     "": {
       "name": "matchmate",
     },
+    "frontend/apps/admin": {
+      "name": "@matchmate/admin",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tanstack/react-query": "^5.102.8",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+      },
+      "devDependencies": {
+        "@testing-library/jest-dom": "^7.0.1",
+        "@testing-library/react": "^16.3.3",
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+        "@vitejs/plugin-react": "^6.1.0",
+        "jsdom": "^30.0.1",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.2",
+        "vitest": "^4.1.11",
+      },
+    },
     "frontend/apps/web": {
       "name": "@matchmate/web",
       "version": "0.0.0",
@@ -63,6 +83,8 @@
     "@gsap/react": ["@gsap/react@2.1.2", "", { "peerDependencies": { "gsap": "^3.12.5", "react": ">=17" } }, "sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
+
+    "@matchmate/admin": ["@matchmate/admin@workspace:frontend/apps/admin"],
 
     "@matchmate/web": ["@matchmate/web@workspace:frontend/apps/web"],
 

@@ -1,0 +1,4 @@
+import {afterEach,describe,expect,it,vi} from 'vitest'
+import {getEvent,listEvents} from './event-api'
+afterEach(()=>vi.unstubAllGlobals())
+describe('event API client',()=>{it('reads the bounded public event page',async()=>{const payload={items:[],limit:12};const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json'}}));vi.stubGlobal('fetch',fetchMock);await expect(listEvents()).resolves.toEqual(payload);expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/events?limit=12'),expect.objectContaining({headers:{Accept:'application/json'}}))});it('encodes event identifiers',async()=>{const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify({eventId:'safe'}),{status:200}));vi.stubGlobal('fetch',fetchMock);await getEvent('id/with spaces');expect(fetchMock.mock.calls[0][0]).toContain('id%2Fwith%20spaces')})})

@@ -16,7 +16,7 @@ The web app never connects directly to databases, RabbitMQ, PayHere secrets, or 
 
 The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
-Implemented routes include the redesigned public `/` landing page, `/register`, `/login`, and the authenticated `/app/profile` workspace. Registration uses TanStack Form and Zod before server-authoritative validation. The API client keeps access tokens in memory, sends refresh cookies only with credentialed requests, retries once after refresh, and never writes tokens or private profile data to browser storage. The profile workspace clearly separates the community allow-list from private matching preferences. Event inventory remains unavailable until its backend journey exists.
+Implemented routes include the redesigned public `/` landing page, `/register`, `/login`, the authenticated `/app/profile` workspace, public `/events`, and `/events/$eventId` discovery/detail routes. Registration uses TanStack Form and Zod before server-authoritative validation. The API client keeps access tokens in memory, sends refresh cookies only with credentialed requests, retries once after refresh, and never writes tokens or private profile data to browser storage. The profile workspace clearly separates the community allow-list from private matching preferences. Event discovery shows only the Event Service public allow-list and clearly labels configured capacity as non-authoritative.
 
 The landing page uses minimal responsive navigation, a happy-couple hero, an image-led About section, a privacy/safety composition, a fully visible five-step journey, explainable preferences-to-rules-to-review matching, a truthful pre-launch event stage, and structured product/trust footer navigation. Distinct project-local imagery gives the hero, café conversation, event check-in, and rooftop-event chapters separate visual purposes. The working registration call-to-action links to `/register`; event actions continue to link only to confirmed announcement information.
 
@@ -38,7 +38,7 @@ bun run build:web
 
 The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
 
-The Account API defaults to `http://localhost:8081/api/v1`. Override it with `VITE_ACCOUNT_API_URL` (see `.env.example`). The API must allow the exact Vite origin and use TLS/secure cookies in production.
+The Account API defaults to `http://localhost:8081/api/v1` and Event API to `http://localhost:8082/api/v1`. Override them with `VITE_ACCOUNT_API_URL` and `VITE_EVENT_API_URL` (see `.env.example`). APIs must allow the exact Vite origin and use TLS/secure cookies in production.
 
 ## Brand assets
 

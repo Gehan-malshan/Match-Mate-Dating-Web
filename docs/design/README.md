@@ -215,6 +215,17 @@ Icons use rounded caps and corners. Rounded shapes should support hierarchy and 
 - Never display legal names, date of birth, exact address, contact details, social handles, private preferences, verification evidence, or moderation data.
 - Cards require keyboard access, descriptive alternatives for meaningful imagery, loading/failure states, and clear block/report entry points where applicable.
 
+Event discovery cards use the same tonal hierarchy without member imagery. They show only approved catalog fields: event name/description, broad location, schedule, fixed-precision price/currency, configured capacity, lifecycle label, and a detail action. Exact venue and organizer identifiers remain operational. Configured capacity always carries a text disclaimer that Booking is authoritative for availability.
+
+### Organizer event operations
+
+- Use compact, calm forms on `surface` containers; privileged work must favor legibility over decorative motion.
+- Separate broad public location from exact operational venue with explicit labels.
+- Show lifecycle state and optimistic version together, and provide only transitions valid for the current state.
+- Cancellation requires an explicit reason and visually distinct destructive treatment; confirmation cannot rely on color alone.
+- Capacity fields state that they configure policy and do not represent consumed or available seats.
+- Loading, empty, error, stale-conflict, and successful-save messages use live status semantics and remain visible without animation.
+
 ### Chips and tags
 
 - Use `radius-full` or `radius-xl`, a translucent white surface near 10%, and `label-sm` typography.
