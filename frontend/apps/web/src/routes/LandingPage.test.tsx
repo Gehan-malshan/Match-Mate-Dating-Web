@@ -91,9 +91,9 @@ describe('LandingPage', () => {
     expect(screen.getByRole('link', { name: /back to top/i })).toHaveAttribute('href', '#top')
   })
 
-  it('links the event action to truthful announcement information', () => {
+  it('links the event action to implemented event discovery', () => {
     render(<LandingPage />)
 
-    expect(screen.getByRole('link', { name: /view event announcements/i })).toHaveAttribute('href', '#event-updates')
+    expect(screen.getAllByRole('link', { name: /browse confirmed events/i })[0]).toHaveAttribute('href', '/events')
   })
 })

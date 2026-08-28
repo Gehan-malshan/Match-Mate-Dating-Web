@@ -10,6 +10,10 @@
     "dev:web": "bun run --cwd frontend/apps/web dev",
     "build:web": "bun run --cwd frontend/apps/web build",
     "typecheck:web": "bun run --cwd frontend/apps/web typecheck",
-    "test:web": "bun run --cwd frontend/apps/web test"
+    "test:web": "bun run --cwd frontend/apps/web test",
+    "dev:admin": "bun run --cwd frontend/apps/admin dev",
+    "build:admin": "bun run --cwd frontend/apps/admin build",
+    "typecheck:admin": "bun run --cwd frontend/apps/admin typecheck",
+    "test:admin": "bun run --cwd frontend/apps/admin test"
   }
 }

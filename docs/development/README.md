@@ -1,6 +1,6 @@
 # MatchMate Developer Workstation Setup
 
-This is the canonical setup guide for developers and coding agents working in Visual Studio Code. It describes the current documentation-only repository and the toolchain that will be used as Go services, React applications, contracts, and Docker infrastructure are introduced.
+This is the canonical setup guide for developers and coding agents working in Visual Studio Code. The repository now contains executable frontend, Account/Profile, and initial Event Service slices alongside the remaining planned services.
 
 ## 1. Supported development model
 
@@ -214,6 +214,15 @@ bun run build:web
 bun run dev:web
 ```
 
+The organizer application uses the same Bun workspace and runs separately:
+
+```powershell
+bun run typecheck:admin
+bun run test:admin
+bun run build:admin
+bun run dev:admin
+```
+
 Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.
 
 Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. An admin command will be added only when `frontend/apps/admin` becomes executable. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
@@ -230,6 +239,14 @@ docker compose logs --tail 100
 ```
 
 Planned local containers include PostgreSQL databases, RabbitMQ, optional Redis, gateway, Go services, and web applications.
+
+The current Event database and migration can be started independently with:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml up -d --build
+```
+
+See `services/event-service/README.md` for JWT public-key configuration, tests, and health checks.
 
 Use named development volumes and fictional seed data. Never mount or import production data. Do not delete shared volumes or databases unless the target and recovery effect are understood.
 

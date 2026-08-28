@@ -1,10 +1,25 @@
 # Organizer and Moderation Application
 
-This React and TanStack application will provide event management, participant operations, pairing review and overrides, payment-support views, moderation queues, and audited administration tools.
+This React and TanStack application provides the first organizer event-management slice and will later add participant operations, pairing review and overrides, payment-support views, moderation queues, and audited administration tools.
+
+## Implemented Event workspace
+
+The Vite application runs on `http://127.0.0.1:5174`. An organizer signs in through Account Service, keeps the access token in memory, and can list only assigned events, create/edit drafts, publish, open/close registration, and cancel with a required reason. Stale versions are rejected by Event Service. The UI labels configured capacity as non-authoritative and never exposes member profiles, preferences, bookings, payments, or moderation data.
+
+Run from the repository root:
+
+```powershell
+bun run dev:admin
+bun run typecheck:admin
+bun run test:admin
+bun run build:admin
+```
+
+Development login: `organizer@example.test` with the public fixture password documented by Account Service. This fixture is development/test only and provides both `member` and `organizer` roles.
 
 ## Planned feature areas
 
-- Organizer event creation, lifecycle, pricing, policy, and capacity configuration.
+- Separate policy-history replacement and Booking-validated capacity reduction.
 - Event-scoped participant/booking/attendance operations.
 - Matching-run generation, score/reason inspection, override, lock, and publication.
 - Safe unmatched/eligibility summaries without exposing private preferences.
@@ -33,4 +48,3 @@ This React and TanStack application will provide event management, participant o
 - Keyboard/accessibility and destructive-action confirmation.
 
 Update this README, canonical docs, contracts, tests, and change history whenever behavior changes.
-
