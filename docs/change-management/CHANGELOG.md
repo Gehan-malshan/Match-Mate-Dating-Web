@@ -4,6 +4,116 @@ This file records architecture-significant and user-visible changes with complet
 
 ## Unreleased
 
+### CHG-20260828-010 — Automatically migrate and seed local PostgreSQL
+
+- **Status:** In review (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Affected:** Account migration runner, service image, local Compose topology, and development documentation
+
+#### Before
+
+Developers started PostgreSQL and then manually ran the migration and shared-account seed commands. The initial migration runner was not idempotent.
+
+#### After
+
+The development Compose topology waits for PostgreSQL health, runs an idempotent migration job, and then runs the development-only seed job. Existing complete pre-tracking schemas are safely baselined; partial schemas fail visibly. The runtime image contains separate API, migration, seed, and outbox executables. Automatic fake-account creation remains absent from production manifests.
+
+#### Verification
+
+- `go test ./...` passed.
+- `go vet ./...` passed.
+- Migration and seed command binaries compiled successfully.
+- `docker compose ... config` and independent YAML parsing passed, including dependency conditions and resolved build context.
+- A live Docker image/startup run remains for the developer terminal because this Codex process cannot access the local Docker engine.
+
+### CHG-20260828-009 — Add hard-coded local test accounts
+
+- **Status:** In review (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Affected:** Account service development tooling, tests, Docker build, and developer documentation
+
+#### Before
+
+Every developer had to register and manually promote local accounts before testing member, community, moderator, and suspended journeys.
+
+#### After
+
+`go run ./cmd/seed-dev` idempotently creates four fake `.test` accounts with the public development password `MatchMateDev123!`. It restores known state on every run, hashes the password normally, and refuses to run outside `development` or `test`. There is no login bypass and no production account is created.
+
+#### Verification
+
+- `gofmt` completed.
+- `go test ./...` passed, including seed environment and reserved-domain tests.
+- `go vet ./...` passed.
+- `go build ./cmd/seed-dev` passed.
+- Live seed execution was not attempted because this Codex process did not have access to the local Docker engine; developers can run the documented command from their own terminal.
+
+### CHG-20260828-008 — Correct the browser registration payload
+
+- **Status:** In review (implementation complete; awaiting review/merge)
+- **Date:** 2026-08-28
+- **Affected:** Member registration request mapping and frontend regression tests
+
+#### Before
+
+The registration form spread its complete UI state into the Account API request. That included the UI-only `consent` boolean in addition to `consentVersion`; the Go API correctly rejects unknown JSON properties and returned `INVALID_JSON` / “Request body is invalid.”
+
+#### After
+
+The form maps API fields explicitly and sends only `email`, `password`, `nickname`, `dateOfBirth`, and `consentVersion`. The checkbox still gates submission locally, while the backend records and validates the canonical consent version. A regression test prevents `consent` from reappearing in the wire payload.
+
+#### Verification
+
+- `bun run typecheck` passed.
+- `bun run test` passed 5 tests across 2 files, including the registration-payload regression.
+- `bun run build` passed; the existing non-blocking large-chunk warning remains.
+
+### CHG-20260828-007 — Implement the Account/Profile vertical slice
+
+- **Status:** In review (implementation complete; production hardening evidence pending)
+- **Date:** 2026-08-28
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Account/Profile Go service, PostgreSQL schema, authentication/session transport, REST and RabbitMQ contracts, member onboarding/profile frontend, local development, tests, security/data/architecture documentation
+- **Decision/ADR:** [`../adr/0001-account-authentication-and-session-transport.md`](../adr/0001-account-authentication-and-session-transport.md)
+
+#### Before
+
+Account/Profile behavior existed only in architecture documentation. The repository had no Go service, database migration, authentication implementation, versioned Account OpenAPI/AsyncAPI contract, outbox publisher, member onboarding/profile screens, or executable Account/Profile tests.
+
+#### After
+
+The first executable Account/Profile vertical slice now covers adult registration and consent records, token-based email verification, Argon2id login, ES256 access tokens, rotating refresh sessions, logout/revocation, self profile and privacy preview, private preferences, safe community discovery, symmetric block exclusion, audited profile approval/hiding, deactivation, transactional outbox events, frontend registration/login/profile routes, health/log correlation, and local PostgreSQL/RabbitMQ support. Production email delivery and gateway-grade throttling remain explicit hardening work rather than hidden stubs.
+
+#### Reason
+
+Account/Profile is the first backend dependency in the approved implementation order and establishes identity, visibility, privacy, and eligibility foundations used by every later service.
+
+#### Compatibility and migration
+
+New v1 APIs, events, service database, and browser routes; no existing production behavior or data requires migration. Future changes must remain compatible with the accepted v1 contracts and versioned migrations.
+
+#### Security, privacy, and moderation impact
+
+High impact. Passwords and opaque tokens are hashed, access tokens contain no PII, refresh tokens rotate in HttpOnly cookies, profiles are private/pending by default, community DTOs use a strict allow-list, private preferences never appear in community responses/events/logs, contact details are rejected from profile text, blocks exclude both directions, and privileged profile decisions are audited.
+
+#### Deployment and rollback
+
+Target order: back up and migrate the Account database, deploy the API, deploy the outbox relay, configure gateway/origins/keys, smoke test, then deploy the frontend routes. Rollback the processes/frontend while preserving the new database and outbox history; the down migration is destructive and development-only.
+
+#### Verification
+
+- `go test ./...` passes account-service domain, authentication, privacy-projection, registration, and login/session unit tests.
+- `go vet ./...` passes.
+- `bun run typecheck`, `bun run test`, and `bun run build` pass for the member web application; the production bundle reports a non-blocking large-chunk warning.
+- `docker compose ... config` validates the Account PostgreSQL/RabbitMQ topology. Runtime integration was not executed because Docker Desktop was not running in the verification environment.
+- Database/RabbitMQ integration, browser E2E, load, security, backup/restore, and production verification-email tests remain required before release.
+
+#### Documentation updated
+
+Account service and member-web READMEs, implementation phase tracker, authentication/session ADR, OpenAPI, AsyncAPI, contract READMEs, environment examples, compose configuration, and this change history.
+
+
 ### CHG-20260828-006 — Recompose the member landing page
 
 - **Status:** In progress (implementation complete; awaiting review/merge)

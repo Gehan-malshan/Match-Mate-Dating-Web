@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS outbox;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS member_block;
+DROP TABLE IF EXISTS matching_preference;
+DROP TABLE IF EXISTS profile_interest;
+DROP TABLE IF EXISTS profile;
+DROP TABLE IF EXISTS refresh_session;
+DROP TABLE IF EXISTS email_verification_token;
+DROP TABLE IF EXISTS role_assignment;
+DROP TABLE IF EXISTS credential;
+DROP TABLE IF EXISTS consent_record;
+DROP TABLE IF EXISTS account;
+DROP TABLE IF EXISTS schema_migration;

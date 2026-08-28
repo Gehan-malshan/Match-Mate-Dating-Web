@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info: {title: MatchMate Account and Profile API, version: 1.0.0}
+servers: [{url: http://localhost:8081}]
+security: [{bearerAuth: []}]
+paths:
+  /api/v1/auth/register:
+    post: {security: [], operationId: register, requestBody: {$ref: '#/components/requestBodies/Register'}, responses: {'201': {description: Private pending profile created, content: {application/json: {schema: {$ref: '#/components/schemas/Registration'}}}}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/verify-email:
+    post: {security: [], operationId: verifyEmail, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token], properties: {token: {type: string}}}}}}, responses: {'200': {description: Verified}, '400': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/login:
+    post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/refresh:
+    post: {security: [], operationId: refresh, description: Rotates the HttpOnly refresh cookie and returns a short-lived access token., responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/logout:
+    post: {security: [], operationId: logout, responses: {'204': {description: Session revoked}}}
+  /api/v1/users/me:
+    get: {operationId: getMe, responses: {'200': {description: Private account aggregate, content: {application/json: {schema: {$ref: '#/components/schemas/Me'}}}}, '401': {$ref: '#/components/responses/Problem'}}}
+    delete: {operationId: deactivateMe, responses: {'204': {description: Account deactivated and sessions revoked}}}
+  /api/v1/users/me/profile:
+    patch: {operationId: updateProfile, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProfilePatch'}}}}, responses: {'200': {description: Updated}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/users/me/matching-preferences:
+    put: {operationId: replacePreferences, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/Preferences'}}}}, responses: {'200': {description: Private preferences replaced}, '422': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/community/profiles:
+    get: {operationId: listCommunityProfiles, parameters: [{name: cursor, in: query, schema: {type: string}}, {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100}}], responses: {'200': {description: Allow-listed approved profiles}}}
+  /api/v1/community/profiles/{accountId}:
+    get: {operationId: getCommunityProfile, parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'200': {description: Community-safe profile, content: {application/json: {schema: {$ref: '#/components/schemas/CommunityProfile'}}}}, '404': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/users/me/blocks:
+    post: {operationId: blockMember, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [accountId], properties: {accountId: {type: string, format: uuid}}}}}}, responses: {'204': {description: Block applied}}}
+  /api/v1/users/me/blocks/{accountId}:
+    delete: {operationId: unblockMember, parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'204': {description: Block removed}}}
+  /api/v1/admin/profiles/{accountId}/decision:
+    post: {operationId: decideProfile, description: Requires moderator or admin role., parameters: [{$ref: '#/components/parameters/AccountId'}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [decision,reason], properties: {decision: {enum: [APPROVED,HIDDEN]}, reason: {type: string}}}}}}, responses: {'204': {description: Audited decision applied}, '403': {$ref: '#/components/responses/Problem'}}}
+  /.well-known/jwks.json:
+    get: {security: [], operationId: jwks, responses: {'200': {description: Public ES256 keys}}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  parameters: {AccountId: {name: accountId, in: path, required: true, schema: {type: string, format: uuid}}}
+  requestBodies: {Register: {required: true, content: {application/json: {schema: {type: object, required: [email,password,nickname,dateOfBirth,consentVersion], properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 128}, nickname: {type: string}, dateOfBirth: {type: string, format: date}, consentVersion: {type: string}}}}}}}
+  responses:
+    Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
+    Token: {description: Access token issued; refresh token is an HttpOnly cookie., content: {application/json: {schema: {type: object, properties: {accessToken: {type: string}, accessExpiresAt: {type: string, format: date-time}}}}}}
+  schemas:
+    Registration: {type: object, properties: {me: {$ref: '#/components/schemas/Me'}, verificationToken: {type: string, description: Development only}}}
+    Me: {type: object, properties: {account: {$ref: '#/components/schemas/Account'}, profile: {$ref: '#/components/schemas/Profile'}, preferences: {$ref: '#/components/schemas/Preferences'}}}
+    Account: {type: object, properties: {id: {type: string, format: uuid}, email: {type: string, format: email}, status: {enum: [ACTIVE,SUSPENDED,DEACTIVATED]}, verification: {enum: [PENDING,VERIFIED]}, roles: {type: array, items: {type: string}}}}
+    Profile: {type: object, properties: {accountId: {type: string}, nickname: {type: string}, dateOfBirth: {type: string, format: date}, broadLocation: {type: string}, bio: {type: string}, visibility: {enum: [PRIVATE,COMMUNITY,HIDDEN]}, approval: {enum: [PENDING,APPROVED,HIDDEN]}, interests: {type: array, items: {type: string}}, version: {type: integer}}}
+    ProfilePatch: {type: object, properties: {nickname: {type: string}, dateOfBirth: {type: string, format: date}, broadLocation: {type: string}, bio: {type: string}, visibility: {enum: [PRIVATE,COMMUNITY]}, interests: {type: array, maxItems: 20, items: {type: string}}, expectedVersion: {type: integer}}}
+    Preferences: {type: object, required: [minAge,maxAge,intentions,interestedIn,languages,dealBreakers], properties: {minAge: {type: integer, minimum: 18}, maxAge: {type: integer, maximum: 120}, intentions: {type: array, items: {type: string}}, interestedIn: {type: array, items: {type: string}}, languages: {type: array, items: {type: string}}, dealBreakers: {type: array, items: {type: string}}}}
+    CommunityProfile: {type: object, additionalProperties: false, properties: {profileId: {type: string}, nickname: {type: string}, ageBand: {type: string}, broadLocation: {type: string}, bio: {type: string}, interests: {type: array, items: {type: string}}}}
+    Problem: {type: object, properties: {type: {type: string}, title: {type: string}, status: {type: integer}, detail: {type: string}, code: {type: string}, correlationId: {type: string}, fields: {type: object, additionalProperties: {type: string}}}}

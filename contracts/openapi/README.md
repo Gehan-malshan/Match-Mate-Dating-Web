@@ -1,6 +1,6 @@
 # OpenAPI Contracts
 
-This directory will contain canonical versioned REST contracts. API implementation and generated clients must conform to these files.
+This directory contains canonical versioned REST contracts. `account-v1.yaml` is implemented; later service files remain planned. API implementation and generated clients must conform to these files.
 
 ## Planned organization
 
@@ -21,4 +21,3 @@ Specifications must define authentication, authorization notes, idempotency, err
 CI must lint, detect backward incompatibility, validate examples, and compile generated clients. An implementation change without matching OpenAPI is incomplete.
 
 Follow `docs/api/README.md`, `AGENTS.md`, and the affected service README.
-

@@ -138,7 +138,7 @@ export function LandingPage() {
           <a href="#how-it-works">The journey</a>
           <a href="#events">Events</a>
         </nav>
-        <a className="button button-small" href="#join">Join the first chapter</a>
+        <a className="button button-small" href="/register">Create your profile</a>
       </header>
 
       <section className="hero" id="top">
@@ -253,7 +253,7 @@ export function LandingPage() {
         <img className="cta-mark" src="/brand/matchmate-logo-mark.png" alt="" aria-hidden="true" />
         <p>Registration opens after identity, booking, privacy, and safety workflows are ready.</p>
         <h2>Something more real<br />is worth <em>waiting for.</em></h2>
-        <span className="button button-muted" aria-disabled="true">Member access coming soon</span>
+        <a className="button" href="/register">Create a private profile</a>
       </section>
 
       <footer>

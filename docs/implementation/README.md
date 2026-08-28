@@ -388,7 +388,7 @@ When implementation starts, maintain this table in the same pull request as phas
 | Phase | Status | Owner | Evidence | Blocking decisions |
 |---|---|---|---|---|
 | 0 Foundation | In progress | Project team | Root Bun workspace and tested `frontend/apps/web` public landing slice | Product/policy decisions and contracts |
-| 1 Account/Profile | Not started | Unassigned | — | Verification/profile policy |
+| 1 Account/Profile | In review | Project team | Go API/migration/outbox relay, PostgreSQL schema, v1 contracts, web registration/login/profile routes, unit tests | Production email delivery, rate-limit/gateway policy, integration/E2E/security evidence |
 | 2 Event | Not started | Unassigned | — | Event lifecycle/capacity policy |
 | 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
 | 4 Payment | Not started | Unassigned | — | PayHere/refund/reconciliation policy |

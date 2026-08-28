@@ -1,0 +1,53 @@
+name: matchmate-account
+services:
+  postgres-account:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: matchmate_account
+      POSTGRES_USER: matchmate
+      POSTGRES_PASSWORD: matchmate
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matchmate -d matchmate_account"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes: ["account-postgres:/var/lib/postgresql/data"]
+  account-migrate:
+    image: matchmate/account-service:development
+    build:
+      context: ../../services/account-service
+    entrypoint: ["/account-migrate"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-account:5432/matchmate_account?sslmode=disable
+    depends_on:
+      postgres-account:
+        condition: service_healthy
+    restart: "no"
+  account-seed:
+    image: matchmate/account-service:development
+    build:
+      context: ../../services/account-service
+    entrypoint: ["/account-seed-dev"]
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-account:5432/matchmate_account?sslmode=disable
+      CURRENT_CONSENT_VERSION: privacy-2026-08
+    depends_on:
+      account-migrate:
+        condition: service_completed_successfully
+    restart: "no"
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: matchmate
+      RABBITMQ_DEFAULT_PASS: matchmate
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+volumes:
+  account-postgres:

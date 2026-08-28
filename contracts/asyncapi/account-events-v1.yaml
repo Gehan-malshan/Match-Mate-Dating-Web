@@ -1,0 +1,27 @@
+asyncapi: 3.0.0
+info: {title: MatchMate Account Events, version: 1.0.0}
+channels:
+  accountEvents:
+    address: account.{eventType}
+    messages:
+      accountFact: {$ref: '#/components/messages/AccountFact'}
+operations:
+  publishAccountFact: {action: send, channel: {$ref: '#/channels/accountEvents'}, summary: Published from the transactional account outbox to matchmate.events.}
+components:
+  messages:
+    AccountFact:
+      name: AccountFact
+      contentType: application/json
+      payload:
+        type: object
+        required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,payload]
+        properties:
+          eventId: {type: string, format: uuid}
+          eventType: {enum: [AccountRegistered,AccountVerified,ProfileUpdated,ProfileApproved,ProfileHidden,MemberBlocked,MemberUnblocked,AccountDeactivated]}
+          schemaVersion: {const: 1}
+          occurredAt: {type: string, format: date-time}
+          aggregateId: {type: string}
+          correlationId: {type: string}
+          causationId: {type: string}
+          actorId: {type: string}
+          payload: {type: object, description: Minimum identifiers and eligibility state only; never email, DOB, preferences, free text, credentials, or evidence.}

@@ -1,6 +1,6 @@
 # AsyncAPI and RabbitMQ Contracts
 
-This directory will contain canonical event schemas, exchanges, routing keys, queue ownership, retry/DLQ behavior, and producer/consumer mappings.
+This directory contains canonical event schemas. `account-events-v1.yaml` documents implemented Account/Profile facts; broader exchange/consumer contracts remain planned.
 
 ## Event rules
 
@@ -23,4 +23,3 @@ asyncapi/
 ```
 
 CI must validate schemas/examples, detect incompatibility, and run producer fixtures against consumer expectations. Producer and all consumers must be listed before an event is accepted.
-

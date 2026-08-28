@@ -16,7 +16,7 @@ The web app never connects directly to databases, RabbitMQ, PayHere secrets, or 
 
 The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
-The first implemented slice is the public `/` landing route. Its AIDA composition includes a floating responsive navigation, the approved full-bleed cinematic hero, a dense privacy/safety trust grid, a keyboard-operable four-step journey accordion, a scrubbed no-ML explanation, and a truthful pre-launch event stage. Original project-local imagery, visible focus, text reflow, and a complete reduced-motion path are covered by the implementation and component tests. Login, registration, and event inventory are intentionally not presented as operational until their backend journeys exist.
+Implemented routes now include the public `/` landing page, `/register`, `/login`, and the authenticated `/app/profile` workspace. Registration uses TanStack Form and Zod before server-authoritative validation. The API client keeps access tokens in memory, sends refresh cookies only with credentialed requests, retries once after refresh, and never writes tokens or private profile data to browser storage. The profile workspace clearly separates the community allow-list from private matching preferences. Event inventory remains intentionally unavailable until its backend journey exists.
 
 GSAP and `@gsap/react` provide progressive entrance and scroll motion. Motion is presentation-only: the page remains complete without JavaScript-driven animation, and `prefers-reduced-motion: reduce` bypasses GSAP timelines and disables the marquee animation. Do not use motion to create pressure around consent, privacy, payment, or safety decisions.
 
@@ -35,6 +35,8 @@ bun run build:web
 ```
 
 The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
+
+The Account API defaults to `http://localhost:8081/api/v1`. Override it with `VITE_ACCOUNT_API_URL` (see `.env.example`). The API must allow the exact Vite origin and use TLS/secure cookies in production.
 
 ## Brand assets
 

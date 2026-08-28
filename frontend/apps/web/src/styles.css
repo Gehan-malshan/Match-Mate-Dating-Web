@@ -265,3 +265,16 @@ footer small { grid-column: 1 / -1; padding-top: 28px; border-top: 1px solid rgb
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
   .marquee-track { transform: none; }
 }
+
+.account-page { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, .7fr); background: #0a080b; color: #fff; }
+.account-panel { width: min(620px, calc(100% - 48px)); margin: auto; padding: 72px 0; }
+.account-brand { display: inline-block; margin-bottom: 64px; color: #fff; font: 700 24px/1 var(--font-display); text-decoration: none; }
+.account-panel h1,.profile-workspace h1 { margin: 14px 0 18px; font-size: clamp(44px,7vw,78px); line-height: .98; letter-spacing: -.05em; }
+.account-intro { max-width: 540px; color: #b9adb2; line-height: 1.7; }
+.account-page aside { display: flex; flex-direction: column; justify-content: end; padding: 64px; background: radial-gradient(circle at 20% 20%,#ef0059,transparent 45%),linear-gradient(140deg,#401122,#ff6a00); }
+.account-page aside strong { max-width: 480px; font-size: clamp(28px,4vw,52px); line-height: 1.05; }
+.account-page form,.profile-workspace form { display: grid; gap: 18px; margin: 36px 0 24px; }
+.account-page label,.profile-workspace label { display: grid; gap: 8px; color: #d9ced2; font-size: 13px; }
+.account-page input,.profile-workspace input,.profile-workspace textarea,.profile-workspace select { width: 100%; box-sizing: border-box; border: 1px solid #40373b; border-radius: 12px; padding: 14px 16px; background: #171317; color: #fff; font: inherit; }
+.profile-workspace textarea { min-height: 120px; resize: vertical; }.check { grid-template-columns: auto 1fr!important; align-items: center }.check input{width:auto}.form-message{padding:14px 16px;border-left:3px solid #ff5f36;background:#20171b}.text-action{border:0;background:none;color:#ff8b5d;text-decoration:underline;cursor:pointer}.profile-workspace{min-height:100vh;padding:56px max(24px,calc((100vw - 1200px)/2));background:#0a080b;color:#fff}.profile-workspace header{display:flex;justify-content:space-between;align-items:start}.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}.profile-grid form,.privacy-note{padding:28px;border:1px solid #332b2f;border-radius:20px;background:#121014}.privacy-note{margin-top:32px;color:#d8cbd1}.private-label{color:#ff986b;font-size:12px;text-transform:uppercase;letter-spacing:.12em}
+@media(max-width:760px){.account-page{grid-template-columns:1fr}.account-page aside{min-height:320px;padding:32px}.profile-grid{grid-template-columns:1fr}.profile-workspace header{display:block}}
