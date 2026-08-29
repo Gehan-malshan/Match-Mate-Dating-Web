@@ -131,6 +131,8 @@ The current executable prototype uses Matchmaking-owned deterministic fixtures t
 
 Owns templates, delivery requests/attempts, provider results, retries, suppression, and channel preferences. It normally consumes facts outside the critical transaction path.
 
+The first executable slice consumes minimum-safe Account and Booking facts containing a recipient account ID, deduplicates each fact in a service-owned PostgreSQL inbox, selects versioned `en-LK` templates, applies account suppression/preferences, and records leased delivery attempts with retry/dead-letter state. Local development uses a no-contact development sink. Production email/SMS/push delivery is disabled until channel policy, an approved provider, and a constrained authenticated Account contact-resolution contract are accepted; destinations are not added to RabbitMQ facts.
+
 ### Moderation/Safety Service
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
@@ -202,7 +204,7 @@ Self-service uses authenticated subject identity. Caller-provided account IDs ar
 | `MatchResponseRecorded` / `RevealConsentGranted` | Matchmaking | Notification, analytics, moderation as needed |
 | `ReportCreated` / `ModerationActionApplied` | Moderation | Account, Matchmaking, Notification |
 
-Events contain only minimum identifiers and safe fields.
+Events contain only minimum identifiers and safe fields. Notification currently binds only supported Account/Booking routing keys with a safe recipient account ID; Event/Payment/Matchmaking/Moderation recipient expansion requires an explicit minimum-safe contract or projection.
 
 ## 12. State models
 

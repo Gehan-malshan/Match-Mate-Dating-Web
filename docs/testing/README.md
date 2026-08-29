@@ -88,6 +88,8 @@ The first executable slice has deterministic unit coverage for snapshot money/st
 
 ### Notification
 
+The first executable slice has deterministic coverage for event routing/schema validation, privacy-safe ignored payloads, template variable allow-lists, subject safety, bounded retry timing, configuration safety, health behavior, and a disposable-schema PostgreSQL component harness for inbox/delivery/suppression/attempt behavior. Required RabbitMQ redelivery/DLQ, provider-failure, crash-window, load, and production-provider evidence remain open.
+
 - Template variable validation and privacy policy.
 - Business idempotency key.
 - Suppression/preference and retry classification.

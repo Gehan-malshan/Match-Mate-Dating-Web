@@ -148,6 +148,8 @@ The implemented prototype adds `event_scope` and `participant_projection` as Mat
 
 ## 8. Notification database
 
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. The first slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence. Templates currently use the development channel until an approved provider/contact-resolution design is accepted.
+
 | Table | Important fields/constraints |
 |---|---|
 | `template` | name, locale, channel, version, status, approved variables/content |
@@ -155,9 +157,9 @@ The implemented prototype adds `event_scope` and `participant_projection` as Mat
 | `delivery_attempt` | delivery, attempt number, provider reference/status, sanitized error, timing |
 | `notification_preference` | account/channel/category, allowed/suppressed, source/time |
 | `suppression` | destination hash/account, reason, expiry/indefinite, audit |
-| `inbox` / `outbox` | event consumption and delivery facts |
+| `inbox` / `outbox` | `notification_inbox` implements event consumption; a Notification outbox is deferred until safe delivery facts have an approved consumer |
 
-Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
+Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPPRESSED`, `PERMANENTLY_FAILED`, or `DEAD_LETTERED`. A unique business key prevents repeated event/template/recipient delivery, worker leases recover abandoned processing, and every completed provider attempt is append-only. Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
 
 ## 9. Moderation database
 

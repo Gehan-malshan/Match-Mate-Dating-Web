@@ -81,13 +81,14 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository contains the member landing page plus executable Account/Profile, Event, deterministic Matchmaking, Booking, and Payment slices. They include independent Go APIs and PostgreSQL migrations, development authentication/fixtures, local RabbitMQ relays/consumers, and the React member/administration applications. Notification and full Moderation remain planned.
+The repository contains the member landing page plus executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, and initial Notification slices. They include independent Go APIs and PostgreSQL migrations, development authentication/fixtures, local RabbitMQ relays/consumers, and the React member/administration applications. Full Moderation remains planned.
 
 The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event
 discovery, optimistic concurrency, a service-owned PostgreSQL migration,
 audit/outbox relay, v1 contracts, member discovery pages, and an administrator-only
 event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until production Booking and Moderation consumers exist. Booking and Payment provide the first executable hold, immutable-price, PayHere-initiation, callback, outbox, and confirmation-consumer flow; real PayHere sandbox evidence, refunds, attendance, and production delivery remain incremental work.
+Notification consumes minimum-safe Account and Booking facts, deduplicates them in its independent PostgreSQL database, applies account suppression, and runs a retryable delivery worker against a development-only privacy-safe sink. A production provider and constrained recipient contact-resolution contract remain policy/integration work.
 
 ## Quick start
 
@@ -128,7 +129,7 @@ Verify backend startup:
 make status
 ```
 
-Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8085`, and the long-running workers should show `Up`.
+Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8086`, and the long-running workers should show `Up`.
 
 In a second terminal, start both frontend applications:
 
@@ -182,7 +183,8 @@ If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain d
 5. Add Booking capacity and hold flow.
 6. Add Payment Service and confirmed-booking integration.
 7. Implement Matchmaking Service and administrator review/lock workflow.
-8. Add event interaction, Notification, moderation hardening, observability, security, and production delivery.
+8. Expand Notification from its Account/Booking development slice to approved providers and remaining safe recipient facts.
+9. Add event interaction, moderation hardening, observability, security, and production delivery.
 
 ## Documentation
 

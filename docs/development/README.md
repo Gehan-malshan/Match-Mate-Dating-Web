@@ -1,6 +1,6 @@
 # MatchMate Developer Workstation Setup
 
-This is the canonical setup guide for developers and coding agents working in Visual Studio Code. The repository now contains executable frontend, Account/Profile, and initial Event Service slices alongside the remaining planned services.
+This is the canonical setup guide for developers and coding agents working in Visual Studio Code. The repository now contains executable frontend, Account/Profile, Event, Matchmaking, Booking, Payment, and initial Notification slices alongside the planned Moderation service.
 
 ## 1. Supported development model
 
@@ -243,7 +243,7 @@ docker compose ps
 docker compose logs --tail 100
 ```
 
-Planned local containers include PostgreSQL databases, RabbitMQ, optional Redis, gateway, Go services, and web applications.
+Current local containers include independent PostgreSQL databases for all executable services, RabbitMQ, Go APIs/workers, and migration/seed jobs. Notification uses PostgreSQL port `5438`, operational API port `8086`, and a development-only provider sink. Optional Redis, gateway, production providers, and orchestration remain later work.
 
 The current Event database and migration can be started independently with:
 

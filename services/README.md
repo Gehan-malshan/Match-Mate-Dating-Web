@@ -2,6 +2,8 @@
 
 This directory contains independently deployable Go microservices. Each service will own its domain model, database, migrations, APIs, events, tests, Dockerfile, and operational documentation.
 
+Account/Profile, Event, Matchmaking, Booking, Payment, and the first Notification vertical slice are executable. Moderation remains documentation-only. Notification currently uses a development-only sink and is not production email/SMS delivery.
+
 Business entities and database models must not be shared between services.
 
 ## Service map
@@ -31,4 +33,3 @@ Every service must have:
 - A README updated whenever ownership, behavior, APIs, events, data, configuration, or operations change.
 
 Before implementing a service, read `AGENTS.md`, the architecture/implementation/data/testing guides, and this service's README.
-
