@@ -44,11 +44,11 @@ services:
       PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
       ACCOUNT_JWKS_URL: http://host.docker.internal:8081/.well-known/jwks.json
       PAYHERE_ENVIRONMENT: sandbox
-      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
-      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-local-sandbox-test}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-local-only-secret}
       PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
       PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
-      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-https://example.test/api/v1/payments/payhere/callback}
     ports: ["8084:8084"]
     depends_on: {payment-migrate: {condition: service_completed_successfully}, booking-api: {condition: service_started}}
   booking-outbox:
@@ -58,7 +58,7 @@ services:
       BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
       BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
     depends_on: {booking-migrate: {condition: service_completed_successfully}}
-    profiles: ["messaging"]
+    restart: on-failure
   booking-payment-consumer:
     build: {context: ../../services/booking-service}
     entrypoint: ["/booking-payment-consumer"]
@@ -66,31 +66,31 @@ services:
       BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
       BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
     depends_on: {booking-migrate: {condition: service_completed_successfully}}
-    profiles: ["messaging"]
+    restart: on-failure
   payment-outbox:
     build: {context: ../../services/payment-service}
     entrypoint: ["/payment-outbox"]
     environment:
       PAYMENT_DATABASE_URL: postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable
       PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
-      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
-      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-local-sandbox-test}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-local-only-secret}
       PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
       PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
-      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-https://example.test/api/v1/payments/payhere/callback}
       PAYMENT_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
     depends_on: {payment-migrate: {condition: service_completed_successfully}}
-    profiles: ["messaging"]
+    restart: on-failure
   payment-reconciliation:
     build: {context: ../../services/payment-service}
     entrypoint: ["/payment-reconciliation"]
     environment:
       PAYMENT_DATABASE_URL: postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable
       PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
-      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
-      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:-local-sandbox-test}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:-local-only-secret}
       PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
       PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
-      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-https://example.test/api/v1/payments/payhere/callback}
     depends_on: {payment-migrate: {condition: service_completed_successfully}}
 volumes: {booking-postgres: {}, payment-postgres: {}}

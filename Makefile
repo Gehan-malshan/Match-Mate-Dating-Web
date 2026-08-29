@@ -38,6 +38,8 @@ backend: ## Start/rebuild the current Docker backend stack
 	@echo "RabbitMQ:    http://localhost:15672"
 	@echo "Event API:   http://localhost:8082"
 	@echo "Matching API:http://localhost:8083"
+	@echo "Payment API: http://localhost:8084"
+	@echo "Booking API: http://localhost:8085"
 
 apps: ## Run the member and administration apps together
 	bun run dev

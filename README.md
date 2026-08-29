@@ -81,13 +81,13 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event and deterministic Matchmaking prototypes are also executable; Booking, Payment, Notification, and full Moderation remain planned.
+The repository contains the member landing page plus executable Account/Profile, Event, deterministic Matchmaking, Booking, and Payment slices. They include independent Go APIs and PostgreSQL migrations, development authentication/fixtures, local RabbitMQ relays/consumers, and the React member/administration applications. Notification and full Moderation remain planned.
 
 The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event
 discovery, optimistic concurrency, a service-owned PostgreSQL migration,
 audit/outbox relay, v1 contracts, member discovery pages, and an administrator-only
-event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until Booking and Moderation fact consumers exist. Booking, payment, notification, and production delivery remain planned incremental work.
+event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until production Booking and Moderation consumers exist. Booking and Payment provide the first executable hold, immutable-price, PayHere-initiation, callback, outbox, and confirmation-consumer flow; real PayHere sandbox evidence, refunds, attendance, and production delivery remain incremental work.
 
 ## Quick start
 
@@ -128,7 +128,7 @@ Verify backend startup:
 make status
 ```
 
-The `account-migrate` and `account-seed` jobs should show `Exited (0)`, which means success. `postgres-account`, `rabbitmq`, `account-api`, and `account-outbox` should be running.
+Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8085`, and the long-running workers should show `Up`.
 
 In a second terminal, start both frontend applications:
 
