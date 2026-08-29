@@ -12,6 +12,7 @@ import {EventsPage} from './routes/EventsPage'
 import {EventDetailPage} from './routes/EventDetailPage'
 import {CommunityPage} from './routes/CommunityPage'
 import {CommunityProfilePage} from './routes/CommunityProfilePage'
+import {BookingsPage} from './routes/BookingsPage'
 
 const rootRoute = createRootRoute({ component: Outlet })
 
@@ -27,8 +28,9 @@ const eventsRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events',compo
 const eventDetailRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events/$eventId',component:EventDetailPage})
 const communityRoute=createRoute({getParentRoute:()=>rootRoute,path:'/community',component:CommunityPage})
 const communityProfileRoute=createRoute({getParentRoute:()=>rootRoute,path:'/community/$profileId',component:CommunityProfilePage})
+const bookingsRoute=createRoute({getParentRoute:()=>rootRoute,path:'/app/bookings',component:BookingsPage})
 
-const routeTree = rootRoute.addChildren([indexRoute,registerRoute,loginRoute,profileRoute,eventsRoute,eventDetailRoute,communityRoute,communityProfileRoute])
+const routeTree = rootRoute.addChildren([indexRoute,registerRoute,loginRoute,profileRoute,bookingsRoute,eventsRoute,eventDetailRoute,communityRoute,communityProfileRoute])
 
 export const router = createRouter({ routeTree })
 

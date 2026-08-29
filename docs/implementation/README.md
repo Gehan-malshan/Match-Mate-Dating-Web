@@ -58,7 +58,7 @@ Remove irreversible ambiguity and establish conventions shared by every componen
 - Partner preference and event matching-group policy.
 - Matching questionnaire, public versus private answers, deal-breakers, and initial weights.
 - Booking hold duration, capacity categories, one-booking policy, cancellation, refund, waitlist, and no-show rules.
-- Event rounds, administrator override policy, reveal consent, and post-event responses.
+- Event rounds, organizer override policy, reveal consent, and post-event responses.
 - PayHere merchant/currency/sandbox and production callback/reconciliation policy.
 - Retention, deletion/anonymization, audit, backup, and legal/safety policy.
 
@@ -125,12 +125,12 @@ A user can register, verify, sign in, manage a safe community profile and privat
 
 ### Business outcome
 
-Administrators create events, assigned operators manage approved later states, and members discover eligible published events.
+Organizers can manage events and members can discover eligible published events.
 
 ### Backend deliverables
 
 - Event aggregate, organizer assignment, venue/broad location, schedule, registration window, price/currency, configured limits, ruleset reference, status, and version.
-- Administrator-only create; assigned organizer/admin update, publish, open/close registration, cancel, and list operations.
+- Organizer/admin create, update, publish, open/close registration, cancel, and list operations.
 - Member event discovery with cursor pagination and bounded filters.
 - PostGIS only if approved location discovery requires it.
 - Event lifecycle validation and optimistic concurrency.
@@ -139,13 +139,13 @@ Administrators create events, assigned operators manage approved later states, a
 ### Frontend/admin deliverables
 
 - Member event list/detail.
-- Administrator event create/edit/publish/lifecycle controls in the protected admin application.
+- Organizer event create/edit/publish/lifecycle controls.
 - Clear display of registration state, price, policy, and availability disclaimer.
 
 ### Required tests
 
 - Invalid date/lifecycle transitions.
-- Administrator-only creation, organizer update scope, and stale update rejection.
+- Organizer scope and stale update rejection.
 - Discovery visibility and pagination.
 - Price precision/currency.
 - Cancellation behavior before bookings are integrated.
@@ -153,7 +153,7 @@ Administrators create events, assigned operators manage approved later states, a
 ### Exit criteria
 
 - A published/open event is discoverable by an eligible member.
-- Only administrators can create; only assigned organizers/admins can mutate an existing event.
+- Only assigned organizers/admins can mutate it.
 - Event states and changes are auditable and versioned.
 
 ## 7. Phase 3 — Booking and capacity
@@ -233,7 +233,7 @@ A member can pay through PayHere and receive exactly one correctly confirmed boo
 
 ### Business outcome
 
-The system creates reproducible, explainable event pairings from confirmed eligible participants and allows administrator review.
+The system creates reproducible, explainable event pairings from confirmed eligible participants and allows organizer review.
 
 ### Backend deliverables
 
@@ -263,13 +263,13 @@ The system creates reproducible, explainable event pairings from confirmed eligi
 - Same snapshots/ruleset always produce same output.
 - Block/restriction/cancellation immediately excludes unlocked runs.
 - Locked history cannot be mutated.
-- Administrator authorization and override audit.
+- Organizer authorization and override audit.
 - Performance at expected event size and larger safety margin.
 
 ### Exit criteria
 
 - A confirmed event cohort produces a reproducible proposed run.
-- Administrator can understand reasons, override, and lock.
+- Organizer can understand reasons, override, and lock.
 - Private answers do not leak in explanations/events/logs.
 - All algorithm behavior matches `docs/matchmaking/README.md`.
 
@@ -390,8 +390,8 @@ When implementation starts, maintain this table in the same pull request as phas
 | 0 Foundation | In progress | Project team | Root Bun workspace and tested `frontend/apps/web` public landing slice | Product/policy decisions and contracts |
 | 1 Account/Profile | In review | Project team | Go API/migration/outbox relay, PostgreSQL schema, v1 contracts, web registration/login/profile routes, unit tests | Production email delivery, rate-limit/gateway policy, integration/E2E/security evidence |
 | 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, audit/outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
-| 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
-| 4 Payment | Not started | Unassigned | — | PayHere/refund/reconciliation policy |
+| 3 Booking | In progress | Project team | Go API/domain, PostgreSQL capacity/booking migration, Event price snapshot adapter, expiry worker, Payment inbox consumer, outbox relay, v1 contracts and unit tests | Cancellation/waitlist/attendance policy; component/contention/failure evidence |
+| 4 Payment | In progress | Project team | Go API/domain/provider adapter, PostgreSQL migration, initiation/callback/status v1 contracts, unit tests, audit/outbox relay, pending reconciliation classification, Booking snapshot/consumer integration, sandbox/live runbook | PayHere refund/provider-resolution policy; component/sandbox/failure evidence |
 | 5 Matchmaking | In progress | Project team | Deterministic Go engine, PostgreSQL migration, `prototype-v1` fixtures, admin-only lifecycle API/UI, member APIs, v1 contracts, optimizer and admin-client tests | Production questionnaire/groups/rounds approval, Booking/Moderation consumers, relay/performance/concurrency evidence |
 | 6 Interaction/Notification | Not started | Unassigned | — | Reveal/response/channel policy |
 | 7 Production hardening | Not started | Unassigned | — | Hosting/SLO/compliance/operations |

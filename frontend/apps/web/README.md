@@ -24,6 +24,12 @@ GSAP and `@gsap/react` provide progressive entrance and scroll motion. Motion is
 
 All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). The landing page now implements its semantic dark surfaces, brand gradient, 12-column rhythm, tonal elevation, responsive gutters, approved logo, and motion rules. Future changes must preserve the varied composition and must not drift back toward repeated generic cards or unsupported product claims.
 
+## Booking and payment journey
+
+The member app now provides atomic seat reservation and PayHere checkout initiation on open event detail pages. `/app/bookings` polls authoritative Booking and Payment state, shows pending, confirmed, failed, expired, cancelled, and review outcomes, and allows unpaid holds to be cancelled safely. Browser return parameters are never treated as payment confirmation.
+
+Booking defaults to `http://localhost:8085/api/v1` and Payment to `http://localhost:8084/api/v1`. Configure `VITE_BOOKING_API_URL` and `VITE_PAYMENT_API_URL` alongside the existing Account and Event variables.
+
 ## Local commands
 
 Run these commands from the repository root:

@@ -62,6 +62,10 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 
 ## 6. Payment controls
 
+Booking now derives price/currency from Event, stores the immutable snapshot, and exposes it only after Account-token verification and subject ownership checks. Capacity updates, Payment inbox insertion, confirmation, and Booking outbox facts use local transactions. Late payment never recreates released capacity.
+
+The first executable Payment slice validates Account-issued ES256 tokens for member operations, forwards the token to Booking's constrained snapshot check, compares ownership locally, verifies PayHere callbacks without member authentication, fingerprints callback receipts, and omits account/provider identifiers from member DTOs. Gateway/WAF callback rate limits and production secret-manager wiring remain deployment requirements.
+
 - Payment Service derives amount/currency from immutable Booking snapshot.
 - Verify PayHere signature plus merchant, order, amount, currency, booking relation, and state.
 - Unique callback/provider fingerprint prevents replay.

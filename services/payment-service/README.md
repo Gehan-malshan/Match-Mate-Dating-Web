@@ -4,6 +4,25 @@ Owns PayHere payment initiation, provider order references, trusted price verifi
 
 Amounts and currency must come from an immutable server-side booking price snapshot, never from client input.
 
+## Implementation status
+
+The first executable slice includes a Go API, ES256 access-token validation, constrained Booking snapshot client, PayHere sandbox/live checkout adapter, initiation idempotency, callback verification and replay fingerprints, member-owned status reads, migration 1, audit records, and transactional outbox facts. The Booking service now supplies the owner-authorized immutable snapshot and consumes completion/review facts.
+
+The Payment outbox relay publishes persistent events with publisher confirms and crash-safe claims. A scheduled worker opens restricted reconciliation items for payments still pending after 30 minutes; provider retrieval and automatic resolution remain disabled. Still required before release: real PostgreSQL/RabbitMQ tests, gateway callback rate limits, approved refund/provider-resolution policy, and PayHere sandbox/live evidence. See `docs/runbooks/payment-payhere.md`.
+
+Local verification:
+
+```powershell
+go mod tidy
+go test ./...
+go vet ./...
+$env:PAYMENT_DATABASE_URL = "postgres://..."
+go run ./cmd/migrate
+go run ./cmd/api
+go run ./cmd/outbox-relay
+go run ./cmd/reconciliation-worker
+```
+
 ## Responsibilities
 
 - Initiate payment for an authorized eligible booking.
@@ -88,4 +107,3 @@ Consumes booking cancellation/expiry facts when needed for review/refund coordin
 No client can influence authoritative charge values; callbacks are replay-safe and fully verified; successful payment produces at most one completion; unknown/late/mismatch states are visible and recoverable; finance audit/reconciliation is complete.
 
 Update this README, architecture/data/testing docs, OpenAPI/AsyncAPI, payment runbook, and change history whenever behavior changes.
-

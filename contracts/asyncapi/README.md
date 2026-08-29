@@ -1,6 +1,6 @@
 # AsyncAPI and RabbitMQ Contracts
 
-Implemented schemas cover Account/Profile facts, Event lifecycle facts, and minimum-safe Matchmaking lifecycle facts in `matchmaking-events-v1.yaml`. Event facts are persisted transactionally and published by the Event outbox relay with durable messages and publisher confirms. Matchmaking relay wiring, consumer bindings, retry queues, DLQ policy, and replay tooling remain planned.
+Implemented schemas cover Account/Profile facts, Event lifecycle facts, first Booking facts in `booking-events-v1.yaml`, minimum-safe Matchmaking lifecycle facts in `matchmaking-events-v1.yaml`, and first Payment facts in `payment-events-v1.yaml`. Event, Booking, and Payment use transactional outboxes with publisher-confirmed relays. Booking consumes Payment completion/review facts with inbox deduplication. Matchmaking relay wiring, broader consumer bindings, retry queues, DLQ policy, and replay tooling remain planned.
 
 This directory contains canonical event schemas. `account-events-v1.yaml` documents implemented Account/Profile facts; broader exchange/consumer contracts remain planned.
 

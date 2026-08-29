@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS outbox;DROP TABLE IF EXISTS inbox;DROP TABLE IF EXISTS idempotency_record;DROP TABLE IF EXISTS booking;DROP TABLE IF EXISTS capacity_allocation;
+

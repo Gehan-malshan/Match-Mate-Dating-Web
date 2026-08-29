@@ -61,6 +61,8 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 
 ### Booking
 
+The first executable slice has deterministic tests for Event registration validation and server-derived price/expiry behavior. Real PostgreSQL last-seat contention, migration, inbox/outbox, expiry crash/retry, and RabbitMQ failure tests remain required before release.
+
 - State transitions and cancellation policy.
 - Hold expiry and idempotent release.
 - One active booking per account/event.
@@ -68,6 +70,8 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 - Immutable price snapshot.
 
 ### Payment
+
+The first executable slice has deterministic unit coverage for snapshot money/state validation, PayHere request hashing, callback signature verification, tampering rejection, and provider status mapping. The Booking consumer is implemented, but real PostgreSQL migration/repository concurrency, HTTP/auth contract, broker outage/redelivery, sandbox E2E, and recovery evidence remain required before release.
 
 - Request/hash adapter inputs.
 - Exact decimal amount/currency verification.

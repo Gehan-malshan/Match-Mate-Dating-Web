@@ -1,0 +1,42 @@
+asyncapi: 3.0.0
+info: {title: MatchMate Booking Events, version: 1.0.0}
+channels:
+  bookingFacts:
+    address: matchmate.booking.v1
+    messages:
+      pending: {$ref: '#/components/messages/BookingPending'}
+      confirmed: {$ref: '#/components/messages/BookingConfirmed'}
+      cancelled: {$ref: '#/components/messages/BookingCancelled'}
+      expired: {$ref: '#/components/messages/HoldExpired'}
+      review: {$ref: '#/components/messages/BookingPaymentReviewRequired'}
+operations: {publishBookingFacts: {action: send, channel: {$ref: '#/channels/bookingFacts'}}}
+components:
+  messages:
+    BookingPending: {name: BookingPending, payload: {$ref: '#/components/schemas/BookingFact'}}
+    BookingConfirmed: {name: BookingConfirmed, payload: {$ref: '#/components/schemas/BookingFact'}}
+    BookingCancelled: {name: BookingCancelled, payload: {$ref: '#/components/schemas/BookingFact'}}
+    HoldExpired: {name: HoldExpired, payload: {$ref: '#/components/schemas/BookingFact'}}
+    BookingPaymentReviewRequired: {name: BookingPaymentReviewRequired, payload: {$ref: '#/components/schemas/BookingFact'}}
+  schemas:
+    BookingFact:
+      type: object
+      required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,actorId,payload]
+      properties:
+        eventId: {type: string, format: uuid}
+        eventType: {type: string, enum: [BookingPending,BookingConfirmed,BookingCancelled,HoldExpired,BookingPaymentReviewRequired]}
+        schemaVersion: {type: integer, const: 1}
+        occurredAt: {type: string, format: date-time}
+        aggregateId: {type: string, format: uuid}
+        correlationId: {type: string, format: uuid}
+        causationId: {type: [string, 'null'], format: uuid}
+        actorId: {type: string}
+        payload:
+          type: object
+          required: [bookingId,eventId,accountId,amount,currency,state]
+          properties:
+            bookingId: {type: string, format: uuid}
+            eventId: {type: string, format: uuid}
+            accountId: {type: string, format: uuid}
+            amount: {type: string}
+            currency: {type: string}
+            state: {type: string}
