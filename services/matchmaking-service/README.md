@@ -1,6 +1,6 @@
 # Matchmaking Service
 
-The executable prototype owns deterministic candidate eligibility, immutable participant snapshots, explainable weighted scoring, event-wide optimization, organizer review/override/lock/publish, member responses, reveal consent, structured feedback, audit, and transactional outbox records. It uses no machine-learning model.
+The executable prototype owns deterministic candidate eligibility, immutable participant snapshots, explainable weighted scoring, event-wide optimization, administrator review/override/lock/publish, member responses, reveal consent, structured feedback, audit, and transactional outbox records. It uses no machine-learning model.
 
 The canonical rule specification remains [`../../docs/matchmaking/README.md`](../../docs/matchmaking/README.md).
 
@@ -57,14 +57,14 @@ POST /api/v1/matches/{matchId}/feedback
 
 The canonical request/response contract is [`../../contracts/openapi/matchmaking-v1.yaml`](../../contracts/openapi/matchmaking-v1.yaml). Protected commands require `Authorization: Bearer <access-token>`; non-repeatable commands also require `Idempotency-Key`.
 
-Organizer fixture login:
+Administrator fixture login:
 
 ```text
-organizer@example.test
+admin@example.test
 MatchMateDev123!
 ```
 
-The fixture event is scoped to that organizer's Account ID. Administrators may access every event scope. No development authentication bypass exists.
+Matching-run listing, generation, review, override, lock, and publication require the `admin` role. Member match/response/consent/feedback routes remain participant-scoped. No development authentication bypass exists.
 
 ## Run lifecycle
 
@@ -97,7 +97,7 @@ go -C services/matchmaking-service vet ./...
 ## Privacy and safety
 
 - Participant snapshots contain private inputs and never appear in member APIs or events.
-- Candidate rejection codes are organizer/internal diagnostics, never member explanations.
+- Candidate rejection codes are administrator/internal diagnostics, never member explanations.
 - Member results include only their match ID, event ID, partner code, score, generalized reasons, and their own response/consent state.
 - Exact locations, private deal-breakers, blocks, safety state, preferences, emails, and dates of birth are not emitted.
 - Override cannot bypass any hard constraint.
@@ -106,6 +106,6 @@ go -C services/matchmaking-service vet ./...
 
 ## Current limitations and next integration
 
-This is a complete deterministic prototype vertical slice, not production completion. Before production, replace fixtures with inbox-deduplicated Account/Event/Booking/Moderation facts, add the RabbitMQ relay/retry/DLQ runbook, event-state integration, organizer UI, component/concurrency/performance suites, rate limiting, metrics/traces, retention/backup evidence, and approved questionnaire/group/reveal policies.
+This is a complete deterministic prototype vertical slice, not production completion. Before production, replace fixtures with inbox-deduplicated Account/Event/Booking/Moderation facts, add the RabbitMQ relay/retry/DLQ runbook, event-state integration, component/concurrency/performance suites, rate limiting, metrics/traces, retention/backup evidence, and approved questionnaire/group/reveal policies. The administrator run-management UI is implemented in `frontend/apps/admin`.
 
 Every future matching behavior change must update the ruleset version, deterministic fixtures/tests, OpenAPI/AsyncAPI contracts, canonical matchmaking guide, this README, and the pull-request before/after record.

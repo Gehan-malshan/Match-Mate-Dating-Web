@@ -50,7 +50,7 @@ services:
       JWT_ISSUER: matchmate-account
       JWT_AUDIENCE: matchmate-api
       JWT_KEY_ID: account-compose-dev-1
-      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
       COOKIE_SECURE: "false"
       DEV_EXPOSE_VERIFICATION_TOKEN: "true"
       CURRENT_CONSENT_VERSION: privacy-2026-08

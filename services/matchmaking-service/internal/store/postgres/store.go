@@ -640,18 +640,15 @@ func (s *Store) pairings(ctx context.Context, q queryer, sql, runID string) ([]d
 func (s *Store) authorizeEvent(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, p domain.Principal, eventID string) error {
-	if p.HasRole("admin") {
-		return nil
+	if !p.HasRole("admin") {
+		return problem(403, "MATCHMAKING_ADMIN_REQUIRED", "Only an administrator can manage matchmaking runs")
 	}
-	if !p.HasRole("organizer") {
-		return problem(403, "MATCHMAKING_SCOPE_REQUIRED", "Organizer or administrator role is required")
+	var exists bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM event_scope WHERE event_id=$1)`, eventID).Scan(&exists); err != nil {
+		return err
 	}
-	var organizer string
-	if err := q.QueryRow(ctx, `SELECT organizer_id FROM event_scope WHERE event_id=$1`, eventID).Scan(&organizer); err != nil {
-		return notFound(err)
-	}
-	if organizer != p.Subject {
-		return problem(403, "EVENT_SCOPE_DENIED", "Organizer is not assigned to this event")
+	if !exists {
+		return problem(404, "MATCHMAKING_EVENT_NOT_CONFIGURED", "This event does not have a matchmaking projection yet")
 	}
 	return nil
 }

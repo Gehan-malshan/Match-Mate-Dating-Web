@@ -56,7 +56,7 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 
 - Date, registration, and lifecycle transitions.
 - Price/currency validation.
-- Organizer ownership and event policy versions.
+- Administrator-only event creation, organizer ownership for later event operations, and event policy versions.
 - Publication/cancellation constraints.
 
 ### Booking
@@ -194,7 +194,7 @@ Baseline scenarios:
 - RabbitMQ outage and backlog recovery without duplicate business effects.
 - Event discovery at expected launch query load with representative filters/data.
 - Matchmaking generation at expected event size and approved growth multiplier.
-- Concurrent organizer review/lock attempts; one valid lock/version result.
+- Concurrent administrator review/lock attempts; one valid lock/version result.
 - Notification provider slowdown without starving critical workers.
 
 For each scenario record workload, data volume, duration, target, measured result, bottleneck, and environment. A performance test without a target is diagnostic, not a release gate.
