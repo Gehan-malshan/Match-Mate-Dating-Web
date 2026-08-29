@@ -113,9 +113,13 @@ Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, regi
 
 Owns ticket holds, bookings, consumed capacity, allocation categories where approved, expiry, cancellation, attendance, and check-in. It is authoritative for confirmed event participation and stores the immutable price/currency snapshot.
 
+The first executable slice implements Event-derived immutable pricing, atomic capacity holds, owner-authorized Payment snapshots, expiry, Payment completion inbox consumption, late-payment review, and outbox publication. Cancellation, waitlist, attendance, and full policy integration remain incomplete.
+
 ### Payment Service
 
 Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, refunds, and payment audit. It never trusts client amount/currency and never allocates capacity.
+
+The first executable slice implements initiation, callback verification/replay evidence, member status, audit, transactional outbox persistence, and publisher-confirmed RabbitMQ relay. Booking integration/consumption, scheduled reconciliation, refunds, and production delivery remain incomplete, so this slice is not yet an end-to-end payment capability.
 
 ### Matchmaking Service
 

@@ -1,0 +1,96 @@
+name: matchmate-booking-payment
+services:
+  postgres-booking:
+    image: postgres:17-alpine
+    environment: {POSTGRES_DB: matchmate_booking, POSTGRES_USER: matchmate, POSTGRES_PASSWORD: matchmate}
+    ports: ["5437:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U matchmate -d matchmate_booking"], interval: 5s, timeout: 3s, retries: 20}
+    volumes: ["booking-postgres:/var/lib/postgresql/data"]
+  postgres-payment:
+    image: postgres:17-alpine
+    environment: {POSTGRES_DB: matchmate_payment, POSTGRES_USER: matchmate, POSTGRES_PASSWORD: matchmate}
+    ports: ["5436:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U matchmate -d matchmate_payment"], interval: 5s, timeout: 3s, retries: 20}
+    volumes: ["payment-postgres:/var/lib/postgresql/data"]
+  booking-migrate:
+    build: {context: ../../services/booking-service}
+    entrypoint: ["/booking-migrate"]
+    environment: {BOOKING_DATABASE_URL: "postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable"}
+    depends_on: {postgres-booking: {condition: service_healthy}}
+    restart: "no"
+  booking-api:
+    build: {context: ../../services/booking-service}
+    environment:
+      BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
+      BOOKING_EVENT_API_URL: http://host.docker.internal:8082/api/v1/events/{eventId}
+      ACCOUNT_JWKS_URL: http://host.docker.internal:8081/.well-known/jwks.json
+    ports: ["8085:8085"]
+    depends_on: {booking-migrate: {condition: service_completed_successfully}}
+  booking-expiry:
+    build: {context: ../../services/booking-service}
+    entrypoint: ["/booking-expiry"]
+    environment: {BOOKING_DATABASE_URL: "postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable"}
+    depends_on: {booking-migrate: {condition: service_completed_successfully}}
+  payment-migrate:
+    build: {context: ../../services/payment-service}
+    entrypoint: ["/payment-migrate"]
+    environment: {PAYMENT_DATABASE_URL: "postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable"}
+    depends_on: {postgres-payment: {condition: service_healthy}}
+    restart: "no"
+  payment-api:
+    build: {context: ../../services/payment-service}
+    environment:
+      PAYMENT_DATABASE_URL: postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable
+      PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
+      ACCOUNT_JWKS_URL: http://host.docker.internal:8081/.well-known/jwks.json
+      PAYHERE_ENVIRONMENT: sandbox
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
+      PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+    ports: ["8084:8084"]
+    depends_on: {payment-migrate: {condition: service_completed_successfully}, booking-api: {condition: service_started}}
+  booking-outbox:
+    build: {context: ../../services/booking-service}
+    entrypoint: ["/booking-outbox"]
+    environment:
+      BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
+      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
+    depends_on: {booking-migrate: {condition: service_completed_successfully}}
+    profiles: ["messaging"]
+  booking-payment-consumer:
+    build: {context: ../../services/booking-service}
+    entrypoint: ["/booking-payment-consumer"]
+    environment:
+      BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
+      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
+    depends_on: {booking-migrate: {condition: service_completed_successfully}}
+    profiles: ["messaging"]
+  payment-outbox:
+    build: {context: ../../services/payment-service}
+    entrypoint: ["/payment-outbox"]
+    environment:
+      PAYMENT_DATABASE_URL: postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable
+      PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
+      PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+      PAYMENT_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
+    depends_on: {payment-migrate: {condition: service_completed_successfully}}
+    profiles: ["messaging"]
+  payment-reconciliation:
+    build: {context: ../../services/payment-service}
+    entrypoint: ["/payment-reconciliation"]
+    environment:
+      PAYMENT_DATABASE_URL: postgres://matchmate:matchmate@postgres-payment:5432/matchmate_payment?sslmode=disable
+      PAYMENT_BOOKING_SNAPSHOT_URL: http://booking-api:8085/internal/v1/bookings/{bookingId}/payment-snapshot
+      PAYHERE_MERCHANT_ID: ${PAYHERE_MERCHANT_ID:?set PAYHERE_MERCHANT_ID}
+      PAYHERE_MERCHANT_SECRET: ${PAYHERE_MERCHANT_SECRET:?set PAYHERE_MERCHANT_SECRET}
+      PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
+      PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
+      PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:?set public PAYHERE_NOTIFY_URL}
+    depends_on: {payment-migrate: {condition: service_completed_successfully}}
+volumes: {booking-postgres: {}, payment-postgres: {}}

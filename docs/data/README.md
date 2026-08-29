@@ -76,6 +76,8 @@ Constraints:
 
 ## 5. Booking database
 
+Booking migration 1 implements `booking`, `capacity_allocation`, `idempotency_record`, `inbox`, and `outbox`. Migration 2 adds the cancellation timestamp used by idempotent unpaid-hold cancellation. A partial unique index prevents more than one active account/event booking, and a conditional allocation update prevents held plus confirmed capacity from exceeding the immutable configured limit. Attendance tables remain planned.
+
 Suggested tables:
 
 | Table | Important fields/constraints |
@@ -97,6 +99,8 @@ Constraints:
 - Confirmation requires allowed state and verified payment fact/approved override.
 
 ## 6. Payment database
+
+Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `inbox`, and `outbox`. Refund and reconciliation tables remain planned until finance policy is approved. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
 
 Suggested tables:
 

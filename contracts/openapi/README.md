@@ -1,8 +1,8 @@
 # OpenAPI Contracts
 
-Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, and the deterministic prototype in `matchmaking-v1.yaml`. Later service specifications remain planned.
+Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, and the first Payment slice in `payment-v1.yaml`.
 
-This directory contains canonical versioned REST contracts. Account, Event, and Matchmaking prototype files are implemented; later service files remain planned. API implementation and generated clients must conform to these files.
+This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, and first Payment files are implemented; later service files remain planned. API implementation and generated clients must conform to these files.
 
 ## Planned organization
 

@@ -2,6 +2,12 @@
 
 Owns ticket holds, bookings, event allocation, capacity consumption, hold expiry, cancellation, attendance, and check-in status.
 
+## Implementation status
+
+The executable member slice provides authenticated hold creation/read/list, idempotent cancellation of unpaid holds, a constrained Payment snapshot, Event-owned price/currency lookup, atomic capacity allocation, configurable expiry, Payment event inbox deduplication, confirmation/late-review transitions, transactional outbox facts, and a publisher-confirmed RabbitMQ relay. The safe initial policy is a configurable 15-minute hold, no waitlist, no automatic refund, and manual review for late payment. Confirmed bookings cannot be cancelled until refund policy is approved. Attendance, account/moderation consumers, and approved refund coordination remain later slices.
+
+The local API uses port `8085` because the upstream Matchmaking prototype owns port `8083`.
+
 It must prevent overselling through transactional allocation controls and idempotent commands.
 
 ## Responsibilities
@@ -28,6 +34,7 @@ GET    /api/v1/bookings?mine=true
 POST   /api/v1/bookings/{bookingId}/cancel
 POST   /api/v1/bookings/{bookingId}/check-in       organizer/admin
 GET    /internal/v1/events/{eventId}/usage         constrained internal
+GET    /internal/v1/bookings/{bookingId}/payment-snapshot constrained Payment integration
 ```
 
 Create/cancel/check-in require idempotency keys. Member booking access uses authenticated subject ownership.

@@ -1,6 +1,93 @@
 # MatchMate Change Log
 
+### CHG-20260829-003 — Complete the member booking and PayHere checkout slice
+
+- **Before:** Members could discover events, while Booking and Payment were backend-only first slices without booking list/cancellation APIs or a web purchase journey.
+- **After:** Members can create an atomic event hold, submit transient checkout contact fields to PayHere, inspect authoritative booking/payment status in `/app/bookings`, and idempotently cancel an unpaid hold with immediate capacity release. Confirmed cancellation remains blocked until refund policy is approved.
+- **Contracts/data:** Booking OpenAPI adds list and cancel operations; Booking AsyncAPI adds `BookingCancelled`; Booking migration 2 adds `cancelled_at`. Existing Payment v1 contracts remain compatible.
+- **Security/privacy:** Access tokens remain memory-only; Booking enforces subject ownership. Checkout contact fields are sent to Payment/PayHere and are not stored in the frontend or Payment database. Browser redirects are never treated as payment success.
+- **Deployment/rollback:** Apply Booking migrations through version 2 before deploying the new API. Rolling back the UI/API leaves the additive nullable column intact; preserve Booking and Payment databases for reconciliation.
+- **Verification:** Booking and Payment Go tests/vet pass. Member web typecheck, 17 tests, and production build pass. Real PostgreSQL/RabbitMQ contention, PayHere sandbox, callback rate limiting, refund/provider resolution, attendance, and moderation consumers remain release blockers.
+
 ## Unreleased
+
+### CHG-20260829-002 — Add the first executable Booking and Payment-confirmation slice
+
+- **Status:** In progress
+- **Date:** 2026-08-29
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Booking Service, Booking PostgreSQL schema, Booking REST/events, Payment-to-Booking messaging, local Compose
+- **Decision/ADR:** Not required; implements documented Booking ownership and asynchronous Payment confirmation
+
+#### Before
+
+Booking was documentation-only, so Payment could not retrieve an authoritative price snapshot or confirm participation. No service owned consumed capacity at runtime.
+
+#### After
+
+Booking creates authenticated, idempotent 15-minute holds from Event-owned price/currency and atomically reserves Booking-owned capacity. It exposes an owner-authorized Payment snapshot, expires holds with capacity release, consumes Payment completion/review facts with inbox deduplication, confirms valid holds exactly once, routes late success to review without reallocating capacity, and publishes Booking facts through a transactional outbox relay. Local ports avoid the existing Matchmaking topology. Cancellation, waitlist, attendance, automatic refunds, and production policy remain incomplete.
+
+#### Compatibility and migration
+
+This additive slice introduces Booking migration 1 and v1 REST/event contracts. No Booking production data exists to backfill. Rollback stops Booking/Payment processes but retains both databases for financial and allocation reconciliation.
+
+#### Security, privacy, and moderation impact
+
+Member endpoints validate Account-issued ES256 tokens and enforce subject ownership. Amount/currency come from Event and are snapshotted by Booking; clients cannot set them. Events contain scalar IDs and minimum operational money fields, not profiles or private preferences.
+
+#### Deployment and rollback
+
+Start Account/RabbitMQ, Event, Booking/Payment databases and migrations, APIs, expiry worker, relays, and consumer in that order. Monitor capacity invariants, expiry, inbox/outbox age, reviews, and confirmation latency. Preserve databases on rollback and reconcile before restart.
+
+#### Verification
+
+Booking and Payment unit tests/vet pass. Compose validation, real PostgreSQL contention/migration, RabbitMQ redelivery/outage, and PayHere sandbox E2E evidence are required before release.
+
+#### Documentation updated
+
+Booking README; Booking OpenAPI/AsyncAPI; architecture, data, security, testing, implementation, Compose and local runbook guides; this change log.
+
+### CHG-20260829-001 — Add the first executable Payment Service slice
+
+- **Status:** In progress
+- **Date:** 2026-08-29
+- **Owner:** Project team
+- **Issue/PR:** Pending
+- **Affected:** Payment Service, Payment PostgreSQL schema, REST/payment-event contracts, PayHere configuration, security and operations
+- **Decision/ADR:** Not required; implements the existing Payment ownership and PayHere adapter decision
+
+#### Before
+
+Payment was documentation-only. No executable initiation, callback verification, payment persistence, audit, replay protection, status API, PayHere adapter, or versioned Payment contracts existed. Booking and its immutable price snapshot are also not implemented.
+
+#### After
+
+The first Payment slice provides authenticated initiation using only an eligible Booking-owned snapshot for authoritative money, domain-specific PayHere sandbox/live configuration and protocol hashes, a form-encoded callback endpoint, constant-time checksum comparison, exact amount/currency verification, callback fingerprints, idempotent state transitions, member-owned status reads, audit records, transactional outbox facts, a publisher-confirmed RabbitMQ relay with crash-safe claims, and pending-payment reconciliation classification. Invalid, unknown, or mismatched outcomes cannot complete a payment. Checkout contact fields are returned transiently to PayHere and are not persisted. The slice remains in progress until provider reconciliation/refunds, component tests, and PayHere sandbox/live evidence exist.
+
+#### Reason
+
+Phase 4 requires verified, replay-safe PayHere processing without trusting browser-controlled price or success state.
+
+#### Compatibility and migration
+
+This is additive and introduces Payment migration 1 plus v1 OpenAPI/AsyncAPI contracts. There is no existing Payment data to backfill. Retain the isolated database on rollback for financial evidence and forward recovery.
+
+#### Security, privacy, and moderation impact
+
+ES256 authentication and ownership protect initiation/status. Provider callbacks use PayHere verification rather than member JWT. No secrets, card data, raw callbacks, checkout contact fields, or internal account identifiers are returned or logged. Callback mismatches enter review and remain auditable.
+
+#### Deployment and rollback
+
+Deploy only after Booking exposes its constrained snapshot and configure database, JWT public key, approved URLs, and secret-managed PayHere credentials. Start with sandbox and a public HTTPS callback. Monitor callback failures/reviews, pending age, outbox age, and confirmation latency. Rollback stops the service but preserves its database; rotate any exposed provider secret.
+
+#### Verification
+
+Go unit tests cover money/snapshot validation, provider status mapping, checkout hashing, notification verification, and tampering. Compilation/vet and live component/sandbox evidence are recorded when run. Booking/RabbitMQ integration, concurrency, recovery, and production verification remain pending.
+
+#### Documentation updated
+
+Payment README; architecture, data, security, testing, and implementation guides; OpenAPI/AsyncAPI READMEs and v1 contracts; PayHere runbook; this change log.
 
 ### CHG-20260828-001 — Add the first executable Event Service slice
 
