@@ -4,3 +4,5 @@ include:
   - path: ./infrastructure/compose/account-profile.compose.yml
   - path: ./infrastructure/compose/event.compose.yml
   - path: ./infrastructure/compose/matchmaking.compose.yml
+  - path: ./infrastructure/compose/booking-payment.compose.yml
+  - path: ./infrastructure/compose/notification.compose.yml

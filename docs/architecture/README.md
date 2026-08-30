@@ -131,6 +131,8 @@ The current executable prototype uses Matchmaking-owned deterministic fixtures t
 
 Owns templates, delivery requests/attempts, provider results, retries, suppression, and channel preferences. It normally consumes facts outside the critical transaction path.
 
+The executable slice consumes minimum-safe Account and Booking facts containing a recipient account ID, deduplicates each fact in a service-owned PostgreSQL inbox, selects versioned `en-LK` templates, applies account suppression/preferences, and records leased delivery attempts with retry/dead-letter state. Each non-suppressed delivery also creates an independently readable member-feed item. The JWT-protected API derives ownership from the Account token subject and exposes only rendered safe template text, category, time, read state, and an allow-listed application path. Local development uses a no-contact provider sink. Production email/SMS/push delivery is disabled until channel policy, an approved provider, credentials, and a constrained authenticated Account contact-resolution contract are accepted; destinations are not added to RabbitMQ facts.
+
 ### Moderation/Safety Service
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
@@ -181,6 +183,9 @@ OpenAPI becomes authoritative when specifications exist.
 | POST | `/api/v1/matching-runs/{runId}/lock` | Matchmaking | Lock reviewed run |
 | POST | `/api/v1/matches/{matchId}/response` | Matchmaking | Structured response |
 | POST | `/api/v1/matches/{matchId}/reveal-consent` | Matchmaking | Record consent |
+| GET | `/api/v1/notifications` | Notification | List own in-app notifications |
+| PATCH | `/api/v1/notifications/{notificationId}/read` | Notification | Mark an owned notification read |
+| POST | `/api/v1/notifications/read-all` | Notification | Mark all own notifications read |
 | POST | `/api/v1/reports` | Moderation | Report behavior/content |
 
 Self-service uses authenticated subject identity. Caller-provided account IDs are not trusted.
@@ -202,7 +207,7 @@ Self-service uses authenticated subject identity. Caller-provided account IDs ar
 | `MatchResponseRecorded` / `RevealConsentGranted` | Matchmaking | Notification, analytics, moderation as needed |
 | `ReportCreated` / `ModerationActionApplied` | Moderation | Account, Matchmaking, Notification |
 
-Events contain only minimum identifiers and safe fields.
+Events contain only minimum identifiers and safe fields. Notification currently binds only supported Account/Booking routing keys with a safe recipient account ID; Event/Payment/Matchmaking/Moderation recipient expansion requires an explicit minimum-safe contract or projection.
 
 ## 12. State models
 
@@ -279,6 +284,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 - Validate/scan profile text and media; quarantine contact information or unsafe content.
 - Provide block/report from profile and match surfaces.
 - A block applies to discovery, eligibility, pairing, reveal, and relevant notifications.
+- Notification APIs derive the recipient from the authenticated subject, conceal other-member item identifiers, and never expose provider destinations, delivery errors, private preferences, or moderation evidence.
 - Moderators can hide profiles, suspend accounts, exclude participation, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is not shown to the reported member.
 - Admin/organizer actions store actor, target, reason, prior/new state, time, and correlation ID.

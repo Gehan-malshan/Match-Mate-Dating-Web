@@ -15,6 +15,7 @@ Versioned OpenAPI files under `contracts/openapi/` are authoritative. This guide
 
 - `Authorization: Bearer <access-token>` for authenticated member/operator APIs unless an accepted transport decision changes it.
 - Self-service uses `/users/me` and token subject, not caller-selected user ID.
+- Notification self-service similarly derives the recipient from the token subject; list/read commands never accept an account ID and conceal another member's item as not found.
 - Every endpoint documents allowed roles/scopes, ownership, event scope, state restrictions, and sensitive fields.
 - Provider callbacks use provider verification, request controls, and replay protection—not member JWT.
 
@@ -68,4 +69,3 @@ Do not expose stack traces, SQL/provider details, private rejection reasons, or 
 - [ ] Handler and generated-client contract tests pass.
 - [ ] Security/privacy/rate-limit/audit behavior tested.
 - [ ] Service README, canonical docs, and before/after change history updated.
-

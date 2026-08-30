@@ -74,6 +74,18 @@ The first executable Payment slice validates Account-issued ES256 tokens for mem
 - Reconcile pending, duplicate, mismatch, late, refund, and unknown outcomes.
 - Separate finance/support scopes and audit all manual decisions.
 
+### Notification controls
+
+- Notification consumes only explicitly bound minimum-safe facts and stores recipient account IDs, not email/phone destinations from events.
+- Template variables are allow-listed; unknown variables and unsafe multiline subjects fail before provider delivery.
+- Account deactivation creates suppression and stops pending/retry deliveries.
+- Inbox and business-key uniqueness make duplicate broker delivery safe.
+- Member feed endpoints validate Account-issued ES256 issuer/audience/expiry, derive ownership from `sub`, accept no caller-selected recipient, and return not found for absent or other-member item IDs.
+- Member DTOs expose only safe rendered template text, category, time, read state, and allow-listed application paths; provider references/errors and source payloads remain private.
+- The development sink logs no recipient destination or rendered message body and is rejected outside development/test.
+- Exact-origin CORS permits the member application in local development. Production edge rate limits and TLS remain deployment requirements.
+- Production email delivery requires an approved provider, credentials from a secret manager, authenticated constrained Account contact resolution, provider idempotency, timeout/rate controls, preference/legal-category policy, and sanitized provider errors.
+
 ## 7. Application and upload security
 
 - Validate at trust boundaries with size, type, range, enum, and semantic checks.

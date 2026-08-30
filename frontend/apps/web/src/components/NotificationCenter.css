@@ -1,0 +1,29 @@
+.notification-center{position:relative}
+.notification-bell{position:relative;display:grid;width:44px;height:44px;place-items:center;border:1px solid rgba(255,178,190,.18);border-radius:50%;background:rgba(255,255,255,.045);color:#f4e9ed;cursor:pointer;transition:border-color .2s ease,background .2s ease}
+.notification-bell:hover,.notification-bell:focus-visible{border-color:var(--primary);background:rgba(255,178,190,.1);outline:none}
+.notification-bell svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.notification-bell>span{position:absolute;top:-4px;right:-5px;min-width:19px;height:19px;display:grid;place-items:center;border:2px solid #0e0e11;border-radius:999px;padding-inline:3px;background:var(--brand-gradient);color:#fff;font-size:9px;font-weight:800}
+.notification-popover{position:absolute;z-index:40;top:54px;right:0;width:min(390px,calc(100vw - 32px));overflow:hidden;border:1px solid rgba(255,178,190,.16);border-radius:18px;background:rgba(20,17,21,.98);box-shadow:0 24px 70px rgba(0,0,0,.52),0 0 36px rgba(255,0,107,.08);backdrop-filter:blur(20px)}
+.notification-popover>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px;border-bottom:1px solid rgba(255,255,255,.07)}
+.notification-popover h2{margin:4px 0 0;color:#f7f2f4;font:600 23px/1.1 Georgia,'Times New Roman',serif}
+.notification-popover header small{color:var(--primary);font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+.notification-popover header button{border:0;background:transparent;color:var(--secondary);font:700 11px/1 Manrope,sans-serif;cursor:pointer}
+.notification-preview-list{max-height:390px;overflow:auto}
+.notification-preview-list>a{position:relative;display:grid;grid-template-columns:10px 1fr;gap:10px;border-bottom:1px solid rgba(255,255,255,.055);padding:17px 20px;color:#eadfe3;text-decoration:none}
+.notification-preview-list>a:hover{background:rgba(255,255,255,.04)}
+.notification-preview-list>a.is-unread{background:linear-gradient(90deg,rgba(255,0,107,.08),transparent)}
+.notification-dot{width:7px;height:7px;margin-top:7px;border-radius:50%;background:transparent}
+.is-unread .notification-dot{background:var(--primary-container);box-shadow:0 0 12px rgba(255,78,124,.5)}
+.notification-preview-list strong,.notification-preview-list small,.notification-preview-list time{display:block}
+.notification-preview-list strong{font-size:13px}
+.notification-preview-list small{margin-top:6px;color:#c6b7bd;font-size:11px;line-height:1.5}
+.notification-preview-list time{margin-top:8px;color:rgba(228,189,194,.55);font-size:9px}
+.notification-view-all{display:flex;justify-content:space-between;padding:16px 20px;color:var(--primary);font-size:12px;font-weight:750;text-decoration:none}
+.notification-state{margin:0;padding:28px 20px;color:#c6b7bd;text-align:center;font-size:13px}
+.notification-toast-region{position:fixed;z-index:70;top:90px;right:24px;width:min(390px,calc(100vw - 32px));display:grid;gap:12px;pointer-events:none}
+.notification-toast{display:flex;justify-content:space-between;gap:18px;border:1px solid rgba(255,178,190,.2);border-radius:16px;padding:18px;background:linear-gradient(145deg,rgba(31,27,31,.98),rgba(14,14,17,.98));box-shadow:0 20px 55px rgba(0,0,0,.48),0 0 30px rgba(255,0,107,.1);pointer-events:auto;animation:notification-enter .35s cubic-bezier(.16,1,.3,1) both}
+.notification-toast small,.notification-toast strong{display:block}.notification-toast small{color:var(--secondary);font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.notification-toast strong{margin-top:7px;color:#fff;font-size:14px}.notification-toast p{margin:7px 0 0;color:#c9bbc0;font-size:11px;line-height:1.5}
+.notification-toast>div:last-child{display:flex;align-items:flex-start;gap:8px}.notification-toast a,.notification-toast button{border:0;background:transparent;color:var(--primary);font-size:12px;font-weight:750;text-decoration:none;cursor:pointer}.notification-toast button{font-size:20px;line-height:1}
+@keyframes notification-enter{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:700px){.notification-popover{position:fixed;top:70px;right:16px}.notification-toast-region{top:76px;right:16px}.notification-bell{width:40px;height:40px}}
+@media(prefers-reduced-motion:reduce){.notification-toast{animation:none}}

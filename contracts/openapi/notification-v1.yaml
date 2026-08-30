@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: MatchMate Notification API
+  version: 1.0.0
+  description: Authenticated member-owned in-app notification feed. Delivery/provider operations are not exposed.
+servers:
+  - url: /api/v1
+paths:
+  /notifications:
+    get:
+      operationId: listMyNotifications
+      summary: List the authenticated member's notifications
+      description: Uses the JWT subject as the recipient. Caller-selected account identifiers are not accepted.
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+        - {name: cursor, in: query, schema: {type: string, maxLength: 256}}
+      responses:
+        "200":
+          description: Member notification page ordered newest first
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/NotificationPage"}
+        "400": {$ref: "#/components/responses/Problem"}
+        "401": {$ref: "#/components/responses/Problem"}
+  /notifications/unread-count:
+    get:
+      operationId: getMyUnreadNotificationCount
+      summary: Read the authenticated member's unread count
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [unreadCount]
+                properties: {unreadCount: {type: integer, minimum: 0}}
+        "401": {$ref: "#/components/responses/Problem"}
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markMyNotificationRead
+      summary: Idempotently mark one owned notification as read
+      description: Returns 404 for absent and other-member notification identifiers to prevent enumeration.
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: notificationId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: Notification is read}
+        "401": {$ref: "#/components/responses/Problem"}
+        "404": {$ref: "#/components/responses/Problem"}
+  /notifications/read-all:
+    post:
+      operationId: markAllMyNotificationsRead
+      summary: Idempotently mark all owned notifications as read
+      security: [{bearerAuth: []}]
+      responses:
+        "200":
+          description: Number of notifications changed by this command
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [updatedCount]
+                properties: {updatedCount: {type: integer, format: int64, minimum: 0}}
+        "401": {$ref: "#/components/responses/Problem"}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  responses:
+    Problem:
+      description: RFC 9457-style problem details
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+  schemas:
+    NotificationPage:
+      type: object
+      additionalProperties: false
+      required: [items, unreadCount]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Notification"}
+        nextCursor: {type: string}
+        unreadCount: {type: integer, minimum: 0}
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [notificationId, sourceEventType, category, title, message, actionPath, createdAt]
+      properties:
+        notificationId: {type: string, format: uuid}
+        sourceEventType:
+          type: string
+          enum: [AccountRegistered, AccountVerified, ProfileApproved, ProfileHidden, BookingPending, BookingConfirmed, BookingCancelled, HoldExpired, BookingPaymentReviewRequired]
+        category: {type: string, enum: [ACCOUNT, BOOKING]}
+        title: {type: string, minLength: 1, maxLength: 160}
+        message: {type: string, minLength: 1, maxLength: 2000}
+        actionPath: {type: string, enum: [/app/profile, /app/bookings]}
+        readAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+    Problem:
+      type: object
+      required: [type, title, status, code, detail, traceId]
+      properties:
+        type: {type: string}
+        title: {type: string}
+        status: {type: integer}
+        code: {type: string}
+        detail: {type: string}
+        instance: {type: string}
+        traceId: {type: string}

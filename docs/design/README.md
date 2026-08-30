@@ -239,6 +239,14 @@ Event discovery cards use the same tonal hierarchy without member imagery. They 
 - Active items may use the brand gradient but also require a shape, label, weight, or indicator.
 - Fixed navigation must respect safe-area insets and must not cover focused content, toasts, forms, or payment controls.
 
+### In-app notifications
+
+- Authenticated member navigation uses a 44px bell target with a text-equivalent unread count; the badge never relies on color alone.
+- The recent-items popover uses a level-2 dark glass surface, explicit unread markers, safe title/body/time content, mark-all control, and a link to the full history.
+- Popup toasts announce only notifications observed after the initial successful poll, remain dismissible, never block navigation/payment/consent controls, and automatically dismiss after a calm interval.
+- The full history uses the standard dark application surface, newest-first readable rows, persistent read state, loading/empty/error/pagination states, and related-page actions.
+- Motion is presentation-only and disabled under `prefers-reduced-motion`. Provider errors, contact destinations, private preferences, moderation evidence, and internal event payloads never appear in member notification UI.
+
 ### Cards, dialogs, and overlays
 
 - Standard cards use tonal surfaces and restrained borders.

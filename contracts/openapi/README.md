@@ -1,8 +1,8 @@
 # OpenAPI Contracts
 
-Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, and the first Payment slice in `payment-v1.yaml`.
+Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, the first Payment slice in `payment-v1.yaml`, and the authenticated member feed in `notification-v1.yaml`.
 
-This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, and first Payment files are implemented; later service files remain planned. API implementation and generated clients must conform to these files.
+This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, first Payment, and Notification member-feed files are implemented; later service files remain planned. API implementation and generated clients must conform to these files.
 
 ## Planned organization
 
@@ -14,7 +14,7 @@ openapi/
 |-- booking-v1.yaml
 |-- payment-v1.yaml
 |-- matchmaking-v1.yaml
-|-- notification-v1.yaml          only if public/admin API exists
+|-- notification-v1.yaml          authenticated member-owned feed
 `-- moderation-v1.yaml
 ```
 
