@@ -5,7 +5,7 @@ Every production service and critical cross-service workflow must have a runnabl
 Implemented initial runbooks:
 
 - [`event-outbox-relay.md`](event-outbox-relay.md) — diagnose and recover Event lifecycle-fact publication without deleting or rewriting outbox data.
-- [`notification-local.md`](notification-local.md) — start, smoke-test, and diagnose the first Notification consumer/delivery slice without exposing recipient contact data.
+- [`notification-local.md`](notification-local.md) — start, smoke-test, and diagnose Notification delivery plus the authenticated in-app member feed without exposing recipient contact data.
 
 ## Required runbooks
 

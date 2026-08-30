@@ -45,12 +45,14 @@ func TestRepositoryEventDeduplicationDeliveryAndSuppression(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	migration, err := migrations.Files.ReadFile("000001_init.up.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = pool.Exec(ctx, string(migration)); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"000001_init.up.sql", "000002_member_feed.up.sql"} {
+		migration, readErr := migrations.Files.ReadFile(name)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		if _, err = pool.Exec(ctx, string(migration)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	repository := store.New(pool)
@@ -79,6 +81,22 @@ func TestRepositoryEventDeduplicationDeliveryAndSuppression(t *testing.T) {
 	state, err := repository.CompleteAttempt(ctx, delivery, store.AttemptResult{Delivered: true, ProviderReference: "test:1", StartedAt: now, CompletedAt: now.Add(time.Second)})
 	if err != nil || state != domain.DeliveryDelivered {
 		t.Fatalf("complete state=%s err=%v", state, err)
+	}
+	feed, hasMore, err := repository.ListFeed(ctx, accountID, 20, nil)
+	if err != nil || hasMore || len(feed) != 1 || feed[0].SourceEventType != "AccountVerified" {
+		t.Fatalf("feed=%+v hasMore=%v err=%v", feed, hasMore, err)
+	}
+	unread, err := repository.UnreadCount(ctx, accountID)
+	if err != nil || unread != 1 {
+		t.Fatalf("unread=%d err=%v", unread, err)
+	}
+	updated, err := repository.MarkRead(ctx, accountID, feed[0].ID, now.Add(2*time.Second))
+	if err != nil || !updated {
+		t.Fatalf("mark read updated=%v err=%v", updated, err)
+	}
+	otherUpdated, err := repository.MarkRead(ctx, uuid.NewString(), feed[0].ID, now.Add(2*time.Second))
+	if err != nil || otherUpdated {
+		t.Fatalf("cross-account mark updated=%v err=%v", otherUpdated, err)
 	}
 
 	deactivated := domain.EventEnvelope{EventID: uuid.NewString(), EventType: "AccountDeactivated", SchemaVersion: 1, OccurredAt: now.Add(2 * time.Second), AggregateID: accountID, CorrelationID: uuid.NewString()}

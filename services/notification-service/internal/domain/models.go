@@ -83,6 +83,32 @@ type Delivery struct {
 	UpdatedAt          time.Time
 }
 
+type FeedCursor struct {
+	CreatedAt time.Time
+	ID        string
+}
+
+type FeedRecord struct {
+	ID              string
+	SourceEventType string
+	Category        string
+	Template        Template
+	Variables       map[string]string
+	ReadAt          *time.Time
+	CreatedAt       time.Time
+}
+
+type FeedItem struct {
+	ID              string     `json:"notificationId"`
+	SourceEventType string     `json:"sourceEventType"`
+	Category        string     `json:"category"`
+	Title           string     `json:"title"`
+	Message         string     `json:"message"`
+	ActionPath      string     `json:"actionPath"`
+	ReadAt          *time.Time `json:"readAt,omitempty"`
+	CreatedAt       time.Time  `json:"createdAt"`
+}
+
 type RenderedMessage struct {
 	Subject string
 	Body    string

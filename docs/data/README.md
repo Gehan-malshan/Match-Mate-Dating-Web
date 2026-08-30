@@ -148,7 +148,7 @@ The implemented prototype adds `event_scope` and `participant_projection` as Mat
 
 ## 8. Notification database
 
-Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. The first slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence. Templates currently use the development channel until an approved provider/contact-resolution design is accepted.
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence. Templates currently use the development provider channel until an approved email/provider contact-resolution design is accepted.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -157,9 +157,10 @@ Migration 1 implements `notification_template`, `notification_delivery`, `notifi
 | `delivery_attempt` | delivery, attempt number, provider reference/status, sanitized error, timing |
 | `notification_preference` | account/channel/category, allowed/suppressed, source/time |
 | `suppression` | destination hash/account, reason, expiry/indefinite, audit |
+| `notification_feed_item` | delivery unique, recipient account, read time, creation time; no copied message body or provider diagnostics |
 | `inbox` / `outbox` | `notification_inbox` implements event consumption; a Notification outbox is deferred until safe delivery facts have an approved consumer |
 
-Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPPRESSED`, `PERMANENTLY_FAILED`, or `DEAD_LETTERED`. A unique business key prevents repeated event/template/recipient delivery, worker leases recover abandoned processing, and every completed provider attempt is append-only. Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
+Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPPRESSED`, `PERMANENTLY_FAILED`, or `DEAD_LETTERED`. In-app `read_at` is independent of provider delivery state. A unique business key prevents repeated event/template/recipient delivery, one feed row references one immutable delivery/template snapshot, worker leases recover abandoned processing, and every completed provider attempt is append-only. Member feed queries and updates always constrain both item and authenticated recipient account. Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
 
 ## 9. Moderation database
 
@@ -217,7 +218,7 @@ Indexes follow measured queries, but baseline candidates include:
 - Booking: account/event active unique, event/state, hold expiry, allocation event/category.
 - Payment: order unique, provider ID/fingerprint unique, booking, state/update time, reconciliation status.
 - Matchmaking: event/run version unique, run/status, canonical pair unique, participant locked lookup, response pairing/account.
-- Notification: state/scheduled time, business idempotency key, provider reference.
+- Notification: state/scheduled time, business idempotency key, provider reference, recipient/created feed pagination, and recipient unread partial index.
 - Moderation: target/state, severity/SLA, assigned owner, action target/effective state.
 
 Avoid indexing sensitive plaintext merely for convenience; evaluate encryption/search implications.

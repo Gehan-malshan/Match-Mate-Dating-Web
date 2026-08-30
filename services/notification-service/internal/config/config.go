@@ -23,6 +23,11 @@ type Config struct {
 	PollInterval    time.Duration
 	LeaseDuration   time.Duration
 	RetryBase       time.Duration
+	JWTPublicKeyPEM string
+	AccountJWKSURL  string
+	JWTIssuer       string
+	JWTAudience     string
+	AllowedOrigins  []string
 }
 
 func value(key, fallback string) string {
@@ -82,6 +87,11 @@ func Load() (Config, error) {
 		PollInterval:    poll,
 		LeaseDuration:   lease,
 		RetryBase:       retryBase,
+		JWTPublicKeyPEM: strings.TrimSpace(os.Getenv("NOTIFICATION_JWT_PUBLIC_KEY_PEM")),
+		AccountJWKSURL:  value("ACCOUNT_JWKS_URL", "http://127.0.0.1:8081/.well-known/jwks.json"),
+		JWTIssuer:       value("JWT_ISSUER", "matchmate-account"),
+		JWTAudience:     value("JWT_AUDIENCE", "matchmate-api"),
+		AllowedOrigins:  strings.Split(value("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173"), ","),
 	}
 	if cfg.DatabaseURL == "" {
 		return cfg, errors.New("NOTIFICATION_DATABASE_URL is required")

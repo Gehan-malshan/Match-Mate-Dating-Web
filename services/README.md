@@ -2,7 +2,7 @@
 
 This directory contains independently deployable Go microservices. Each service will own its domain model, database, migrations, APIs, events, tests, Dockerfile, and operational documentation.
 
-Account/Profile, Event, Matchmaking, Booking, Payment, and the first Notification vertical slice are executable. Moderation remains documentation-only. Notification currently uses a development-only sink and is not production email/SMS delivery.
+Account/Profile, Event, Matchmaking, Booking, Payment, and the Notification in-app vertical slice are executable. Moderation remains documentation-only. Notification has an authenticated member feed plus a development-only provider sink; it is not production email/SMS delivery.
 
 Business entities and database models must not be shared between services.
 
@@ -15,7 +15,7 @@ Business entities and database models must not be shared between services.
 | Booking | Holds, consumed capacity, bookings, attendance | Event policy; Payment completion; account restrictions |
 | Payment | PayHere orders/callbacks, payment/refund/reconciliation state | Booking eligibility and immutable price snapshot |
 | Matchmaking | Eligibility snapshots, scores, runs, pairings, responses, consent, feedback | Account/profile, Event, Booking, Moderation facts |
-| Notification | Templates, delivery, attempts, suppression | Business events from all domains |
+| Notification | Templates, delivery/attempts, member feed/read state, suppression | Minimum-safe Account and Booking events; later approved domain facts |
 | Moderation | Reports, cases, actions, appeals, safety audit | Reports/content/account/event context |
 
 ## Standard requirements

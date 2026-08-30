@@ -16,8 +16,10 @@ The first executable vertical slice provides:
 - A RabbitMQ dead-letter queue for malformed or oversized business events.
 - A privacy-safe development sink that records successful attempts without resolving or logging email/phone destinations.
 - Liveness/readiness endpoints and sanitized structured logs.
+- An authenticated member-owned in-app feed with cursor pagination, unread counts, idempotent mark-read operations, and historical template-version rendering.
+- A Midnight Chemistry member notification bell, recent-items popover, full history page, and polling-based popup toasts.
 
-This is an executable development slice, not production email/SMS completion. Notification channel policy, an approved provider, constrained Account contact resolution, consent/preference source integration, retry replay operations, metrics/traces, and broader Event/Payment/Matchmaking/Moderation recipients remain required.
+This is an executable in-app development slice, not production email/SMS completion. Real email remains intentionally deferred until provider selection, credentials, constrained Account contact resolution, and channel/legal policy are approved. Consent/preference source integration, retry replay operations, metrics/traces, and broader Event/Payment/Matchmaking/Moderation recipients also remain required.
 
 ## Safe initial boundary
 
@@ -50,14 +52,18 @@ notification-worker    claims and delivers due records
 postgres-notification  service-owned PostgreSQL on local port 5438
 ```
 
-The operational API exposes:
+The API exposes public operational health plus a JWT-protected member feed:
 
 ```text
 GET /health/live
 GET /health/ready
+GET /api/v1/notifications?limit=20&cursor=...
+GET /api/v1/notifications/unread-count
+PATCH /api/v1/notifications/{notificationId}/read
+POST /api/v1/notifications/read-all
 ```
 
-There is deliberately no member/admin delivery-list API in this slice. Adding one requires Account-token authorization, visibility rules, pagination, audit, and an OpenAPI contract.
+Member endpoints validate Account-issued ES256 tokens and derive ownership only from the token subject. They never accept a caller-selected account ID, never expose delivery/provider diagnostics, and conceal another member's notification as not found. The canonical contract is `contracts/openapi/notification-v1.yaml`. There is no admin delivery-list API.
 
 ## Delivery flow
 
@@ -71,6 +77,8 @@ Business outbox -> matchmate.events -> notification.business.v1
 -> append notification_delivery_attempt
 ```
 
+In the same event-consumer transaction, every non-suppressed delivery receives one `notification_feed_item`. The member API joins that item to the immutable delivery/template version, renders only allow-listed variables, and returns a safe title, message, category, timestamp, and allow-listed application path. Email/provider delivery state and in-app read state are intentionally independent.
+
 The inbox row and delivery/suppression change commit in one PostgreSQL transaction. Duplicate RabbitMQ delivery is acknowledged without creating a second delivery. External providers must accept `delivery.id` as their idempotency key because a worker can crash after provider acceptance but before local completion.
 
 ## Data ownership
@@ -83,6 +91,8 @@ Migration 1 owns:
 - `notification_preference`
 - `notification_suppression`
 - `notification_inbox`
+
+Migration 2 adds `notification_feed_item` and backfills existing non-suppressed development deliveries. It stores only delivery/recipient identifiers, read time, and creation time; member-visible text remains versioned in the existing template/delivery snapshot.
 
 Key invariants:
 
@@ -120,6 +130,11 @@ Configuration rejects `dev-sink` when `APP_ENV` is not `development` or `test`. 
 | `NOTIFICATION_POLL_INTERVAL` | `1s` | Worker polling interval |
 | `NOTIFICATION_LEASE_DURATION` | `30s` | Crash-recovery delivery lease |
 | `NOTIFICATION_RETRY_BASE` | `1m` | Exponential retry base |
+| `NOTIFICATION_JWT_PUBLIC_KEY_PEM` | Empty | Optional static Account ES256 public key |
+| `ACCOUNT_JWKS_URL` | Account JWKS URL | Account signing-key discovery |
+| `JWT_ISSUER` | `matchmate-account` | Required access-token issuer |
+| `JWT_AUDIENCE` | `matchmate-api` | Required access-token audience |
+| `ALLOWED_ORIGINS` | Member Vite origins | Exact browser CORS allow-list |
 
 Real provider credentials must use the deployment secret manager and must never be committed or placed in Compose defaults.
 
@@ -153,6 +168,16 @@ Remove-Item Env:NOTIFICATION_TEST_DATABASE_URL
 
 The test creates and removes only its own randomly named schema.
 
+Browser verification:
+
+1. Run `bun run dev` and sign in at `http://localhost:5173/login`.
+2. Use the bell in the member header or open `/app/notifications`.
+3. Create/cancel a booking in another tab while the member page remains open.
+4. Within about 10 seconds, the unread badge and privacy-safe popup toast should appear.
+5. Opening the item or using the read controls must update only that signed-in member's feed.
+
+The frontend defaults to `http://localhost:8086/api/v1`; override it with `VITE_NOTIFICATION_API_URL`.
+
 ## Required production follow-up
 
 - Approve email/SMS/push and legally required versus suppressible categories.
@@ -163,6 +188,6 @@ The test creates and removes only its own randomly named schema.
 - Add broker retry topology, guarded DLQ inspection/replay tooling, dashboards, metrics, traces, alerts, and provider outage runbook evidence.
 - Add real PostgreSQL/RabbitMQ component and failure tests to required CI.
 - Define retention/deletion periods and backup/restore evidence.
+- Add production real-time delivery only if polling no longer meets the approved experience/SLO; WebSocket/SSE is not required by the current slice.
 
 Update this README, AsyncAPI, architecture/data/testing/security guides, Compose/runbooks, and pull-request before/after summary whenever behavior changes.
-

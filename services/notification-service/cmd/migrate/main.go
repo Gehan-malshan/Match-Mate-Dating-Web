@@ -24,7 +24,7 @@ func main() {
 		panic(err)
 	}
 
-	for index, filename := range []string{"000001_init.up.sql"} {
+	for index, filename := range []string{"000001_init.up.sql", "000002_member_feed.up.sql"} {
 		version := index + 1
 		var applied bool
 		if err = conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=$1)`, version).Scan(&applied); err != nil {

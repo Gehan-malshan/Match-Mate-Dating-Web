@@ -243,7 +243,7 @@ docker compose ps
 docker compose logs --tail 100
 ```
 
-Current local containers include independent PostgreSQL databases for all executable services, RabbitMQ, Go APIs/workers, and migration/seed jobs. Notification uses PostgreSQL port `5438`, operational API port `8086`, and a development-only provider sink. Optional Redis, gateway, production providers, and orchestration remain later work.
+Current local containers include independent PostgreSQL databases for all executable services, RabbitMQ, Go APIs/workers, and migration/seed jobs. Notification uses PostgreSQL port `5438`, authenticated member/health API port `8086`, Account JWKS validation, and a development-only provider sink. The member frontend uses `VITE_NOTIFICATION_API_URL` for this API. Optional Redis, gateway, real email providers, and orchestration remain later work.
 
 The current Event database and migration can be started independently with:
 

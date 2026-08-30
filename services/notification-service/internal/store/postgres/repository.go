@@ -80,7 +80,79 @@ func (r *Repository) ApplyEvent(ctx context.Context, event domain.EventEnvelope,
 	if err != nil {
 		return false, err
 	}
+	if state != domain.DeliverySuppressed {
+		_, err = tx.Exec(ctx, `INSERT INTO notification_feed_item(id,delivery_id,recipient_account_id,created_at)
+SELECT id,id,recipient_account_id,created_at FROM notification_delivery WHERE business_key=$1
+ON CONFLICT(delivery_id) DO NOTHING`, plan.BusinessKey)
+		if err != nil {
+			return false, err
+		}
+	}
 	return state == domain.DeliveryPending, tx.Commit(ctx)
+}
+
+func (r *Repository) ListFeed(ctx context.Context, accountID string, limit int, cursor *domain.FeedCursor) ([]domain.FeedRecord, bool, error) {
+	arguments := []any{accountID, limit + 1}
+	query := `
+SELECT f.id,d.source_event_type,d.category,t.id,t.template_key,t.version,t.locale,t.channel,t.category,
+       t.subject_template,t.body_template,t.allowed_variables,d.variables,f.read_at,f.created_at
+FROM notification_feed_item f
+JOIN notification_delivery d ON d.id=f.delivery_id
+JOIN notification_template t ON t.id=d.template_id
+WHERE f.recipient_account_id=$1`
+	if cursor != nil {
+		query += ` AND (f.created_at,f.id)<($3,$4)`
+		arguments = append(arguments, cursor.CreatedAt, cursor.ID)
+	}
+	query += ` ORDER BY f.created_at DESC,f.id DESC LIMIT $2`
+
+	rows, err := r.pool.Query(ctx, query, arguments...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	records := make([]domain.FeedRecord, 0, limit+1)
+	for rows.Next() {
+		var record domain.FeedRecord
+		var variables []byte
+		if err = rows.Scan(
+			&record.ID, &record.SourceEventType, &record.Category,
+			&record.Template.ID, &record.Template.Key, &record.Template.Version, &record.Template.Locale,
+			&record.Template.Channel, &record.Template.Category, &record.Template.SubjectTemplate,
+			&record.Template.BodyTemplate, &record.Template.AllowedVariables, &variables,
+			&record.ReadAt, &record.CreatedAt,
+		); err != nil {
+			return nil, false, err
+		}
+		if err = json.Unmarshal(variables, &record.Variables); err != nil {
+			return nil, false, err
+		}
+		records = append(records, record)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(records) > limit
+	if hasMore {
+		records = records[:limit]
+	}
+	return records, hasMore, nil
+}
+
+func (r *Repository) UnreadCount(ctx context.Context, accountID string) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM notification_feed_item WHERE recipient_account_id=$1 AND read_at IS NULL`, accountID).Scan(&count)
+	return count, err
+}
+
+func (r *Repository) MarkRead(ctx context.Context, accountID, notificationID string, now time.Time) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `UPDATE notification_feed_item SET read_at=COALESCE(read_at,$3) WHERE id=$1 AND recipient_account_id=$2`, notificationID, accountID, now)
+	return tag.RowsAffected() == 1, err
+}
+
+func (r *Repository) MarkAllRead(ctx context.Context, accountID string, now time.Time) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `UPDATE notification_feed_item SET read_at=$2 WHERE recipient_account_id=$1 AND read_at IS NULL`, accountID, now)
+	return tag.RowsAffected(), err
 }
 
 func (r *Repository) ClaimDue(ctx context.Context, now time.Time, lease time.Duration) (domain.Delivery, bool, error) {

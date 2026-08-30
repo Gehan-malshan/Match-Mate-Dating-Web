@@ -88,7 +88,7 @@ Event provides scoped draft management, lifecycle commands, safe future-event
 discovery, optimistic concurrency, a service-owned PostgreSQL migration,
 audit/outbox relay, v1 contracts, member discovery pages, and an administrator-only
 event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until production Booking and Moderation consumers exist. Booking and Payment provide the first executable hold, immutable-price, PayHere-initiation, callback, outbox, and confirmation-consumer flow; real PayHere sandbox evidence, refunds, attendance, and production delivery remain incremental work.
-Notification consumes minimum-safe Account and Booking facts, deduplicates them in its independent PostgreSQL database, applies account suppression, and runs a retryable delivery worker against a development-only privacy-safe sink. A production provider and constrained recipient contact-resolution contract remain policy/integration work.
+Notification consumes minimum-safe Account and Booking facts, deduplicates them in its independent PostgreSQL database, applies account suppression, and runs a retryable delivery worker against a development-only privacy-safe sink. Authenticated members now receive an owner-scoped in-app feed through the navigation bell, history page, unread controls, and polling-based popup toasts. Real email and its provider credentials/contact-resolution contract remain policy/integration work.
 
 ## Quick start
 
