@@ -2,7 +2,7 @@
 
 This directory contains independently deployable Go microservices. Each service will own its domain model, database, migrations, APIs, events, tests, Dockerfile, and operational documentation.
 
-Account/Profile, Event, Matchmaking, Booking, Payment, and the Notification in-app vertical slice are executable. Moderation remains documentation-only. Notification has an authenticated member feed plus a development-only provider sink; it is not production email/SMS delivery.
+Account/Profile, Event, Matchmaking, Booking, Payment, Notification, and the first Moderation vertical slice are executable. Moderation publishes enforcement facts, but downstream enforcement consumers remain incremental work. Notification has an authenticated member feed, optional Firebase web push, and a development provider sink; it is not production email/SMS delivery.
 
 Business entities and database models must not be shared between services.
 

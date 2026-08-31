@@ -115,6 +115,10 @@ Business audit records include actor, target, action, prior/new state, reason, t
 
 ## 10. Moderation and safety
 
+The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
+
+The current per-process report limiter is defense-in-depth for local/single-replica use. Production requires gateway plus distributed rate enforcement. Downstream services must consume enforcement facts idempotently before cross-domain exclusion is complete.
+
 - Block/report available from relevant profile/match surfaces.
 - Risk triage and temporary action available for urgent safety cases.
 - Moderation actions can hide profiles, suspend accounts, exclude events/matching, invalidate unpublished pairings, and prevent reveal.

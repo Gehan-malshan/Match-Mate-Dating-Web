@@ -137,6 +137,8 @@ The executable slice consumes minimum-safe Account and Booking facts containing 
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
 
+The first executable standalone slice owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe report status and moderator/admin operations, expires due actions, and publishes minimum-safe enforcement facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification consumers remain required before cross-domain enforcement is complete.
+
 ## 9. Communication model
 
 Use synchronous REST when an immediate result is required or a narrow validation protects an invariant. Avoid long synchronous chains. Use RabbitMQ for completed facts, projections, notifications, matching-pool updates, deactivation propagation, and payment-to-booking confirmation.

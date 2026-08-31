@@ -26,6 +26,8 @@ This guide defines mandatory testing levels, ownership, critical scenarios, envi
 | Failure/recovery | Controlled dependency failure and restoration | Broker/DB/provider outage, redelivery, restore | Release and architecture changes |
 | Security/privacy | Abuse, authorization, leakage, replay, secrets | API/UI/infrastructure and audit | Every sensitive change and release |
 
+Moderation changes additionally require member/organizer/moderator/admin authorization tests, owner-report leakage checks, append-only action/appeal/audit tests, action expiry/reversal tests, duplicate report/event tests, and matching/reveal race evidence once downstream consumers exist.
+
 ## 3. Test ownership and location
 
 ```text
@@ -102,6 +104,10 @@ The executable slice has deterministic coverage for event routing/schema validat
 - Effective/expiry behavior.
 - Target restrictions and role/scope rules.
 - Reporter/evidence visibility.
+
+The executable Moderation suite covers report validation, malformed/oversized-shape JSON, per-subject rate limiting, role isolation, invalid JWT issuer/audience/expiry/algorithm/subject, invalid resource IDs, privileged-view auditing, strict `OPEN -> TRIAGED -> INVESTIGATING -> ACTIONED | DISMISSED` transitions, duplicate reports/actions, owner-only appeals, single appeal decisions, expiry idempotency, owner-history description suppression, minimum-safe outbox payloads, outbox claim/publish behavior, and append-only audit counts. PostgreSQL coverage is enabled with `MODERATION_TEST_DATABASE_URL`; without it, that disposable-schema component test is intentionally skipped.
+
+Still required before production are RabbitMQ outage/redelivery confirmation, multi-worker concurrency/load evidence, downstream Account/Booking/Matchmaking enforcement and race tests, gateway/distributed rate-limit tests, browser moderator/member journeys, and approved retention/legal-hold tests.
 
 ## 5. Component test requirements
 
