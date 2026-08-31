@@ -2,7 +2,7 @@
 
 Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, the first Payment slice in `payment-v1.yaml`, and the authenticated member feed in `notification-v1.yaml`.
 
-This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, first Payment, and Notification member-feed files are implemented; later service files remain planned. API implementation and generated clients must conform to these files.
+This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, first Payment, Notification, and the first Moderation reporting/case-status/action/appeal API are implemented. API implementation and generated clients must conform to these files.
 
 ## Planned organization
 

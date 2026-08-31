@@ -6,6 +6,7 @@ MATCHMAKING_DIR := services/matchmaking-service
 BOOKING_DIR := services/booking-service
 PAYMENT_DIR := services/payment-service
 NOTIFICATION_DIR := services/notification-service
+MODERATION_DIR := services/moderation-service
 
 .PHONY: help setup start backend apps frontend admin status logs stop test build
 
@@ -32,6 +33,7 @@ setup: ## Install project dependencies
 	go -C $(BOOKING_DIR) mod download
 	go -C $(PAYMENT_DIR) mod download
 	go -C $(NOTIFICATION_DIR) mod download
+	go -C $(MODERATION_DIR) mod download
 
 start: backend ## Start the complete local project
 	@echo "Backend is running. Starting member and admin apps now..."
@@ -47,6 +49,7 @@ backend: ## Start/rebuild the current Docker backend stack
 	@echo "Payment API: http://localhost:8084"
 	@echo "Booking API: http://localhost:8085"
 	@echo "Notify API:  http://localhost:8086"
+	@echo "Moderation:  http://localhost:8087"
 
 apps: ## Run the member and administration apps together
 	bun run dev
@@ -73,6 +76,7 @@ test: ## Run implemented backend and frontend tests
 	go -C $(BOOKING_DIR) test ./...
 	go -C $(PAYMENT_DIR) test ./...
 	go -C $(NOTIFICATION_DIR) test ./...
+	go -C $(MODERATION_DIR) test ./...
 	bun run test:web
 	bun run test:admin
 
@@ -84,5 +88,6 @@ build: ## Build the Docker backend and frontend production assets
 	go -C $(BOOKING_DIR) vet ./...
 	go -C $(PAYMENT_DIR) vet ./...
 	go -C $(NOTIFICATION_DIR) vet ./...
+	go -C $(MODERATION_DIR) vet ./...
 	bun run build:web
 	bun run build:admin

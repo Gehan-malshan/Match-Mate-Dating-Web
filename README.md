@@ -81,7 +81,7 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository contains the member landing page plus executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, and initial Notification slices. They include independent Go APIs and PostgreSQL migrations, development authentication/fixtures, local RabbitMQ relays/consumers, and the React member/administration applications. Full Moderation remains planned.
+The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and initial Moderation slices. Moderation reporting/case/action/appeal APIs publish minimum-safe enforcement facts; downstream enforcement consumers and moderator UI remain incremental work.
 
 The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event
@@ -129,7 +129,7 @@ Verify backend startup:
 make status
 ```
 
-Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8086`, and the long-running workers should show `Up`.
+Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8087`, and the long-running workers should show `Up`.
 
 In a second terminal, start both frontend applications:
 

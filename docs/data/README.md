@@ -164,6 +164,8 @@ Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPP
 
 ## 9. Moderation database
 
+Moderation migration 1 implements the first independently deployed schema. Reports store restricted descriptions and reporter IDs; owner history intentionally selects neither. Evidence is reference/integrity/retention metadata only. Actions and audit decisions are append-only; expiry and reversal change only effective state while preserving the original action. The service never joins another service database.
+
 | Table | Important fields/constraints |
 |---|---|
 | `report` | reporter, target type/ID, category, description/reference, event, state, created time |
@@ -173,6 +175,8 @@ Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPP
 | `appeal` | action/case, appellant, state, decision actor/reason/time |
 | `moderation_audit` | append-only privileged views and changes |
 | `outbox` | safe restriction/action facts only |
+
+Implemented table names are `report`, `moderation_case`, `evidence_reference`, `moderation_action`, `appeal`, `moderation_audit`, and `outbox`. Assignment moves an open case to triage; an audited command moves triage to investigation, then either an action or audited dismissal resolves it. A partial unique index prevents simultaneous equivalent active actions. Production retention, legal hold, evidence-object storage, and deletion/anonymization remain **OPEN QUESTION — Safety/Privacy owner**.
 
 Reporter identity and evidence are more restricted than general organizer data.
 
