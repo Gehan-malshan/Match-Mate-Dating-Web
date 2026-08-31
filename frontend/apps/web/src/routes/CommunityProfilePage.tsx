@@ -7,7 +7,7 @@ import './CommunityPage.css'
 const initials = (nickname: string) => nickname.split(/\s+|_/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'M'
 
 export function CommunityProfilePage() {
-  const { profileId } = useParams({ from: '/community/$profileId' })
+  const { profileId } = useParams({ from: '/member-access/community/$profileId' })
   const navigate = useNavigate()
   const [profile, setProfile] = useState<CommunityProfile>()
   const [message, setMessage] = useState('Loading this community profile…')

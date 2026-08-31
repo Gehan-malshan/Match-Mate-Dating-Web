@@ -7,14 +7,11 @@
     "frontend/packages/*"
   ],
   "scripts": {
-    "dev": "bun run --parallel --filter '@matchmate/web' --filter '@matchmate/admin' dev",
+    "dev": "bun run --cwd frontend/apps/web dev",
     "dev:web": "bun run --cwd frontend/apps/web dev",
     "build:web": "bun run --cwd frontend/apps/web build",
     "typecheck:web": "bun run --cwd frontend/apps/web typecheck",
     "test:web": "bun run --cwd frontend/apps/web test",
-    "dev:admin": "bun run --cwd frontend/apps/admin dev",
-    "build:admin": "bun run --cwd frontend/apps/admin build",
-    "typecheck:admin": "bun run --cwd frontend/apps/admin typecheck",
-    "test:admin": "bun run --cwd frontend/apps/admin test"
+    "graphql:generate": "cd services/graphql-gateway && go tool gqlgen generate"
   }
 }

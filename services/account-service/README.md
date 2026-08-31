@@ -123,7 +123,7 @@ $env:DEV_EXPOSE_VERIFICATION_TOKEN='true'
 go run ./cmd/api
 ```
 
-Run the relay in a second terminal with `go run ./cmd/outbox-relay`. Run the frontend from `frontend/apps/web` with `bun run dev`; it uses `http://localhost:8081/api/v1` unless `VITE_ACCOUNT_API_URL` overrides it.
+Run the relay in a second terminal with `go run ./cmd/outbox-relay`. The unified frontend uses the GraphQL gateway at `http://localhost:8080/graphql`; the gateway calls this service internally.
 
 ### Shared development logins
 

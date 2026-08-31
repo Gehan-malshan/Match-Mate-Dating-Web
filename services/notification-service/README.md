@@ -176,7 +176,7 @@ Browser verification:
 4. Within about 10 seconds, the unread badge and privacy-safe popup toast should appear.
 5. Opening the item or using the read controls must update only that signed-in member's feed.
 
-The frontend defaults to `http://localhost:8086/api/v1`; override it with `VITE_NOTIFICATION_API_URL`.
+The frontend reads notifications through `VITE_GRAPHQL_API_URL`, which defaults to `http://localhost:8080/graphql`. The GraphQL gateway calls this service internally.
 
 ## Required production follow-up
 

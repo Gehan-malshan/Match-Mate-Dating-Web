@@ -7,18 +7,18 @@ BOOKING_DIR := services/booking-service
 PAYMENT_DIR := services/payment-service
 NOTIFICATION_DIR := services/notification-service
 MODERATION_DIR := services/moderation-service
+GRAPHQL_DIR := services/graphql-gateway
 
-.PHONY: help setup start backend apps frontend admin status logs stop test build
+.PHONY: help setup start backend apps frontend status logs stop test build
 
 help: ## Show the basic local-development commands
 	@echo "MatchMate — basic local commands"
 	@echo ""
 	@echo "  make setup       Install Bun and Go dependencies (first time only)"
-	@echo "  make start       Start backend, then run both frontend apps in this terminal"
+	@echo "  make start       Start backend, then run the unified frontend in this terminal"
 	@echo "  make backend     Start all current Docker backends and infrastructure"
-	@echo "  make apps        Run member and admin apps together"
-	@echo "  make frontend    Run the web app only at http://localhost:5173"
-	@echo "  make admin       Run the admin app only at http://localhost:5174"
+	@echo "  make apps        Run the unified member/admin frontend"
+	@echo "  make frontend    Run the unified frontend at http://localhost:5173"
 	@echo "  make status      Show backend container status"
 	@echo "  make logs        Follow backend logs"
 	@echo "  make stop        Stop backend containers; keep database data"
@@ -34,9 +34,10 @@ setup: ## Install project dependencies
 	go -C $(PAYMENT_DIR) mod download
 	go -C $(NOTIFICATION_DIR) mod download
 	go -C $(MODERATION_DIR) mod download
+	go -C $(GRAPHQL_DIR) mod download
 
 start: backend ## Start the complete local project
-	@echo "Backend is running. Starting member and admin apps now..."
+	@echo "Backend is running. Starting the unified frontend now..."
 	@echo "Open http://localhost:5173 after Vite prints its URLs."
 	bun run dev
 
@@ -50,15 +51,13 @@ backend: ## Start/rebuild the current Docker backend stack
 	@echo "Booking API: http://localhost:8085"
 	@echo "Notify API:  http://localhost:8086"
 	@echo "Moderation:  http://localhost:8087"
+	@echo "GraphQL API: http://localhost:8080/graphql"
 
-apps: ## Run the member and administration apps together
+apps: ## Run the unified member and administration frontend
 	bun run dev
 
 frontend: ## Run the React/TanStack web app
 	bun run dev:web
-
-admin: ## Run the protected administration app
-	bun run dev:admin
 
 status: ## Show backend status
 	docker compose ps -a
@@ -77,8 +76,8 @@ test: ## Run implemented backend and frontend tests
 	go -C $(PAYMENT_DIR) test ./...
 	go -C $(NOTIFICATION_DIR) test ./...
 	go -C $(MODERATION_DIR) test ./...
+	go -C $(GRAPHQL_DIR) test ./...
 	bun run test:web
-	bun run test:admin
 
 build: ## Build the Docker backend and frontend production assets
 	docker compose build
@@ -89,5 +88,5 @@ build: ## Build the Docker backend and frontend production assets
 	go -C $(PAYMENT_DIR) vet ./...
 	go -C $(NOTIFICATION_DIR) vet ./...
 	go -C $(MODERATION_DIR) vet ./...
+	go -C $(GRAPHQL_DIR) vet ./...
 	bun run build:web
-	bun run build:admin

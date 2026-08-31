@@ -61,9 +61,9 @@ At each sensitive step, revalidate account status, blocks, reports, event eligib
 ## 6. Logical architecture
 
 ```text
-Member Web                 Protected Admin Web
-     \                           /
-      +-- WAF / Load Balancer / API Gateway --+
+Unified role-aware Web (`/app/*`, `/admin/*`)
+                         |
+      +-- WAF / Load Balancer / GraphQL BFF --+
                            |
   +----------+---------+----------+---------+---------+----------+
   |          |         |          |         |         |          |
@@ -89,7 +89,8 @@ Telemetry -> centralized logs, metrics, and traces
 | Backend | Go; prefer `net/http` or `chi`, `pgx`, and `sqlc` unless an ADR changes it |
 | Persistence | PostgreSQL database/user per service; PostGIS for approved geographic discovery |
 | Messaging | RabbitMQ, durable queues, retry/DLQ, transactional outbox/inbox, AsyncAPI |
-| API | REST/JSON through canonical `/api/v1`; OpenAPI is authoritative |
+| Browser API | Schema-first GraphQL through `/graphql`; SDL is authoritative and queries have bounded complexity |
+| Service API | REST/JSON through canonical `/api/v1`; OpenAPI remains authoritative for internal service contracts |
 | Payment | PayHere adapter isolated in Payment Service |
 | Containers | OCI/Docker; Docker Compose for local integration |
 | Delivery | GitHub Actions, independent images, path-aware CI, staged deployment |
@@ -97,9 +98,9 @@ Telemetry -> centralized logs, metrics, and traces
 
 ## 8. Service boundaries
 
-### API Gateway
+### GraphQL Gateway / BFF
 
-Owns edge routing, TLS/WAF integration, request IDs, coarse authentication, throttling, CORS, request-size limits, and temporary aliases. It owns no business data and cannot replace service authorization.
+Owns the browser-facing schema, request IDs, coarse authentication/role checks, CORS, request-size and query-complexity limits, and orchestration of narrow service calls. It owns no business data, has no database, and cannot replace service authorization. Domain services keep their REST contracts and independently validate identity, ownership, state, and role.
 
 ### Account/Profile Service
 
@@ -141,7 +142,9 @@ The first executable standalone slice owns PostgreSQL-backed reports/cases/refer
 
 ## 9. Communication model
 
-Use synchronous REST when an immediate result is required or a narrow validation protects an invariant. Avoid long synchronous chains. Use RabbitMQ for completed facts, projections, notifications, matching-pool updates, deactivation propagation, and payment-to-booking confirmation.
+The browser uses GraphQL queries and mutations when an immediate result is required. The GraphQL BFF maps those operations to narrow synchronous REST calls owned by the domain services. Avoid long synchronous chains and N+1 resolver calls. Use RabbitMQ for completed facts, projections, notifications, matching-pool updates, deactivation propagation, and payment-to-booking confirmation.
+
+GraphQL is a client-contract and aggregation decision, not a capacity strategy. Supporting 10,000+ registered users still requires cursor pagination, bounded selections, query complexity/depth controls, rate limits, stateless gateway replicas, service connection pools, indexed PostgreSQL access, load tests, and horizontal scaling based on observed traffic.
 
 Canonical event envelope:
 
@@ -162,6 +165,10 @@ Canonical event envelope:
 Producers persist business state and outbox in one transaction. Consumers persist inbox deduplication and their business update in one transaction. Duplicate delivery is normal and safe.
 
 ## 10. Core API map
+
+The browser calls one endpoint, `POST /graphql`. Representative operations are `login`, `me`, `events`, `bookings`, `initiatePayment`, `notifications`, `managedEvents`, and the administrator-only matching-run mutations. The complete contract is `services/graphql-gateway/graph/schema.graphqls`.
+
+The following REST map remains the internal service contract used by the GraphQL BFF and non-browser integrations.
 
 OpenAPI becomes authoritative when specifications exist.
 

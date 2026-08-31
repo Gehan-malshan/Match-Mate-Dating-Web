@@ -111,7 +111,7 @@ docker compose logs --tail 200 notification-api account-api
 Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:8086/health/ready"
 ```
 
-Confirm Account API is running so Notification can load JWKS, the frontend uses `VITE_NOTIFICATION_API_URL=http://localhost:8086/api/v1`, and the browser origin is `http://127.0.0.1:5173` or `http://localhost:5173`. A 401 requires a fresh member login; do not copy access tokens into tickets or logs.
+Confirm Account API is running so Notification can load JWKS, GraphQL gateway is healthy at `http://localhost:8080/health/live`, and the frontend uses `VITE_GRAPHQL_API_URL=http://localhost:8080/graphql`. A 401 requires a fresh member login; do not copy access tokens into tickets or logs.
 
 ### Dead-letter queue contains messages
 

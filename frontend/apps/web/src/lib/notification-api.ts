@@ -1,42 +1,9 @@
-import {authenticatedRequest} from './account-api'
+import {graphqlClient} from './account-api'
 
-const notificationBase=import.meta.env.VITE_NOTIFICATION_API_URL??'http://localhost:8086/api/v1'
-
-export type NotificationItem={
-  notificationId:string
-  sourceEventType:string
-  category:'ACCOUNT'|'BOOKING'|string
-  title:string
-  message:string
-  actionPath:'/app/profile'|'/app/bookings'|string
-  readAt?:string
-  createdAt:string
-}
-
-export type NotificationPage={
-  items:NotificationItem[]
-  nextCursor?:string
-  unreadCount:number
-}
-
-export const listNotifications=(limit=20,cursor='')=>authenticatedRequest<NotificationPage>(
-  notificationBase,
-  `/notifications?limit=${limit}${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`,
-)
-
-export const getUnreadNotificationCount=()=>authenticatedRequest<{unreadCount:number}>(
-  notificationBase,
-  '/notifications/unread-count',
-)
-
-export const markNotificationRead=(notificationId:string)=>authenticatedRequest<void>(
-  notificationBase,
-  `/notifications/${encodeURIComponent(notificationId)}/read`,
-  {method:'PATCH'},
-)
-
-export const markAllNotificationsRead=()=>authenticatedRequest<{updatedCount:number}>(
-  notificationBase,
-  '/notifications/read-all',
-  {method:'POST'},
-)
+export type NotificationItem={notificationId:string;sourceEventType:string;category:'ACCOUNT'|'BOOKING'|string;title:string;message:string;actionPath:'/app/profile'|'/app/bookings'|string;readAt?:string;createdAt:string}
+export type NotificationPage={items:NotificationItem[];nextCursor?:string;unreadCount:number}
+const fields='notificationId sourceEventType category title message actionPath readAt createdAt'
+export async function listNotifications(limit=20,cursor=''){const data=await graphqlClient.execute<{notifications:NotificationPage}>(`query Notifications($limit:Int!,$cursor:String){notifications(limit:$limit,cursor:$cursor){items{${fields}} nextCursor unreadCount}}`,{limit,cursor:cursor||null});return data.notifications}
+export async function getUnreadNotificationCount(){const data=await graphqlClient.execute<{unreadNotificationCount:{unreadCount:number}}>(`query UnreadCount{unreadNotificationCount{unreadCount}}`);return data.unreadNotificationCount}
+export async function markNotificationRead(notificationId:string){await graphqlClient.execute(`mutation MarkRead($notificationId:ID!){markNotificationRead(notificationId:$notificationId){success}}`,{notificationId})}
+export async function markAllNotificationsRead(){const data=await graphqlClient.execute<{markAllNotificationsRead:{updatedCount:number}}>(`mutation MarkAllRead{markAllNotificationsRead{updatedCount}}`);return data.markAllNotificationsRead}

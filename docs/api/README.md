@@ -1,15 +1,16 @@
 # MatchMate API Conventions
 
-Versioned OpenAPI files under `contracts/openapi/` are authoritative. This guide defines conventions shared by all services.
+The browser-facing GraphQL SDL at `services/graphql-gateway/graph/schema.graphqls` and versioned internal-service OpenAPI files under `contracts/openapi/` are authoritative for their respective boundaries.
 
 ## Public edge
 
-- Canonical base path: `/api/v1`.
-- Clients call the API Gateway, not service-private addresses.
+- Browser endpoint: `/graphql`; internal service base path: `/api/v1`.
+- Browser clients call the GraphQL BFF, not service-private addresses.
 - JSON request/response bodies use consistent lower camel-case fields.
 - UTC ISO-8601 timestamps; fixed-precision decimal money represented without floating-point ambiguity and with explicit ISO 4217 currency.
 - Cursor pagination for mutable collections: `items`, `nextCursor`, and `limit`.
 - Query filters are bounded, validated, and documented.
+- GraphQL queries use variables for caller input, bounded pagination, request-size limits, complexity/depth controls, and production introspection/explorer policy.
 
 ## Authentication and identity
 
@@ -61,7 +62,7 @@ Do not expose stack traces, SQL/provider details, private rejection reasons, or 
 - Add optional fields and endpoints compatibly within v1.
 - Do not change field meaning/type, remove values, make optional fields required, or reuse error/event codes silently.
 - Breaking behavior requires a new major version, migration window, deprecation date, telemetry, and change record.
-- Generate frontend clients from reviewed OpenAPI and compile them in CI.
+- Generate GraphQL server bindings and frontend operation types from reviewed contracts and compile them in CI. OpenAPI remains required for service contracts.
 
 ## API change checklist
 
