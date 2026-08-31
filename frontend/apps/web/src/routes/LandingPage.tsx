@@ -138,7 +138,7 @@ export function LandingPage() {
           <a href="#how-it-works">How it works</a>
           <a href="#events">Events</a>
         </nav>
-        <a className="button button-small" href="/register">Create your profile</a>
+        <div className="site-header-actions"><a className="button button-ghost button-small" href="/login">Log in</a><a className="button button-small" href="/register">Create your profile</a></div>
       </header>
 
       <section className="hero" id="top">
@@ -149,7 +149,8 @@ export function LandingPage() {
           <p className="hero-copy">Meet compatible people through thoughtfully organized real-world events.</p>
           <div className="hero-actions">
           <a className="button" href="/events">Browse confirmed events <Icon name="arrow" /></a>
-            <a className="button button-ghost" href="#how-it-works">See how it works</a>
+            <a className="button button-ghost" href="/register">Create your profile</a>
+            <a className="hero-login-link" href="/login">Already a member? Log in</a>
           </div>
         </div>
         <a className="scroll-cue" href="#trust"><span /> Discover the experience</a>

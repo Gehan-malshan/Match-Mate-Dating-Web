@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info: {title: MatchMate Moderation API, version: 1.0.0, description: Owner-scoped reporting and restricted audited moderation operations.}
+servers: [{url: /api/v1}]
+security: [{bearerAuth: []}]
+paths:
+  /reports:
+    post:
+      operationId: submitReport
+      summary: Submit a safety report as the authenticated member or organizer
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateReport'}}}}
+      responses: {'201': {description: Report accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Report'}}}}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}, '429': {$ref: '#/components/responses/Problem'}}
+  /reports/mine:
+    get:
+      operationId: listMyReports
+      summary: List safe status for reports owned by the authenticated subject
+      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      responses: {'200': {description: Owner-safe report page}, '401': {$ref: '#/components/responses/Problem'}}
+  /moderation/cases:
+    get:
+      operationId: listModerationCases
+      summary: List restricted cases for moderators and administrators
+      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      responses: {'200': {description: Restricted case page}, '403': {$ref: '#/components/responses/Problem'}}
+  /moderation/cases/{caseId}:
+    get:
+      operationId: getModerationCase
+      summary: Read one restricted moderation case
+      parameters: [{$ref: '#/components/parameters/CaseId'}]
+      responses: {'200': {description: Restricted case}, '403': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}}
+  /moderation/cases/{caseId}/assign:
+    post:
+      operationId: assignModerationCase
+      parameters: [{$ref: '#/components/parameters/CaseId'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [assigneeId,reason], properties: {assigneeId: {type: string, format: uuid}, reason: {type: string, minLength: 10, maxLength: 1000}}}}}}
+      responses: {'200': {description: Assigned case}, '400': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /moderation/cases/{caseId}/status:
+    post:
+      operationId: updateModerationCaseStatus
+      summary: Start investigation or dismiss an investigated case with an audited reason
+      parameters: [{$ref: '#/components/parameters/CaseId'}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [status,reason], properties: {status: {type: string, enum: [INVESTIGATING,DISMISSED]}, reason: {type: string, minLength: 10, maxLength: 1000}}}}}}
+      responses: {'200': {description: Updated restricted case}, '400': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /moderation/cases/{caseId}/actions:
+    post:
+      operationId: applyModerationAction
+      parameters: [{$ref: '#/components/parameters/CaseId'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateAction'}}}}
+      responses: {'201': {description: Append-only action created}, '400': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /moderation/actions/{actionId}/appeals:
+    post:
+      operationId: appealModerationAction
+      parameters: [{name: actionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [reason], properties: {reason: {type: string, minLength: 10, maxLength: 1000}}}}}}
+      responses: {'201': {description: Appeal submitted}, '403': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /moderation/appeals/{appealId}/decision:
+    post:
+      operationId: decideModerationAppeal
+      parameters: [{name: appealId, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [decision,reason], properties: {decision: {type: string, enum: [UPHELD,REVERSED]}, reason: {type: string, minLength: 10, maxLength: 1000}}}}}}
+      responses: {'200': {description: Appeal decision recorded}, '400': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  parameters:
+    Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+    Cursor: {name: cursor, in: query, schema: {type: string, maxLength: 256}}
+    CaseId: {name: caseId, in: path, required: true, schema: {type: string, format: uuid}}
+  responses:
+    Problem: {description: RFC 9457-style problem, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
+  schemas:
+    CreateReport:
+      type: object
+      additionalProperties: false
+      required: [targetType,targetId,category,description]
+      properties:
+        targetType: {type: string, enum: [ACCOUNT,PROFILE,EVENT,BOOKING,PAIRING]}
+        targetId: {type: string, format: uuid}
+        category: {type: string, enum: [HARASSMENT,SAFETY,IMPERSONATION,CONTACT_SHARING,INAPPROPRIATE_CONTENT,FRAUD,OTHER]}
+        description: {type: string, minLength: 10, maxLength: 2000}
+        eventId: {type: string, format: uuid}
+        evidence: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/EvidenceReference'}}
+    EvidenceReference: {type: object, additionalProperties: false, required: [reference,mediaType,sha256], properties: {reference: {type: string, maxLength: 500}, mediaType: {type: string, maxLength: 100}, sha256: {type: string, pattern: '^[a-fA-F0-9]{64}$'}, retainUntil: {type: string, format: date-time}}}
+    Report: {type: object, required: [reportId,caseId,targetType,targetId,category,status,severity,createdAt,updatedAt], properties: {reportId: {type: string, format: uuid}, caseId: {type: string, format: uuid}, targetType: {type: string}, targetId: {type: string, format: uuid}, category: {type: string}, description: {type: string}, status: {type: string}, severity: {type: string}, createdAt: {type: string, format: date-time}, updatedAt: {type: string, format: date-time}}}
+    CreateAction: {type: object, additionalProperties: false, required: [targetType,targetId,actionClass,scope,reason,effectiveAt], properties: {targetType: {type: string, enum: [ACCOUNT,PROFILE,EVENT,BOOKING,PAIRING]}, targetId: {type: string, format: uuid}, actionClass: {type: string, enum: [CONTENT_HIDE,PROFILE_RESTRICTION,EVENT_EXCLUSION,ACCOUNT_SUSPENSION,MATCHMAKING_EXCLUSION,PAIRING_INVALIDATION,REVEAL_PREVENTION]}, scope: {type: string, minLength: 1, maxLength: 200}, reason: {type: string, minLength: 10, maxLength: 1000}, effectiveAt: {type: string, format: date-time}, expiresAt: {type: string, format: date-time}}}
+    Problem: {type: object, required: [type,title,status,code,detail,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, instance: {type: string}, traceId: {type: string}, fieldErrors: {type: object, additionalProperties: {type: string}}}}

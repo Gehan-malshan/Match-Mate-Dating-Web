@@ -239,6 +239,14 @@ Event discovery cards use the same tonal hierarchy without member imagery. They 
 - Active items may use the brand gradient but also require a shape, label, weight, or indicator.
 - Fixed navigation must respect safe-area insets and must not cover focused content, toasts, forms, or payment controls.
 
+### In-app notifications
+
+- Authenticated member navigation uses a 44px bell target with a text-equivalent unread count; the badge never relies on color alone.
+- The recent-items popover uses a level-2 dark glass surface, explicit unread markers, safe title/body/time content, mark-all control, and a link to the full history.
+- Popup toasts announce only notifications observed after the initial successful poll, remain dismissible, never block navigation/payment/consent controls, and automatically dismiss after a calm interval.
+- The full history uses the standard dark application surface, newest-first readable rows, persistent read state, loading/empty/error/pagination states, and related-page actions.
+- Motion is presentation-only and disabled under `prefers-reduced-motion`. Provider errors, contact destinations, private preferences, moderation evidence, and internal event payloads never appear in member notification UI.
+
 ### Cards, dialogs, and overlays
 
 - Standard cards use tonal surfaces and restrained borders.
@@ -289,7 +297,8 @@ This design system does not authorize new product behavior. All interfaces must 
 - No publication of contact information or exact addresses.
 - Private matchmaking preferences remain private.
 - Matchmaking is deterministic and explainable without machine learning.
-- Blocking, reporting, moderation, organizer review, consent, and audit states are first-class UI requirements.
+- Blocking, reporting, moderation, administrator matchmaking review, consent, and audit states are first-class UI requirements.
+- The protected administration app uses a persistent dark sidebar, compact operational cards, editorial serif headings, and the brand magenta/orange accent. Event creation and matchmaking controls must clearly show administrator authority, non-ML behavior, version state, and audit consequences; participant imagery and private preference details are excluded in favor of participant codes and generalized reasons.
 - Payment success is confirmed from server state, not browser redirects alone.
 - Unapproved events, metrics, availability, verification claims, or safety promises must not be presented as facts.
 

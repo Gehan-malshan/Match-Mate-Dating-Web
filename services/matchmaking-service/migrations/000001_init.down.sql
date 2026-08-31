@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS outbox,audit_log,match_feedback,reveal_consent,match_response,locked_participant,locked_pairing,pairing_override,unmatched_participant,pairing_selection,pairing_suggestion,candidate,participant_snapshot,matching_run,participant_projection,event_scope,ruleset CASCADE;

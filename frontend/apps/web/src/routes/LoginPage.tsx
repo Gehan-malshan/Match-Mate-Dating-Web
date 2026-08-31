@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
-import { ApiProblem, login } from '../lib/account-api'
+import { ApiProblem, getMe, login } from '../lib/account-api'
 
 export function LoginPage() {
   const [message, setMessage] = useState('')
@@ -13,6 +13,11 @@ export function LoginPage() {
       setMessage('')
       try {
         await login(value.email, value.password)
+        const me = await getMe()
+        if (me.account.roles.includes('admin')) {
+          window.location.assign(import.meta.env.VITE_ADMIN_APP_URL ?? 'http://localhost:5174')
+          return
+        }
         await navigate({ to: '/app/profile' })
       } catch (error) {
         setMessage((error as ApiProblem).detail ?? 'Sign in failed. Please try again.')

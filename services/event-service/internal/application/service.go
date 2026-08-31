@@ -19,11 +19,8 @@ func New(r store.Repository) *Service {
 	return &Service{repo: r, now: func() time.Time { return time.Now().UTC() }}
 }
 func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.CreateInput, corr string) (domain.Event, error) {
-	if !p.HasRole("admin") && !p.HasRole("organizer") {
-		return domain.Event{}, problem(403, "EVENT_FORBIDDEN", "Organizer or admin role is required", nil)
-	}
-	if p.HasRole("organizer") && !p.HasRole("admin") && in.OrganizerID != p.Subject {
-		return domain.Event{}, problem(403, "EVENT_ORGANIZER_SCOPE", "An organizer can only create their own event", nil)
+	if !p.HasRole("admin") {
+		return domain.Event{}, problem(403, "EVENT_ADMIN_REQUIRED", "Only an administrator can create an event", nil)
 	}
 	if f := domain.Validate(in); len(f) > 0 {
 		return domain.Event{}, problem(422, "EVENT_VALIDATION_FAILED", "Event configuration is invalid", f)

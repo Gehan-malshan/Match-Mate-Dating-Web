@@ -1,0 +1,47 @@
+asyncapi: 3.0.0
+info:
+  title: MatchMate Notification Consumer
+  version: 1.0.0
+  description: >-
+    First executable Notification consumer contract. It accepts only Account and
+    Booking facts that contain a safe recipient account ID. Contact destinations
+    and message content are never transported in these business events.
+channels:
+  businessFacts:
+    address: matchmate.events
+    messages:
+      accountFact:
+        $ref: './account-events-v1.yaml#/components/messages/AccountFact'
+      bookingFact:
+        name: BookingFact
+        contentType: application/json
+        payload:
+          $ref: './booking-events-v1.yaml#/components/schemas/BookingFact'
+  notificationDeadLetters:
+    address: notification.business.v1.dlq
+    messages:
+      rejectedAccountFact:
+        $ref: './account-events-v1.yaml#/components/messages/AccountFact'
+      rejectedBookingFact:
+        name: RejectedBookingFact
+        contentType: application/json
+        payload:
+          $ref: './booking-events-v1.yaml#/components/schemas/BookingFact'
+operations:
+  consumeAccountAndBookingFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/businessFacts'
+    summary: >-
+      notification.business.v1 binds account.AccountRegistered,
+      account.AccountVerified, account.ProfileApproved, account.ProfileHidden,
+      account.AccountDeactivated, booking.BookingPending,
+      booking.BookingConfirmed, booking.BookingCancelled, booking.HoldExpired,
+      and booking.BookingPaymentReviewRequired.
+  inspectRejectedFacts:
+    action: receive
+    channel:
+      $ref: '#/channels/notificationDeadLetters'
+    summary: >-
+      Operations-only dead-letter queue for malformed, oversized, or unsupported
+      major-version messages. Replay requires correction and preserves eventId.

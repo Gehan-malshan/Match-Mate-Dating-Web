@@ -1,50 +1,78 @@
-# Organizer and Moderation Application
+# MatchMate Administration Application
 
-This React and TanStack application provides the first organizer event-management slice and will later add participant operations, pairing review and overrides, payment-support views, moderation queues, and audited administration tools.
+The administration application is a separate React/TanStack Query frontend at `http://localhost:5174`. It is not a member interface. Account Service authentication, Event Service authorization, and Matchmaking Service authorization all require the `admin` role for the privileged actions implemented here.
 
-## Implemented Event workspace
+## Implemented workspaces
 
-The Vite application runs on `http://127.0.0.1:5174`. An organizer signs in through Account Service, keeps the access token in memory, and can list only assigned events, create/edit drafts, publish, open/close registration, and cancel with a required reason. Stale versions are rejected by Event Service. The UI labels configured capacity as non-authoritative and never exposes member profiles, preferences, bookings, payments, or moderation data.
+### Overview
 
-Run from the repository root:
+- Event totals, registration-open count, draft count, and upcoming schedule.
+- Direct navigation to protected event creation and deterministic matchmaking.
+- Clear administrator-session and least-privilege indicators.
+
+### Event Manager
+
+- List all managed events for an administrator.
+- Create an administrator-owned private draft.
+- Edit draft configuration with optimistic concurrency.
+- Publish, open/close registration, and cancel with an audited reason.
+- Keep exact venue data inside the protected interface; member event DTOs remain restricted.
+- Label configured capacity as Event configuration, not Booking-owned availability.
+
+Only administrators can create events. Event Service enforces this rule and returns `EVENT_ADMIN_REQUIRED` for organizer/member callers; hiding the UI is not the security boundary.
+
+### Matchmaking
+
+- Select an event and list immutable matching-run history.
+- Generate a new deterministic, non-ML run with an idempotency key.
+- Inspect participant-code-only pairings, compatibility scores, safe generalized reasons, unmatched outcomes, and aggregate hard-rule exclusions.
+- Move a run through `GENERATED -> UNDER_REVIEW -> LOCKED -> PUBLISHED`.
+- Replace a selected pairing only with an eligible candidate and a required audit reason.
+- Preserve server-side hard eligibility, minimum score, optimistic version, participant uniqueness, and immutable lock rules.
+
+Matching-run management is administrator-only in Matchmaking Service. Member response, mutual-interest, reveal-consent, and feedback endpoints remain accessible only to the relevant pairing participant.
+
+## Authentication behavior
+
+The access token stays in memory; it is not written to local storage. Account Service provides the rotating refresh session in an `HttpOnly` cookie. Concurrent client refresh attempts share one in-flight request so React development checks and simultaneous API retries cannot reuse a rotating token. The member website is the only login entry point: it detects the `admin` role after sign-in and redirects to this application, which restores the session through `/auth/refresh`. Opening this app without an active administrator session redirects to the member login page.
+
+Development-only fixture:
+
+```text
+Email: admin@example.test
+Password: MatchMateDev123!
+```
+
+The organizer fixture is intentionally denied access to this application and cannot create an event or manage a matching run.
+
+## Run locally
+
+Start backend services from the repository root:
+
+```powershell
+docker compose up --build -d
+```
+
+Start the admin frontend in another terminal:
 
 ```powershell
 bun run dev:admin
+```
+
+Sign in as the administrator at `http://localhost:5173/login`; the role-based redirect opens `http://localhost:5174`. Opening `http://localhost:5174` directly without a session also redirects to the member login page.
+
+Verification:
+
+```powershell
 bun run typecheck:admin
 bun run test:admin
 bun run build:admin
 ```
 
-Development login: `organizer@example.test` with the public fixture password documented by Account Service. This fixture is development/test only and provides both `member` and `organizer` roles.
+## Prototype boundary
 
-## Planned feature areas
+Only the fixed event `11111111-1111-4111-8111-000000000001` currently has Matchmaking-owned participant projections. Newly created events can be configured and published, but matching generation remains unavailable until confirmed Booking, Account, Event, and Moderation facts populate the Matchmaking projection. The UI explains this state instead of inventing participant data.
 
-- Separate policy-history replacement and Booking-validated capacity reduction.
-- Event-scoped participant/booking/attendance operations.
-- Matching-run generation, score/reason inspection, override, lock, and publication.
-- Safe unmatched/eligibility summaries without exposing private preferences.
-- Moderation report/case/action/appeal workflow according to role.
-- Restricted support/finance payment reconciliation views.
-- Role/configuration/audit views for administrators.
+Before production, add MFA/step-up authentication, gateway deployment, production event consumers, end-to-end browser automation, load/concurrency evidence, metrics/traces, retention controls, and approved operational runbooks.
 
-## Security boundaries
-
-- UI hides unauthorized actions, but each backend service performs authoritative checks.
-- Organizer access is event-scoped; organizer is not a global moderator, finance user, or administrator.
-- Use least-privilege routes and APIs for moderator, support, finance, and admin roles.
-- Require reason/confirmation for overrides, cancellation, moderation, refund, reveal/safety, and other sensitive actions.
-- Avoid bulk export. Any approved export is minimized, audited, expiring, and documented.
-- Mask PII/payment/safety fields by default and audit privileged views where required.
-- Support strong reauthentication/MFA for privileged roles before production.
-
-## Required tests
-
-- Full role and event-scope authorization matrix.
-- Sensitive field masking and absence from unauthorized responses/UI.
-- Stale version/conflict behavior for event and matching edits.
-- Pair override cannot bypass hard safety/eligibility constraints.
-- Moderation action/reversal/appeal and audit.
-- Payment review/refund permissions and confirmation.
-- Keyboard/accessibility and destructive-action confirmation.
-
-Update this README, canonical docs, contracts, tests, and change history whenever behavior changes.
+Any future behavior change must update backend authorization tests, API contracts, this README, canonical architecture/implementation guidance, and the pull-request before/after record.

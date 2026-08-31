@@ -14,7 +14,7 @@ Principles:
 - Persist the exact snapshots and ruleset used so results are reproducible.
 - Show generalized reasons without revealing private answers.
 - Optimize the complete event, not each participant independently.
-- Allow audited organizer intervention without erasing algorithm history.
+- Allow audited administrator intervention without erasing algorithm history.
 - Store outcome data for product analysis, but do not silently train or deploy ML.
 
 ## 2. Matching inputs
@@ -52,9 +52,9 @@ Required baseline filters:
 7. No moderation/safety exclusion applies.
 8. All approved hard deal-breakers pass in both directions.
 9. They are not already locked to another partner in the same round.
-10. Event-specific repeat-pair or organizer exclusion rules pass.
+10. Event-specific repeat-pair or administrator exclusion rules pass.
 
-Every rejection stores a machine-readable reason code for diagnostics and aggregate organizer summaries. Do not reveal one participant's private rejection reason to another participant.
+Every rejection stores a machine-readable reason code for diagnostics and aggregate administrator summaries. Do not reveal one participant's private rejection reason to another participant.
 
 Suggested reason codes:
 
@@ -163,7 +163,7 @@ Possible approved controls:
 - Minimum publishable compatibility threshold.
 - Penalty for prior pairing within a configured event history window.
 - Exclusion for a prior negative/safety response where policy permits.
-- Organizer-declared event constraint.
+- Administrator-declared event constraint.
 
 Every penalty/threshold is versioned, explainable, and tested. It cannot override a hard exclusion.
 
@@ -179,7 +179,7 @@ EVENT_CONSTRAINT
 REMOVED_DURING_REVIEW
 ```
 
-Organizer UI may show aggregate/internal operational reasons but must not reveal another member's private preference.
+Administrator UI may show aggregate/internal operational reasons but must not reveal another member's private preference.
 
 ## 6. Matching run lifecycle
 
@@ -189,15 +189,15 @@ DRAFT -> GENERATED -> UNDER_REVIEW -> LOCKED -> PUBLISHED
 
 - A run references one event, participant snapshot set, ruleset version, optimizer version, seed/tie-break policy, creator, and timestamps.
 - Generation creates immutable candidate/score output for that version.
-- Organizer changes create override records; they do not overwrite original suggestions.
+- Administrator changes create override records; they do not overwrite original suggestions.
 - Lock validates eligibility again and creates the immutable selected set.
 - Publication controls member-visible output and notifications.
 - A rerun creates a new version linked to the superseded run.
 - A safety action may invalidate an unpublished run or flag a locked run for controlled incident handling; never silently rewrite history.
 
-## 7. Organizer review and override
+## 7. Administrator review and override
 
-Organizer view may include:
+Administrator view may include:
 
 - Participant codes, not unnecessary PII.
 - Eligibility counts and safe exclusion summaries.
@@ -207,7 +207,7 @@ Organizer view may include:
 
 Override requirements:
 
-- Organizer has scope for the event.
+- Caller has the administrator role and the event has a Matchmaking projection.
 - Replacement pair passes all current hard constraints.
 - Reason code and optional note are required.
 - Original pair, replacement, actor, time, correlation ID, and ruleset/run version are audited.
@@ -254,6 +254,7 @@ Suggested Matchmaking-owned tables/aggregates:
 | `locked_pairing` | Immutable selected pairing per run/round |
 | `match_response` | Member continue/switch/interest response and deadline |
 | `reveal_consent` | Versioned consent decision and policy context |
+| `reveal_consent_history` | Append-only grant/revoke decision versions; current consent remains a query projection |
 | `match_feedback` | Structured quality, comfort, safety, and product feedback |
 | `inbox` / `outbox` | Idempotent integration |
 
@@ -270,12 +271,12 @@ Important constraints:
 
 | Method | Endpoint | Authorization |
 |---|---|---|
-| GET | `/api/v1/events/{eventId}/matching-runs` | Event organizer/admin |
-| POST | `/api/v1/events/{eventId}/matching-runs` | Event organizer/admin; event in matching state |
-| GET | `/api/v1/matching-runs/{runId}` | Scoped organizer/admin |
-| POST | `/api/v1/matching-runs/{runId}/overrides` | Scoped organizer/admin |
-| POST | `/api/v1/matching-runs/{runId}/lock` | Scoped organizer/admin; idempotent command |
-| POST | `/api/v1/matching-runs/{runId}/publish` | Scoped organizer/admin; approved state |
+| GET | `/api/v1/events/{eventId}/matching-runs` | Administrator only |
+| POST | `/api/v1/events/{eventId}/matching-runs` | Administrator only; event in matching state |
+| GET | `/api/v1/matching-runs/{runId}` | Administrator only |
+| POST | `/api/v1/matching-runs/{runId}/overrides` | Administrator only |
+| POST | `/api/v1/matching-runs/{runId}/lock` | Administrator only; idempotent command |
+| POST | `/api/v1/matching-runs/{runId}/publish` | Administrator only; approved state |
 | GET | `/api/v1/matches/mine` | Authenticated eligible member |
 | POST | `/api/v1/matches/{matchId}/response` | Pair participant; deadline/state checks |
 | POST | `/api/v1/matches/{matchId}/reveal-consent` | Pair participant; policy/state checks |
@@ -340,7 +341,7 @@ Generation must be idempotent for the same command key and must not produce a di
 - Disconnected candidate graph.
 - Threshold-created unmatched participants.
 - Repeat-pair penalties.
-- Organizer replacement impact.
+- Administrator replacement impact.
 
 ### Component/integration tests
 
@@ -352,7 +353,7 @@ Generation must be idempotent for the same command key and must not produce a di
 
 ### Security/privacy tests
 
-- Organizer event scope.
+- Administrator-only matching-run authorization.
 - Member can access only own published pairing.
 - Private inputs/rejection reasons absent from member APIs/events/logs.
 - Block/restriction prevents generation, lock, publication, response, and reveal.
@@ -376,3 +377,8 @@ Changing questions, eligibility, weights, matrices, thresholds, optimizer object
 
 Never modify a ruleset already used by a generated run.
 
+## 15. Implemented prototype profile
+
+The executable Go prototype in `services/matchmaking-service` implements the two-group strategy in ADR-0002 with immutable `prototype-v1`, the initial weights in section 4, `IGNORE_AND_RENORMALIZE`, a minimum selectable score of 45, Hungarian maximum-weight assignment, cardinality priority, and lexicographic account-ID tie-breaking. Development fixtures represent future consumed eligibility facts and are never treated as source Account, Booking, Event, or Moderation records.
+
+This profile is reversible development evidence. **OPEN QUESTION — Product owner:** approve questionnaire dimensions, group policy, compatibility matrices, minimum score, repeat window, response question, and reveal policy before production. Any answer that changes behavior creates a new ruleset version; `prototype-v1` is never edited after use.

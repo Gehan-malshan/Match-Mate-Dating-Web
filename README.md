@@ -2,7 +2,7 @@
 
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.
 
-This repository is a monorepo for the MatchMate member website, organizer portal, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
+This repository is a monorepo for the MatchMate member website, protected administration portal, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
 
 ## Planned technology stack
 
@@ -23,7 +23,7 @@ Match-Mate-Dating-Web/
 |-- frontend/
 |   |-- apps/
 |   |   |-- web/                   Member-facing React/TanStack application
-|   |   `-- admin/                 Organizer and moderation portal
+|   |   `-- admin/                 Protected event and matchmaking administration
 |   `-- packages/
 |       |-- ui/                    Shared frontend design system
 |       |-- validation/            Frontend validation and generated client helpers
@@ -81,14 +81,14 @@ Match-Mate-Dating-Web/
 
 ## Current status
 
-The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event, Booking, Payment, Matchmaking, Notification, and full Moderation services remain planned.
+The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and initial Moderation slices. Moderation reporting/case/action/appeal APIs publish minimum-safe enforcement facts; downstream enforcement consumers and moderator UI remain incremental work.
 
-The Account/Profile slice and the initial Event vertical slice are executable.
+The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event
 discovery, optimistic concurrency, a service-owned PostgreSQL migration,
-audit/outbox relay, v1 contracts, member discovery pages, and an organizer
-workspace. Booking, payment, matchmaking, notification, and production
-delivery remain planned incremental work.
+audit/outbox relay, v1 contracts, member discovery pages, and an administrator-only
+event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until production Booking and Moderation consumers exist. Booking and Payment provide the first executable hold, immutable-price, PayHere-initiation, callback, outbox, and confirmation-consumer flow; real PayHere sandbox evidence, refunds, attendance, and production delivery remain incremental work.
+Notification consumes minimum-safe Account and Booking facts, deduplicates them in its independent PostgreSQL database, applies account suppression, and runs a retryable delivery worker against a development-only privacy-safe sink. Authenticated members now receive an owner-scoped in-app feed through the navigation bell, history page, unread controls, and polling-based popup toasts. Real email and its provider credentials/contact-resolution contract remain policy/integration work.
 
 ## Quick start
 
@@ -108,14 +108,16 @@ Start the backend from the repository root:
 docker compose up --build -d
 ```
 
-In a second terminal, start the frontend:
+In a second terminal, start both frontend applications:
 
 ```powershell
-bun run dev:web
+bun run dev
 ```
 
-Open `http://localhost:5173` after Bun prints the Vite URL. Docker automatically
-runs the idempotent database migration and creates the shared development users.
+Open `http://localhost:5173` for the member website. The administrator app runs at
+`http://localhost:5174`; administrator login begins at the member login page and is
+redirected by role. Docker automatically runs the idempotent database migration and
+creates the shared development users.
 
 If GNU Make is installed, `make start` performs those two startup steps for you:
 it starts the Docker backend, then keeps the frontend development server running in
@@ -127,12 +129,12 @@ Verify backend startup:
 make status
 ```
 
-The `account-migrate` and `account-seed` jobs should show `Exited (0)`, which means success. `postgres-account`, `rabbitmq`, `account-api`, and `account-outbox` should be running.
+Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8087`, and the long-running workers should show `Up`.
 
-In a second terminal, start the web application:
+In a second terminal, start both frontend applications:
 
 ```bash
-make web
+make apps
 ```
 
 Open `http://127.0.0.1:5173`. The API is available at `http://localhost:8081`, and RabbitMQ management is at `http://localhost:15672` using `matchmate` / `matchmate`.
@@ -144,16 +146,25 @@ Email: member@example.test
 Password: MatchMateDev123!
 ```
 
-Additional development users are `community@example.test`, `moderator@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production.
+Administrator login at `http://localhost:5173/login`:
+
+```text
+Email: admin@example.test
+Password: MatchMateDev123!
+```
+
+Additional development users are `community@example.test`, `moderator@example.test`, `organizer@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production. The organizer fixture cannot create events or manage matchmaking runs.
 
 ## Make command reference
 
 ```text
 make help                         Show all commands
 make setup                        Install Bun and Go dependencies
-make start                        Start backend, then frontend in one terminal
+make start                        Start backend, then both frontend apps in one terminal
 make backend                      Start/rebuild the local backend
+make apps                         Start member and admin frontends together
 make frontend                     Start the frontend only
+make admin                        Start the admin frontend only
 make status                       Show running and completed containers
 make logs                         Follow backend/infrastructure logs
 make test                         Run backend and frontend tests
@@ -171,8 +182,9 @@ If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain d
 4. Add Event Service.
 5. Add Booking capacity and hold flow.
 6. Add Payment Service and confirmed-booking integration.
-7. Implement Matchmaking Service and organizer review/lock workflow.
-8. Add event interaction, Notification, moderation hardening, observability, security, and production delivery.
+7. Implement Matchmaking Service and administrator review/lock workflow.
+8. Expand Notification from its Account/Booking development slice to approved providers and remaining safe recipient facts.
+9. Add event interaction, moderation hardening, observability, security, and production delivery.
 
 ## Documentation
 

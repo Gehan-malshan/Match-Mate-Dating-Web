@@ -6,7 +6,7 @@ This is the canonical architecture description for MatchMate. It must remain syn
 
 MatchMate is a privacy-first, community-driven blind-dating platform for Sri Lanka, initially focused on Colombo. Its purpose is to move relationship-minded adults from safe online discovery to curated real-world interaction instead of prolonged chatting or swiping.
 
-The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, organizer controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
+The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, protected administrator controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
 
 ## 2. Requirement and decision labels
 
@@ -22,10 +22,10 @@ Important open questions include exact age policy, verification method, gender/g
 |---|---|
 | Visitor | Public marketing and permitted event summaries; no community profiles |
 | Member | Account/profile/preferences, safe discovery, bookings, own matches/responses, feedback, block/report |
-| Organizer | Assigned events, participants, matching runs, overrides, locks, attendance, exceptions |
+| Organizer | Assigned existing-event lifecycle and attendance operations; no event creation or matchmaking-run access |
 | Moderator | Reports/content, safety actions, profile hiding, restrictions, suspension, appeals |
 | Support/Finance | Constrained support and reconciliation without broad profile access |
-| Administrator | Roles, configuration, rulesets, audit access, emergency controls |
+| Administrator | Event creation, matching runs/overrides/locks/publication, roles, configuration, rulesets, audit access, emergency controls |
 | Service account | Machine identity with only required integration scopes |
 
 Possession of a role never bypasses ownership, event scope, resource state, privacy policy, or audit requirements.
@@ -50,7 +50,7 @@ Discover -> register/consent -> verify -> complete safe profile
 -> supply private preferences/questionnaire -> moderation/approval
 -> community discovery -> discover event -> time-limited ticket hold
 -> PayHere payment -> confirmed booking -> eligible matching pool
--> deterministic matching run -> organizer review/override/lock
+-> deterministic matching run -> administrator review/override/lock
 -> policy-limited pairing information -> attend event
 -> structured continue/switch/interest response
 -> consent-controlled reveal -> feedback/report/safety follow-up
@@ -61,7 +61,7 @@ At each sensitive step, revalidate account status, blocks, reports, event eligib
 ## 6. Logical architecture
 
 ```text
-Member Web                 Organizer/Admin Web
+Member Web                 Protected Admin Web
      \                           /
       +-- WAF / Load Balancer / API Gateway --+
                            |
@@ -113,21 +113,31 @@ Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, regi
 
 Owns ticket holds, bookings, consumed capacity, allocation categories where approved, expiry, cancellation, attendance, and check-in. It is authoritative for confirmed event participation and stores the immutable price/currency snapshot.
 
+The first executable slice implements Event-derived immutable pricing, atomic capacity holds, owner-authorized Payment snapshots, expiry, Payment completion inbox consumption, late-payment review, and outbox publication. Cancellation, waitlist, attendance, and full policy integration remain incomplete.
+
 ### Payment Service
 
 Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, refunds, and payment audit. It never trusts client amount/currency and never allocates capacity.
 
+The first executable slice implements initiation, callback verification/replay evidence, member status, audit, transactional outbox persistence, and publisher-confirmed RabbitMQ relay. Booking integration/consumption, scheduled reconciliation, refunds, and production delivery remain incomplete, so this slice is not yet an end-to-end payment capability.
+
 ### Matchmaking Service
 
-Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, organizer overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
+Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, administrator overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
+
+The current executable prototype uses Matchmaking-owned deterministic fixtures to simulate future consumed Account/Event/Booking/Moderation facts. It validates Account-issued ES256 tokens, stores data in its independent PostgreSQL database, and exposes an administrator-only run lifecycle plus participant-scoped published results. Production integration will replace fixture projection writes with inbox-deduplicated events without changing ownership.
 
 ### Notification Service
 
 Owns templates, delivery requests/attempts, provider results, retries, suppression, and channel preferences. It normally consumes facts outside the critical transaction path.
 
+The executable slice consumes minimum-safe Account and Booking facts containing a recipient account ID, deduplicates each fact in a service-owned PostgreSQL inbox, selects versioned `en-LK` templates, applies account suppression/preferences, and records leased delivery attempts with retry/dead-letter state. Each non-suppressed delivery also creates an independently readable member-feed item. The JWT-protected API derives ownership from the Account token subject and exposes only rendered safe template text, category, time, read state, and an allow-listed application path. Local development uses a no-contact provider sink. Production email/SMS/push delivery is disabled until channel policy, an approved provider, credentials, and a constrained authenticated Account contact-resolution contract are accepted; destinations are not added to RabbitMQ facts.
+
 ### Moderation/Safety Service
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
+
+The first executable standalone slice owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe report status and moderator/admin operations, expires due actions, and publishes minimum-safe enforcement facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification consumers remain required before cross-domain enforcement is complete.
 
 ## 9. Communication model
 
@@ -175,6 +185,9 @@ OpenAPI becomes authoritative when specifications exist.
 | POST | `/api/v1/matching-runs/{runId}/lock` | Matchmaking | Lock reviewed run |
 | POST | `/api/v1/matches/{matchId}/response` | Matchmaking | Structured response |
 | POST | `/api/v1/matches/{matchId}/reveal-consent` | Matchmaking | Record consent |
+| GET | `/api/v1/notifications` | Notification | List own in-app notifications |
+| PATCH | `/api/v1/notifications/{notificationId}/read` | Notification | Mark an owned notification read |
+| POST | `/api/v1/notifications/read-all` | Notification | Mark all own notifications read |
 | POST | `/api/v1/reports` | Moderation | Report behavior/content |
 
 Self-service uses authenticated subject identity. Caller-provided account IDs are not trusted.
@@ -196,7 +209,7 @@ Self-service uses authenticated subject identity. Caller-provided account IDs ar
 | `MatchResponseRecorded` / `RevealConsentGranted` | Matchmaking | Notification, analytics, moderation as needed |
 | `ReportCreated` / `ModerationActionApplied` | Moderation | Account, Matchmaking, Notification |
 
-Events contain only minimum identifiers and safe fields.
+Events contain only minimum identifiers and safe fields. Notification currently binds only supported Account/Booking routing keys with a safe recipient account ID; Event/Payment/Matchmaking/Moderation recipient expansion requires an explicit minimum-safe contract or projection.
 
 ## 12. State models
 
@@ -249,7 +262,7 @@ The complete specification is [`../matchmaking/README.md`](../matchmaking/README
 
 ```text
 Confirmed participants -> hard filters -> component scores -> weighted total
--> event-wide optimizer -> organizer review/override -> immutable lock
+-> event-wide optimizer -> administrator review/override -> immutable lock
 -> responses -> consent-controlled reveal -> feedback
 ```
 
@@ -273,6 +286,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 - Validate/scan profile text and media; quarantine contact information or unsafe content.
 - Provide block/report from profile and match surfaces.
 - A block applies to discovery, eligibility, pairing, reveal, and relevant notifications.
+- Notification APIs derive the recipient from the authenticated subject, conceal other-member item identifiers, and never expose provider destinations, delivery errors, private preferences, or moderation evidence.
 - Moderators can hide profiles, suspend accounts, exclude participation, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is not shown to the reported member.
 - Admin/organizer actions store actor, target, reason, prior/new state, time, and correlation ID.

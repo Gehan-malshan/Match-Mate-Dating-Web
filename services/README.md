@@ -2,6 +2,8 @@
 
 This directory contains independently deployable Go microservices. Each service will own its domain model, database, migrations, APIs, events, tests, Dockerfile, and operational documentation.
 
+Account/Profile, Event, Matchmaking, Booking, Payment, Notification, and the first Moderation vertical slice are executable. Moderation publishes enforcement facts, but downstream enforcement consumers remain incremental work. Notification has an authenticated member feed, optional Firebase web push, and a development provider sink; it is not production email/SMS delivery.
+
 Business entities and database models must not be shared between services.
 
 ## Service map
@@ -13,7 +15,7 @@ Business entities and database models must not be shared between services.
 | Booking | Holds, consumed capacity, bookings, attendance | Event policy; Payment completion; account restrictions |
 | Payment | PayHere orders/callbacks, payment/refund/reconciliation state | Booking eligibility and immutable price snapshot |
 | Matchmaking | Eligibility snapshots, scores, runs, pairings, responses, consent, feedback | Account/profile, Event, Booking, Moderation facts |
-| Notification | Templates, delivery, attempts, suppression | Business events from all domains |
+| Notification | Templates, delivery/attempts, member feed/read state, suppression | Minimum-safe Account and Booking events; later approved domain facts |
 | Moderation | Reports, cases, actions, appeals, safety audit | Reports/content/account/event context |
 
 ## Standard requirements
@@ -31,4 +33,3 @@ Every service must have:
 - A README updated whenever ownership, behavior, APIs, events, data, configuration, or operations change.
 
 Before implementing a service, read `AGENTS.md`, the architecture/implementation/data/testing guides, and this service's README.
-

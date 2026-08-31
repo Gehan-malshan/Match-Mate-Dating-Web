@@ -1,6 +1,6 @@
 # AsyncAPI and RabbitMQ Contracts
 
-Implemented schemas cover Account/Profile facts and Event lifecycle facts in `event-events-v1.yaml`. Event facts are persisted transactionally and published by the Event outbox relay with durable messages and publisher confirms. Consumer bindings, retry queues, DLQ policy, and replay tooling remain planned.
+Implemented schemas cover Account/Profile, Event, Booking, Matchmaking, Payment, and minimum-safe Moderation enforcement facts. `notification-consumer-v1.yaml` defines Notification's supported bindings and operations-only dead-letter queue. Moderation uses a transactional outbox and publisher-confirmed relay; Account, Booking, Matchmaking, and Notification inbox consumers for its enforcement facts remain required. Matchmaking relay wiring, broader Notification recipients, retry exchanges, and replay tooling remain planned.
 
 This directory contains canonical event schemas. `account-events-v1.yaml` documents implemented Account/Profile facts; broader exchange/consumer contracts remain planned.
 

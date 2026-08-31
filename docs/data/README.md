@@ -76,6 +76,8 @@ Constraints:
 
 ## 5. Booking database
 
+Booking migration 1 implements `booking`, `capacity_allocation`, `idempotency_record`, `inbox`, and `outbox`. Migration 2 adds the cancellation timestamp used by idempotent unpaid-hold cancellation. A partial unique index prevents more than one active account/event booking, and a conditional allocation update prevents held plus confirmed capacity from exceeding the immutable configured limit. Attendance tables remain planned.
+
 Suggested tables:
 
 | Table | Important fields/constraints |
@@ -97,6 +99,8 @@ Constraints:
 - Confirmation requires allowed state and verified payment fact/approved override.
 
 ## 6. Payment database
+
+Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `inbox`, and `outbox`. Refund and reconciliation tables remain planned until finance policy is approved. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
 
 Suggested tables:
 
@@ -134,12 +138,17 @@ See [`../matchmaking/README.md`](../matchmaking/README.md) for algorithm behavio
 | `locked_pairing` | run/event/round, canonical pair, locked time; participant uniqueness enforced |
 | `match_response` | pairing, account, question/policy version, response, time; unique active response |
 | `reveal_consent` | pairing, account, policy version, decision/revocation, time |
+| `reveal_consent_history` | pairing, account, increasing decision version, grant/revoke decision, policy version, idempotency key, time; append-only |
 | `match_feedback` | pairing/account, structured ratings/flags, restricted free-text reference where approved |
 | `inbox` / `outbox` | idempotent integration |
 
 Rulesets and used snapshots are append-only. Never update history to make a new algorithm appear to have produced an old result.
 
+The implemented prototype adds `event_scope` and `participant_projection` as Matchmaking-owned read models plus `pairing_selection`, `locked_participant`, `audit_log`, and transactional `outbox`. Development seed writes fixture projections only; production writers will be inbox-deduplicated consumers of minimum-safe facts. No Matchmaking query joins another service database.
+
 ## 8. Notification database
+
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence. Templates currently use the development provider channel until an approved email/provider contact-resolution design is accepted.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -148,11 +157,14 @@ Rulesets and used snapshots are append-only. Never update history to make a new 
 | `delivery_attempt` | delivery, attempt number, provider reference/status, sanitized error, timing |
 | `notification_preference` | account/channel/category, allowed/suppressed, source/time |
 | `suppression` | destination hash/account, reason, expiry/indefinite, audit |
-| `inbox` / `outbox` | event consumption and delivery facts |
+| `notification_feed_item` | delivery unique, recipient account, read time, creation time; no copied message body or provider diagnostics |
+| `inbox` / `outbox` | `notification_inbox` implements event consumption; a Notification outbox is deferred until safe delivery facts have an approved consumer |
 
-Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
+Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPPRESSED`, `PERMANENTLY_FAILED`, or `DEAD_LETTERED`. In-app `read_at` is independent of provider delivery state. A unique business key prevents repeated event/template/recipient delivery, one feed row references one immutable delivery/template snapshot, worker leases recover abandoned processing, and every completed provider attempt is append-only. Member feed queries and updates always constrain both item and authenticated recipient account. Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
 
 ## 9. Moderation database
+
+Moderation migration 1 implements the first independently deployed schema. Reports store restricted descriptions and reporter IDs; owner history intentionally selects neither. Evidence is reference/integrity/retention metadata only. Actions and audit decisions are append-only; expiry and reversal change only effective state while preserving the original action. The service never joins another service database.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -163,6 +175,8 @@ Do not replicate full profiles or payment payloads. Resolve only approved recipi
 | `appeal` | action/case, appellant, state, decision actor/reason/time |
 | `moderation_audit` | append-only privileged views and changes |
 | `outbox` | safe restriction/action facts only |
+
+Implemented table names are `report`, `moderation_case`, `evidence_reference`, `moderation_action`, `appeal`, `moderation_audit`, and `outbox`. Assignment moves an open case to triage; an audited command moves triage to investigation, then either an action or audited dismissal resolves it. A partial unique index prevents simultaneous equivalent active actions. Production retention, legal hold, evidence-object storage, and deletion/anonymization remain **OPEN QUESTION — Safety/Privacy owner**.
 
 Reporter identity and evidence are more restricted than general organizer data.
 
@@ -208,7 +222,7 @@ Indexes follow measured queries, but baseline candidates include:
 - Booking: account/event active unique, event/state, hold expiry, allocation event/category.
 - Payment: order unique, provider ID/fingerprint unique, booking, state/update time, reconciliation status.
 - Matchmaking: event/run version unique, run/status, canonical pair unique, participant locked lookup, response pairing/account.
-- Notification: state/scheduled time, business idempotency key, provider reference.
+- Notification: state/scheduled time, business idempotency key, provider reference, recipient/created feed pagination, and recipient unread partial index.
 - Moderation: target/state, severity/SLA, assigned owner, action target/effective state.
 
 Avoid indexing sensitive plaintext merely for convenience; evaluate encryption/search implications.
@@ -283,4 +297,3 @@ Before merging a data change, verify:
 - [ ] PII classification, encryption, logs/events, retention, and deletion are addressed.
 - [ ] Component, concurrency, and recovery tests are updated.
 - [ ] Service README, this guide, contracts, and change log are updated.
-

@@ -47,11 +47,11 @@ func appInput() domain.CreateInput {
 	start := time.Now().UTC().Add(10 * 24 * time.Hour)
 	return domain.CreateInput{OrganizerID: "org-1", Name: "Colombo Social", BroadLocation: "Colombo", TimeZone: "Asia/Colombo", StartsAt: start, EndsAt: start.Add(2 * time.Hour), RegistrationOpensAt: start.Add(-9 * 24 * time.Hour), RegistrationClosesAt: start.Add(-time.Hour), Price: "2500.00", Currency: "LKR", ConfiguredCapacity: 40, MatchingRulesetVersion: "v1"}
 }
-func TestOrganizerCannotCreateForAnotherOrganizer(t *testing.T) {
+func TestOrganizerCannotCreateEvent(t *testing.T) {
 	s := New(&fakeRepo{})
-	_, err := s.Create(context.Background(), domain.Principal{Subject: "org-2", Roles: []string{"organizer"}}, appInput(), "")
+	_, err := s.Create(context.Background(), domain.Principal{Subject: "org-1", Roles: []string{"organizer"}}, appInput(), "")
 	p, ok := err.(*domain.ProblemError)
-	if !ok || p.Code != "EVENT_ORGANIZER_SCOPE" {
+	if !ok || p.Code != "EVENT_ADMIN_REQUIRED" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

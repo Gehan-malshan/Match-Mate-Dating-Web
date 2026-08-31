@@ -26,6 +26,8 @@ This guide defines mandatory testing levels, ownership, critical scenarios, envi
 | Failure/recovery | Controlled dependency failure and restoration | Broker/DB/provider outage, redelivery, restore | Release and architecture changes |
 | Security/privacy | Abuse, authorization, leakage, replay, secrets | API/UI/infrastructure and audit | Every sensitive change and release |
 
+Moderation changes additionally require member/organizer/moderator/admin authorization tests, owner-report leakage checks, append-only action/appeal/audit tests, action expiry/reversal tests, duplicate report/event tests, and matching/reveal race evidence once downstream consumers exist.
+
 ## 3. Test ownership and location
 
 ```text
@@ -56,10 +58,12 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 
 - Date, registration, and lifecycle transitions.
 - Price/currency validation.
-- Organizer ownership and event policy versions.
+- Administrator-only event creation, organizer ownership for later event operations, and event policy versions.
 - Publication/cancellation constraints.
 
 ### Booking
+
+The first executable slice has deterministic tests for Event registration validation and server-derived price/expiry behavior. Real PostgreSQL last-seat contention, migration, inbox/outbox, expiry crash/retry, and RabbitMQ failure tests remain required before release.
 
 - State transitions and cancellation policy.
 - Hold expiry and idempotent release.
@@ -68,6 +72,8 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 - Immutable price snapshot.
 
 ### Payment
+
+The first executable slice has deterministic unit coverage for snapshot money/state validation, PayHere request hashing, callback signature verification, tampering rejection, and provider status mapping. The Booking consumer is implemented, but real PostgreSQL migration/repository concurrency, HTTP/auth contract, broker outage/redelivery, sandbox E2E, and recovery evidence remain required before release.
 
 - Request/hash adapter inputs.
 - Exact decimal amount/currency verification.
@@ -84,9 +90,13 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 
 ### Notification
 
+The executable slice has deterministic coverage for event routing/schema validation, privacy-safe ignored payloads, template variable allow-lists, subject safety, bounded retry timing, configuration safety, health behavior, ES256 member authentication, owner-scoped feed/read behavior, cursor/popup selection, frontend API behavior, and a disposable-schema PostgreSQL component harness for inbox/delivery/feed/suppression/attempt behavior. Required RabbitMQ redelivery/DLQ, provider-failure, crash-window, load, browser E2E, and production email-provider evidence remain open.
+
 - Template variable validation and privacy policy.
 - Business idempotency key.
 - Suppression/preference and retry classification.
+- Notification-feed ownership, concealed cross-account reads, pagination, unread/read idempotency, and no provider/private-data leakage.
+- Popup polling must not replay old unread items on initial page load and must honor reduced motion.
 
 ### Moderation
 
@@ -94,6 +104,10 @@ Every test suite has an owner, execution command, dependencies, expected duratio
 - Effective/expiry behavior.
 - Target restrictions and role/scope rules.
 - Reporter/evidence visibility.
+
+The executable Moderation suite covers report validation, malformed/oversized-shape JSON, per-subject rate limiting, role isolation, invalid JWT issuer/audience/expiry/algorithm/subject, invalid resource IDs, privileged-view auditing, strict `OPEN -> TRIAGED -> INVESTIGATING -> ACTIONED | DISMISSED` transitions, duplicate reports/actions, owner-only appeals, single appeal decisions, expiry idempotency, owner-history description suppression, minimum-safe outbox payloads, outbox claim/publish behavior, and append-only audit counts. PostgreSQL coverage is enabled with `MODERATION_TEST_DATABASE_URL`; without it, that disposable-schema component test is intentionally skipped.
+
+Still required before production are RabbitMQ outage/redelivery confirmation, multi-worker concurrency/load evidence, downstream Account/Booking/Matchmaking enforcement and race tests, gateway/distributed rate-limit tests, browser moderator/member journeys, and approved retention/legal-hold tests.
 
 ## 5. Component test requirements
 
@@ -190,7 +204,7 @@ Baseline scenarios:
 - RabbitMQ outage and backlog recovery without duplicate business effects.
 - Event discovery at expected launch query load with representative filters/data.
 - Matchmaking generation at expected event size and approved growth multiplier.
-- Concurrent organizer review/lock attempts; one valid lock/version result.
+- Concurrent administrator review/lock attempts; one valid lock/version result.
 - Notification provider slowdown without starving critical workers.
 
 For each scenario record workload, data volume, duration, target, measured result, bottleneck, and environment. A performance test without a target is diagnostic, not a release gate.

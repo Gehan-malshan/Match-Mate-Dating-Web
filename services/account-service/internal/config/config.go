@@ -24,7 +24,7 @@ func Load() (Config, error) {
 		DatabaseURL: os.Getenv("DATABASE_URL"), RabbitMQURL: env("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:5672/"), EventExchange: env("EVENT_EXCHANGE", "matchmate.events"),
 		Issuer: env("JWT_ISSUER", "matchmate-account"), Audience: env("JWT_AUDIENCE", "matchmate-api"), JWTPrivateKeyPEM: os.Getenv("JWT_PRIVATE_KEY_PEM"), JWTKeyID: env("JWT_KEY_ID", "account-dev-1"),
 		CurrentConsentVersion: env("CURRENT_CONSENT_VERSION", "privacy-2026-08"),
-		AllowedOrigins:        split(env("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")),
+		AllowedOrigins:        split(env("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174")),
 		AccessTTL:             duration("ACCESS_TOKEN_TTL", 10*time.Minute), RefreshTTL: duration("REFRESH_TOKEN_TTL", 30*24*time.Hour), VerificationTTL: duration("VERIFICATION_TOKEN_TTL", 24*time.Hour),
 		MinimumAge: integer("MINIMUM_AGE", 18), CookieSecure: boolean("COOKIE_SECURE", false), DevExposeVerificationToken: boolean("DEV_EXPOSE_VERIFICATION_TOKEN", false),
 	}

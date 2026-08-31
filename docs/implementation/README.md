@@ -282,6 +282,7 @@ Members receive the right event information, complete structured responses, and 
 ### Deliverables
 
 - Notification templates and delivery workers for registration, booking, payment, event reminder/change, pairing publication, and approved response outcomes.
+- Authenticated in-app notification feed, unread/read controls, member navigation bell/history, and accessible popup updates.
 - Member match/event surface with policy-limited information.
 - Continue/switch/interest response uniqueness and deadline rules.
 - Consent recording and reveal policy implementation.
@@ -390,10 +391,10 @@ When implementation starts, maintain this table in the same pull request as phas
 | 0 Foundation | In progress | Project team | Root Bun workspace and tested `frontend/apps/web` public landing slice | Product/policy decisions and contracts |
 | 1 Account/Profile | In review | Project team | Go API/migration/outbox relay, PostgreSQL schema, v1 contracts, web registration/login/profile routes, unit tests | Production email delivery, rate-limit/gateway policy, integration/E2E/security evidence |
 | 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, audit/outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
-| 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
-| 4 Payment | Not started | Unassigned | — | PayHere/refund/reconciliation policy |
-| 5 Matchmaking | Not started | Unassigned | — | Questionnaire/groups/weights/rounds |
-| 6 Interaction/Notification | Not started | Unassigned | — | Reveal/response/channel policy |
-| 7 Production hardening | Not started | Unassigned | — | Hosting/SLO/compliance/operations |
+| 3 Booking | In progress | Project team | Go API/domain, PostgreSQL capacity/booking migration, Event price snapshot adapter, expiry worker, Payment inbox consumer, outbox relay, v1 contracts and unit tests | Cancellation/waitlist/attendance policy; component/contention/failure evidence |
+| 4 Payment | In progress | Project team | Go API/domain/provider adapter, PostgreSQL migration, initiation/callback/status v1 contracts, unit tests, audit/outbox relay, pending reconciliation classification, Booking snapshot/consumer integration, sandbox/live runbook | PayHere refund/provider-resolution policy; component/sandbox/failure evidence |
+| 5 Matchmaking | In progress | Project team | Deterministic Go engine, PostgreSQL migration, `prototype-v1` fixtures, admin-only lifecycle API/UI, member APIs, v1 contracts, optimizer and admin-client tests | Production questionnaire/groups/rounds approval, Booking/Moderation consumers, relay/performance/concurrency evidence |
+| 6 Interaction/Notification | In progress | Project team | Notification Go API/migrations, owner-scoped in-app feed/read state, member bell/history/popup UI, PostgreSQL inbox/templates/deliveries/attempts/suppression, Account/Booking RabbitMQ consumer, retry worker, development sink, OpenAPI/AsyncAPI, unit/component harness, Compose/runbook | Real email provider credentials/contact resolution, channel/preference/reveal policy, remaining recipient projections, failure/production evidence |
+| 7 Production hardening | In progress | Project team | Initial Moderation Go API/database, reporting/triage/investigation/dismissal/action/appeal workflow, privileged-view audit, expiry worker, audit/outbox relay, v1 contracts, Compose, unit/security tests, and disposable-schema PostgreSQL component coverage | Downstream enforcement consumers/race tests, moderator UI, RabbitMQ failure/load evidence, approved safety/retention/SLA policy, hosting/SLO/compliance/operations |
 
 Allowed status values are `Not started`, `In progress`, `Blocked`, `In review`, and `Complete`. A phase is `Complete` only when its exit criteria and evidence are present.

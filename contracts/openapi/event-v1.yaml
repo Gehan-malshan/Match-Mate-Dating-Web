@@ -25,7 +25,7 @@ paths:
         "200": {description: Event page, content: {application/json: {schema: {$ref: "#/components/schemas/EventPage"}}}}
         "422": {$ref: "#/components/responses/Problem"}
     post:
-      summary: Create a draft event
+      summary: Create a draft event; administrator role required
       security: [{bearerAuth: []}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/EventInput"}}}}
       responses:

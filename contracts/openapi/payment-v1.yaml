@@ -1,0 +1,112 @@
+openapi: 3.1.0
+info:
+  title: MatchMate Payment API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /payments/initiate:
+    post:
+      summary: Initiate PayHere checkout from an authoritative booking snapshot
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InitiatePayment' }
+      responses:
+        '201':
+          description: Checkout created or safely replayed
+          content: { application/json: { schema: { $ref: '#/components/schemas/Checkout' } } }
+        '401': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /bookings/{bookingId}/payment:
+    get:
+      summary: Read the authenticated member's payment status
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Payment, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /payments/payhere/callback:
+    post:
+      summary: Receive and verify a PayHere server notification
+      description: Provider-authenticated, replay-protected endpoint. It does not use a member JWT.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [merchant_id, order_id, payment_id, payhere_amount, payhere_currency, status_code, md5sig]
+              properties:
+                merchant_id: { type: string }
+                order_id: { type: string }
+                payment_id: { type: string }
+                payhere_amount: { type: string, pattern: '^(0|[1-9][0-9]*)\.[0-9]{2}$' }
+                payhere_currency: { type: string, pattern: '^[A-Z]{3}$' }
+                status_code: { type: string, enum: ['2', '0', '-1', '-2', '-3'] }
+                md5sig: { type: string }
+      responses:
+        '200': { description: Callback recorded, including a valid duplicate }
+        '400': { $ref: '#/components/responses/Problem' }
+        '500': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Problem details
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    InitiatePayment:
+      type: object
+      additionalProperties: false
+      required: [bookingId, firstName, lastName, email, phone, address, city, country]
+      properties:
+        bookingId: { type: string, format: uuid }
+        firstName: { type: string, maxLength: 100 }
+        lastName: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+        phone: { type: string, maxLength: 32 }
+        address: { type: string, maxLength: 300 }
+        city: { type: string, maxLength: 100 }
+        country: { type: string, maxLength: 100 }
+    Payment:
+      type: object
+      required: [paymentId, bookingId, orderId, amount, currency, provider, state, version, createdAt, updatedAt]
+      properties:
+        paymentId: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        orderId: { type: string }
+        amount: { type: string, pattern: '^(0|[1-9][0-9]*)\.[0-9]{2}$' }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        provider: { type: string, const: PAYHERE }
+        state: { type: string, enum: [PENDING, COMPLETED, FAILED, REVIEW] }
+        version: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+    Checkout:
+      type: object
+      required: [payment, actionUrl, fields]
+      properties:
+        payment: { $ref: '#/components/schemas/Payment' }
+        actionUrl: { type: string, format: uri }
+        fields: { type: object, additionalProperties: { type: string } }
+    Problem:
+      type: object
+      required: [type, title, status, code, detail]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        detail: { type: string }
+        traceId: { type: string }

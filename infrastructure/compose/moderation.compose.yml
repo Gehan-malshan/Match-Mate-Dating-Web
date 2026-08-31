@@ -1,0 +1,48 @@
+name: matchmate-moderation
+services:
+  postgres-moderation:
+    image: postgres:17-alpine
+    environment: {POSTGRES_DB: matchmate_moderation, POSTGRES_USER: matchmate, POSTGRES_PASSWORD: matchmate}
+    ports: ["5439:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U matchmate -d matchmate_moderation"], interval: 5s, timeout: 3s, retries: 20}
+    volumes: ["moderation-postgres:/var/lib/postgresql/data"]
+  moderation-migrate:
+    image: matchmate/moderation-service:development
+    build: {context: ../../services/moderation-service}
+    entrypoint: ["/moderation-migrate"]
+    environment: &moderation-environment
+      APP_ENV: development
+      HTTP_ADDRESS: :8087
+      DATABASE_URL: postgres://matchmate:matchmate@postgres-moderation:5432/matchmate_moderation?sslmode=disable
+      RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
+      EVENT_EXCHANGE: matchmate.events
+      ACCOUNT_JWKS_URL: http://account-api:8081/.well-known/jwks.json
+      JWT_ISSUER: matchmate-account
+      JWT_AUDIENCE: matchmate-api
+      ALLOWED_ORIGINS: http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174
+      MODERATION_REPORT_RATE_LIMIT_PER_HOUR: "5"
+      MODERATION_EXPIRY_INTERVAL: 30s
+    depends_on: {postgres-moderation: {condition: service_healthy}}
+    restart: "no"
+  moderation-api:
+    image: matchmate/moderation-service:development
+    build: {context: ../../services/moderation-service}
+    environment: *moderation-environment
+    ports: ["8087:8087"]
+    depends_on: {moderation-migrate: {condition: service_completed_successfully}, account-api: {condition: service_started}}
+    restart: unless-stopped
+  moderation-outbox-relay:
+    image: matchmate/moderation-service:development
+    build: {context: ../../services/moderation-service}
+    entrypoint: ["/moderation-outbox-relay"]
+    environment: *moderation-environment
+    depends_on: {moderation-migrate: {condition: service_completed_successfully}, rabbitmq: {condition: service_healthy}}
+    restart: unless-stopped
+  moderation-expiry-worker:
+    image: matchmate/moderation-service:development
+    build: {context: ../../services/moderation-service}
+    entrypoint: ["/moderation-expiry-worker"]
+    environment: *moderation-environment
+    depends_on: {moderation-migrate: {condition: service_completed_successfully}}
+    restart: unless-stopped
+volumes: {moderation-postgres: {}}
