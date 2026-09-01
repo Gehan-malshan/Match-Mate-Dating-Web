@@ -31,6 +31,7 @@ services:
     entrypoint: ["/booking-expiry"]
     environment: {BOOKING_DATABASE_URL: "postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable"}
     depends_on: {booking-migrate: {condition: service_completed_successfully}}
+    restart: unless-stopped
   payment-migrate:
     build: {context: ../../services/payment-service}
     entrypoint: ["/payment-migrate"]
@@ -56,17 +57,17 @@ services:
     entrypoint: ["/booking-outbox"]
     environment:
       BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
-      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
-    depends_on: {booking-migrate: {condition: service_completed_successfully}}
-    restart: on-failure
+      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
+    depends_on: {booking-migrate: {condition: service_completed_successfully}, rabbitmq: {condition: service_healthy}}
+    restart: unless-stopped
   booking-payment-consumer:
     build: {context: ../../services/booking-service}
     entrypoint: ["/booking-payment-consumer"]
     environment:
       BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
-      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
-    depends_on: {booking-migrate: {condition: service_completed_successfully}}
-    restart: on-failure
+      BOOKING_RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
+    depends_on: {booking-migrate: {condition: service_completed_successfully}, rabbitmq: {condition: service_healthy}}
+    restart: unless-stopped
   payment-outbox:
     build: {context: ../../services/payment-service}
     entrypoint: ["/payment-outbox"]
@@ -78,9 +79,9 @@ services:
       PAYHERE_RETURN_URL: http://localhost:5173/app/bookings
       PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
       PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-https://example.test/api/v1/payments/payhere/callback}
-      PAYMENT_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
-    depends_on: {payment-migrate: {condition: service_completed_successfully}}
-    restart: on-failure
+      PAYMENT_RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
+    depends_on: {payment-migrate: {condition: service_completed_successfully}, rabbitmq: {condition: service_healthy}}
+    restart: unless-stopped
   payment-reconciliation:
     build: {context: ../../services/payment-service}
     entrypoint: ["/payment-reconciliation"]
@@ -93,4 +94,5 @@ services:
       PAYHERE_CANCEL_URL: http://localhost:5173/app/bookings
       PAYHERE_NOTIFY_URL: ${PAYHERE_NOTIFY_URL:-https://example.test/api/v1/payments/payhere/callback}
     depends_on: {payment-migrate: {condition: service_completed_successfully}}
+    restart: unless-stopped
 volumes: {booking-postgres: {}, payment-postgres: {}}

@@ -59,11 +59,13 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgres://matchmate:matchmate@postgres-event:5432/matchmate_event?sslmode=disable
-      RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
+      RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
       EVENT_EXCHANGE: matchmate.events
     depends_on:
       event-migrate:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     restart: on-failure
     profiles: ["messaging"]
 volumes:
