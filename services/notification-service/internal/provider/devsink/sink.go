@@ -16,7 +16,7 @@ type Sink struct {
 
 func New(log *slog.Logger) *Sink { return &Sink{log: log} }
 
-func (s *Sink) Send(_ context.Context, delivery domain.Delivery, _ domain.RenderedMessage) (string, error) {
+func (s *Sink) Send(_ context.Context, delivery domain.Delivery, _ domain.RenderedMessage, _ string) (string, error) {
 	reference := "dev-sink:" + delivery.ID
 	s.log.Info("notification_dev_sink_delivered",
 		"delivery_id", delivery.ID,

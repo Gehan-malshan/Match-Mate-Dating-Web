@@ -12,10 +12,17 @@ import (
 var ErrInvalidEvent = errors.New("invalid notification event")
 
 type Router struct {
-	locale string
+	locale  string
+	channel string
 }
 
-func NewRouter(locale string) *Router { return &Router{locale: locale} }
+func NewRouter(locale string, channels ...string) *Router {
+	channel := "DEVELOPMENT"
+	if len(channels) > 0 && channels[0] != "" {
+		channel = channels[0]
+	}
+	return &Router{locale: locale, channel: channel}
+}
 
 type accountPayload struct {
 	AccountID string `json:"accountId"`
@@ -33,7 +40,7 @@ func (r *Router) Route(event domain.EventEnvelope) (domain.Plan, error) {
 		return domain.Plan{}, ErrInvalidEvent
 	}
 
-	plan := domain.Plan{Action: domain.ActionIgnore, Locale: r.locale, Channel: "DEVELOPMENT", Variables: map[string]string{}}
+	plan := domain.Plan{Action: domain.ActionIgnore, Locale: r.locale, Channel: r.channel, Variables: map[string]string{}}
 	switch event.EventType {
 	case "AccountRegistered", "AccountVerified", "ProfileApproved", "ProfileHidden", "AccountDeactivated":
 		var payload accountPayload

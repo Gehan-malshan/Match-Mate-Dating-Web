@@ -14,10 +14,17 @@ import (
 type Worker struct {
 	repository Repository
 	sender     provider.Sender
+	resolver   RecipientResolver
 	log        *slog.Logger
 	lease      time.Duration
 	retryBase  time.Duration
 	now        func() time.Time
+}
+
+// RecipientResolver resolves a verified delivery destination only at send time.
+// The Notification database continues to store account IDs, not email addresses.
+type RecipientResolver interface {
+	Resolve(context.Context, string) (string, error)
 }
 
 type Repository interface {
@@ -25,8 +32,8 @@ type Repository interface {
 	CompleteAttempt(context.Context, domain.Delivery, postgres.AttemptResult) (domain.DeliveryState, error)
 }
 
-func NewWorker(repository Repository, sender provider.Sender, log *slog.Logger, lease, retryBase time.Duration) *Worker {
-	return &Worker{repository: repository, sender: sender, log: log, lease: lease, retryBase: retryBase, now: time.Now}
+func NewWorker(repository Repository, sender provider.Sender, resolver RecipientResolver, log *slog.Logger, lease, retryBase time.Duration) *Worker {
+	return &Worker{repository: repository, sender: sender, resolver: resolver, log: log, lease: lease, retryBase: retryBase, now: time.Now}
 }
 
 func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
@@ -42,7 +49,15 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		result.PermanentFailure = true
 		result.ErrorCode = "TEMPLATE_RENDER_INVALID"
 	} else {
-		reference, sendErr := w.sender.Send(ctx, delivery, message)
+		recipient := ""
+		var sendErr error
+		if w.resolver != nil {
+			recipient, sendErr = w.resolver.Resolve(ctx, delivery.RecipientAccountID)
+		}
+		reference := ""
+		if sendErr == nil {
+			reference, sendErr = w.sender.Send(ctx, delivery, message, recipient)
+		}
 		result.CompletedAt = w.now().UTC()
 		result.ProviderReference = reference
 		if sendErr == nil {

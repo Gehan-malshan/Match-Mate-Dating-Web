@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -42,6 +44,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	mux.Handle("GET /auth/google/start", accountOAuthProxy(client, "/auth/google/start"))
+	mux.Handle("GET /auth/google/callback", accountOAuthProxy(client, "/auth/google/callback"))
 	mux.Handle("/graphql", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		server.ServeHTTP(w, r.WithContext(requestcontext.WithHTTP(r.Context(), r, w)))
@@ -55,6 +59,38 @@ func main() {
 		logger.Error("graphql_gateway_stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+// accountOAuthProxy exposes only the browser OAuth redirect endpoints. The
+// Account service stays private behind the GraphQL gateway in production.
+func accountOAuthProxy(client *upstream.Client, path string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		target := client.Services.Account + path
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
+		if err != nil {
+			http.Error(w, "OAuth service unavailable", http.StatusBadGateway)
+			return
+		}
+		response, err := client.HTTP.Do(req)
+		if err != nil {
+			http.Error(w, "OAuth service unavailable", http.StatusBadGateway)
+			return
+		}
+		defer response.Body.Close()
+		for key, values := range response.Header {
+			for _, value := range values {
+				if key == "Set-Cookie" {
+					value = strings.Replace(value, "Path=/api/v1/auth", "Path=/", 1)
+				}
+				w.Header().Add(key, value)
+			}
+		}
+		w.WriteHeader(response.StatusCode)
+		_, _ = io.Copy(w, response.Body)
+	})
 }
 
 func cors(cfg config.Config, next http.Handler) http.Handler {

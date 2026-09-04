@@ -54,6 +54,11 @@ services:
       COOKIE_SECURE: "false"
       DEV_EXPOSE_VERIFICATION_TOKEN: "true"
       CURRENT_CONSENT_VERSION: privacy-2026-08
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URL: ${GOOGLE_OAUTH_REDIRECT_URL:-http://localhost:8080/auth/google/callback}
+      GOOGLE_OAUTH_SUCCESS_REDIRECT_URL: ${GOOGLE_OAUTH_SUCCESS_REDIRECT_URL:-http://localhost:5173/login?google=success}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-matchmate-local-notification-only}
     ports: ["8081:8081"]
     depends_on:
       account-seed:

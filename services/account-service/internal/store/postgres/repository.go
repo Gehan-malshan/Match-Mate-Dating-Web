@@ -106,6 +106,14 @@ func (r *Repository) CredentialsByEmail(ctx context.Context, email string) (stor
 	c.Account.Roles = roles
 	return c, err
 }
+func (r *Repository) AccountByEmail(ctx context.Context, email string) (domain.Account, error) {
+	var a domain.Account
+	err := r.pool.QueryRow(ctx, `SELECT a.account_id,a.normalized_email,a.status,a.verification_state,a.token_version,a.created_at,a.updated_at,COALESCE(array_agg(ra.role) FILTER (WHERE ra.revoked_at IS NULL),ARRAY[]::text[]) FROM account a LEFT JOIN role_assignment ra USING(account_id) WHERE a.normalized_email=$1 GROUP BY a.account_id`, email).Scan(&a.ID, &a.Email, &a.Status, &a.Verification, &a.TokenVersion, &a.CreatedAt, &a.UpdatedAt, &a.Roles)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return a, store.ErrNotFound
+	}
+	return a, err
+}
 func (r *Repository) AccountByID(ctx context.Context, id string) (domain.Account, error) {
 	var a domain.Account
 	err := r.pool.QueryRow(ctx, `SELECT a.account_id,a.normalized_email,a.status,a.verification_state,a.token_version,a.created_at,a.updated_at,COALESCE(array_agg(ra.role) FILTER (WHERE ra.revoked_at IS NULL),ARRAY[]::text[]) FROM account a LEFT JOIN role_assignment ra USING(account_id) WHERE a.account_id=$1 GROUP BY a.account_id`, id).Scan(&a.ID, &a.Email, &a.Status, &a.Verification, &a.TokenVersion, &a.CreatedAt, &a.UpdatedAt, &a.Roles)

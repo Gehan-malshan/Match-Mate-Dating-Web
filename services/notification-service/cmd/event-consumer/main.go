@@ -66,7 +66,11 @@ func main() {
 		panic(err)
 	}
 
-	service := application.New(application.NewRouter(cfg.Locale), postgres.New(pool), cfg.MaxAttempts)
+	notificationChannel := "DEVELOPMENT"
+	if cfg.Provider == "smtp" {
+		notificationChannel = "EMAIL"
+	}
+	service := application.New(application.NewRouter(cfg.Locale, notificationChannel), postgres.New(pool), cfg.MaxAttempts)
 	log.Info("notification_consumer_started", "queue", cfg.QueueName)
 	for {
 		select {

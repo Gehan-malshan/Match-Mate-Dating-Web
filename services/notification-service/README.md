@@ -15,11 +15,12 @@ The first executable vertical slice provides:
 - Database-backed delivery claims, leases, attempts, exponential retry scheduling, permanent-failure state, and exhausted/dead-letter state.
 - A RabbitMQ dead-letter queue for malformed or oversized business events.
 - A privacy-safe development sink that records successful attempts without resolving or logging email/phone destinations.
+- An SMTP provider adapter for approved real email delivery. It resolves a verified recipient only at send time through a narrowly authenticated Account endpoint, requires STARTTLS, and never persists/logs the address or rendered body.
 - Liveness/readiness endpoints and sanitized structured logs.
 - An authenticated member-owned in-app feed with cursor pagination, unread counts, idempotent mark-read operations, and historical template-version rendering.
 - A Midnight Chemistry member notification bell, recent-items popover, full history page, and polling-based popup toasts.
 
-This is an executable in-app development slice, not production email/SMS completion. Real email remains intentionally deferred until provider selection, credentials, constrained Account contact resolution, and channel/legal policy are approved. Consent/preference source integration, retry replay operations, metrics/traces, and broader Event/Payment/Matchmaking/Moderation recipients also remain required.
+This is an executable in-app and SMTP email slice. SMTP credentials, a verified sender domain, consent/preference source integration, retry replay operations, metrics/traces, and broader Event/Payment/Matchmaking/Moderation recipients still require production approval.
 
 ## Safe initial boundary
 
@@ -124,7 +125,11 @@ Configuration rejects `dev-sink` when `APP_ENV` is not `development` or `test`. 
 | `NOTIFICATION_QUEUE` | `notification.business.v1` | Durable consumer queue |
 | `NOTIFICATION_DEAD_LETTER_EXCHANGE` | `matchmate.notification.dlx` | Rejected-message exchange |
 | `NOTIFICATION_DEAD_LETTER_QUEUE` | `notification.business.v1.dlq` | Operations dead-letter queue |
-| `NOTIFICATION_PROVIDER` | `dev-sink` | Provider adapter |
+| `NOTIFICATION_PROVIDER` | `dev-sink` | `dev-sink` for local testing or `smtp` for real email |
+| `SMTP_HOST` / `SMTP_PORT` | Empty / `587` | STARTTLS SMTP server |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | Empty | Provider credentials and verified sender; required for `smtp` |
+| `NOTIFICATION_ACCOUNT_CONTACT_URL` | Required for SMTP | Narrow Account recipient-resolution endpoint |
+| `INTERNAL_SERVICE_TOKEN` | Required for SMTP | Shared Account/Notification internal credential |
 | `NOTIFICATION_DEFAULT_LOCALE` | `en-LK` | Template locale |
 | `NOTIFICATION_MAX_ATTEMPTS` | `5` | Maximum provider attempts |
 | `NOTIFICATION_POLL_INTERVAL` | `1s` | Worker polling interval |
@@ -136,7 +141,7 @@ Configuration rejects `dev-sink` when `APP_ENV` is not `development` or `test`. 
 | `JWT_AUDIENCE` | `matchmate-api` | Required access-token audience |
 | `ALLOWED_ORIGINS` | Member Vite origins | Exact browser CORS allow-list |
 
-Real provider credentials must use the deployment secret manager and must never be committed or placed in Compose defaults.
+Real provider credentials must use the deployment secret manager and must never be committed or placed in Compose defaults. See `docs/runbooks/google-email-local.md` for local Google and SMTP setup.
 
 ## Local development
 

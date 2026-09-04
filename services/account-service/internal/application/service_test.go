@@ -28,6 +28,9 @@ func (f *fakeRepo) Register(_ context.Context, in domain.RegisterInput, hash str
 func (f *fakeRepo) CredentialsByEmail(context.Context, string) (store.Credential, error) {
 	return f.credential, nil
 }
+func (f *fakeRepo) AccountByEmail(context.Context, string) (domain.Account, error) {
+	return f.account, nil
+}
 func (f *fakeRepo) CreateSession(_ context.Context, s domain.Session) error {
 	f.session = s
 	return nil
@@ -83,5 +86,18 @@ func TestLoginRequiresVerificationThenCreatesRotatingSession(t *testing.T) {
 	}
 	if string(repo.session.TokenHash) == pair.RefreshToken {
 		t.Fatal("refresh token stored in plaintext")
+	}
+}
+
+func TestLoginWithGoogleRequiresExistingVerifiedActiveAccount(t *testing.T) {
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"member"}, TokenVersion: 1}}
+	s := testService(t, repo)
+	pair, err := s.LoginWithGoogle(context.Background(), " MEMBER@EXAMPLE.TEST ")
+	if err != nil || pair.AccessToken == "" || repo.session.AccountID != "a1" {
+		t.Fatalf("google login pair=%+v session=%+v err=%v", pair, repo.session, err)
+	}
+	repo.account.Verification = domain.VerificationPending
+	if _, err = s.LoginWithGoogle(context.Background(), "member@example.test"); err == nil {
+		t.Fatal("unverified account logged in with Google")
 	}
 }
