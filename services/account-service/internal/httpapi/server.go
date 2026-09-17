@@ -2,10 +2,15 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +57,8 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/v1/auth/register", s.authLimited(http.HandlerFunc(s.register)))
 	s.mux.HandleFunc("POST /api/v1/auth/verify-email", s.verify)
 	s.mux.Handle("POST /api/v1/auth/login", s.authLimited(http.HandlerFunc(s.login)))
+	s.mux.HandleFunc("GET /api/v1/auth/google/start", s.googleStart)
+	s.mux.HandleFunc("GET /api/v1/auth/google/callback", s.googleCallback)
 	s.mux.Handle("POST /api/v1/auth/refresh", s.authLimited(http.HandlerFunc(s.refresh)))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	s.mux.Handle("GET /api/v1/users/me", s.protected(http.HandlerFunc(s.me)))
@@ -63,6 +70,140 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/v1/users/me/blocks", s.protected(http.HandlerFunc(s.block)))
 	s.mux.Handle("DELETE /api/v1/users/me/blocks/{accountId}", s.protected(http.HandlerFunc(s.unblock)))
 	s.mux.Handle("POST /api/v1/admin/profiles/{accountId}/decision", s.protected(s.roles("moderator", "admin", http.HandlerFunc(s.moderate))))
+	s.mux.HandleFunc("GET /api/v1/internal/notification-recipients/{accountId}", s.notificationRecipient)
+}
+
+type googleTokenResponse struct {
+	AccessToken string `json:"access_token"`
+}
+type googleUserInfo struct {
+	Subject       string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+}
+
+func (s *Server) googleConfigured() bool {
+	return s.cfg.GoogleClientID != "" && s.cfg.GoogleClientSecret != "" && s.cfg.GoogleRedirectURL != ""
+}
+
+func (s *Server) googleStart(w http.ResponseWriter, r *http.Request) {
+	if !s.googleConfigured() {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_NOT_CONFIGURED")
+		return
+	}
+	state, err := randomState()
+	if err != nil {
+		problem(w, r, 500, "INTERNAL_ERROR", "Could not start Google sign in", nil)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "matchmate_google_state", Value: state, Path: "/api/v1/auth/google", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 600})
+	query := url.Values{"client_id": {s.cfg.GoogleClientID}, "redirect_uri": {s.cfg.GoogleRedirectURL}, "response_type": {"code"}, "scope": {"openid email profile"}, "state": {state}, "prompt": {"select_account"}}
+	http.Redirect(w, r, "https://accounts.google.com/o/oauth2/v2/auth?"+query.Encode(), http.StatusFound)
+}
+
+func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
+	if !s.googleConfigured() {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_NOT_CONFIGURED")
+		return
+	}
+	cookie, err := r.Cookie("matchmate_google_state")
+	if err != nil || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
+		s.googleFailure(w, r, "GOOGLE_STATE_INVALID")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "matchmate_google_state", Value: "", Path: "/api/v1/auth/google", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	if r.URL.Query().Get("error") != "" {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_CANCELLED")
+		return
+	}
+	user, err := s.googleUser(r.Context(), r.URL.Query().Get("code"))
+	if err != nil || !user.EmailVerified || user.Email == "" || user.Subject == "" {
+		s.googleFailure(w, r, "GOOGLE_IDENTITY_INVALID")
+		return
+	}
+	pair, err := s.app.LoginWithGoogle(r.Context(), user.Email)
+	if err != nil {
+		var p *domain.ProblemError
+		if errors.As(err, &p) {
+			s.googleFailure(w, r, p.Code)
+			return
+		}
+		s.googleFailure(w, r, "GOOGLE_LOGIN_FAILED")
+		return
+	}
+	s.setSession(w, pair)
+	http.Redirect(w, r, s.cfg.GoogleSuccessRedirectURL, http.StatusFound)
+}
+
+func (s *Server) googleUser(ctx context.Context, code string) (googleUserInfo, error) {
+	if strings.TrimSpace(code) == "" {
+		return googleUserInfo{}, errors.New("authorization code is required")
+	}
+	form := url.Values{"code": {code}, "client_id": {s.cfg.GoogleClientID}, "client_secret": {s.cfg.GoogleClientSecret}, "redirect_uri": {s.cfg.GoogleRedirectURL}, "grant_type": {"authorization_code"}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(req)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return googleUserInfo{}, errors.New("google token exchange failed")
+	}
+	var token googleTokenResponse
+	if err = json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&token); err != nil || token.AccessToken == "" {
+		return googleUserInfo{}, errors.New("google token response invalid")
+	}
+	profileRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://openidconnect.googleapis.com/v1/userinfo", nil)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	profileRequest.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	profile, err := client.Do(profileRequest)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	defer profile.Body.Close()
+	if profile.StatusCode != http.StatusOK {
+		return googleUserInfo{}, errors.New("google userinfo request failed")
+	}
+	var user googleUserInfo
+	if err = json.NewDecoder(io.LimitReader(profile.Body, 1<<20)).Decode(&user); err != nil {
+		return googleUserInfo{}, err
+	}
+	return user, nil
+}
+
+func (s *Server) googleFailure(w http.ResponseWriter, r *http.Request, code string) {
+	separator := "?"
+	if strings.Contains(s.cfg.GoogleSuccessRedirectURL, "?") {
+		separator = "&"
+	}
+	http.Redirect(w, r, s.cfg.GoogleSuccessRedirectURL+separator+"googleError="+url.QueryEscape(code), http.StatusFound)
+}
+
+func randomState() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
+
+func (s *Server) notificationRecipient(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.InternalServiceToken == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-MatchMate-Internal-Token")), []byte(s.cfg.InternalServiceToken)) != 1 {
+		problem(w, r, 401, "INTERNAL_AUTH_REQUIRED", "Internal service authorization is required", nil)
+		return
+	}
+	a, err := s.app.NotificationRecipient(r.Context(), r.PathValue("accountId"))
+	if handle(w, r, err) {
+		return
+	}
+	write(w, 200, map[string]string{"email": a.Email})
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {

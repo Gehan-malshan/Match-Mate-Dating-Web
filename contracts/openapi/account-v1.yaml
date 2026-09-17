@@ -9,6 +9,10 @@ paths:
     post: {security: [], operationId: verifyEmail, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token], properties: {token: {type: string}}}}}}, responses: {'200': {description: Verified}, '400': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/login:
     post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/google/start:
+    get: {security: [], operationId: startGoogleLogin, description: Browser-only OAuth start endpoint. The GraphQL gateway exposes it as /auth/google/start., responses: {'302': {description: Redirect to Google authorization}}}
+  /api/v1/auth/google/callback:
+    get: {security: [], operationId: completeGoogleLogin, description: Browser-only OAuth callback. It validates state, exchanges the authorization code, creates a MatchMate session for an existing verified account, and redirects to the approved frontend login URL., responses: {'302': {description: Redirect to frontend with Google login result}}}
   /api/v1/auth/refresh:
     post: {security: [], operationId: refresh, description: Rotates the HttpOnly refresh cookie and returns a short-lived access token., responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/logout:
@@ -30,10 +34,12 @@ paths:
     delete: {operationId: unblockMember, parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'204': {description: Block removed}}}
   /api/v1/admin/profiles/{accountId}/decision:
     post: {operationId: decideProfile, description: Requires moderator or admin role., parameters: [{$ref: '#/components/parameters/AccountId'}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [decision,reason], properties: {decision: {enum: [APPROVED,HIDDEN]}, reason: {type: string}}}}}}, responses: {'204': {description: Audited decision applied}, '403': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/internal/notification-recipients/{accountId}:
+    get: {security: [{internalServiceToken: []}], operationId: resolveNotificationRecipient, description: Private service-to-service endpoint. It returns a verified active member email only for Notification SMTP delivery; never expose it to browsers., parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'200': {description: Runtime-only email destination, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, '401': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}}}
   /.well-known/jwks.json:
     get: {security: [], operationId: jwks, responses: {'200': {description: Public ES256 keys}}}
 components:
-  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}, internalServiceToken: {type: apiKey, in: header, name: X-MatchMate-Internal-Token}}
   parameters: {AccountId: {name: accountId, in: path, required: true, schema: {type: string, format: uuid}}}
   requestBodies: {Register: {required: true, content: {application/json: {schema: {type: object, required: [email,password,nickname,dateOfBirth,consentVersion], properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 128}, nickname: {type: string}, dateOfBirth: {type: string, format: date}, consentVersion: {type: string}}}}}}}
   responses:

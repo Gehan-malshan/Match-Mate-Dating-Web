@@ -7,3 +7,4 @@ include:
   - path: ./infrastructure/compose/booking-payment.compose.yml
   - path: ./infrastructure/compose/notification.compose.yml
   - path: ./infrastructure/compose/moderation.compose.yml
+  - path: ./infrastructure/compose/graphql.compose.yml

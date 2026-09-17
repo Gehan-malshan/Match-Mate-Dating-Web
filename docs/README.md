@@ -24,7 +24,7 @@ This documentation is the canonical, repository-local source of truth for MatchM
 | Data architecture | [`data/README.md`](data/README.md) | Tables, ownership, migrations, retention, constraints, or consistency change |
 | Testing and CI | [`testing/README.md`](testing/README.md) | Test levels, required cases, tooling, or quality gates change |
 | Security and privacy | [`security/README.md`](security/README.md) | Authentication, authorization, visibility, moderation, secrets, or retention change |
-| REST APIs | [`api/README.md`](api/README.md) and `contracts/openapi/` | Endpoint behavior, schemas, errors, versioning, or authorization change |
+| GraphQL and REST APIs | `services/graphql-gateway/graph/schema.graphqls`, [`api/README.md`](api/README.md), and `contracts/openapi/` | Browser operations, service endpoints, schemas, errors, versioning, or authorization change |
 | RabbitMQ events | `contracts/asyncapi/` | Producers, consumers, routing, envelopes, payloads, or versions change |
 | Architecture decisions | [`adr/README.md`](adr/README.md) | A significant decision is proposed, accepted, replaced, or reversed |
 | Operations | [`runbooks/README.md`](runbooks/README.md) | Deployment, alerts, recovery, reconciliation, or incident behavior changes |

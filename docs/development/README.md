@@ -183,6 +183,7 @@ The root Bun workspace groups all frontend applications and frontend-only packag
 ```text
 frontend/apps/web
 frontend/apps/admin
+frontend/packages/graphql-client
 frontend/packages/ui
 frontend/packages/validation
 frontend/packages/telemetry
@@ -211,21 +212,13 @@ bun install --frozen-lockfile
 bun run typecheck:web
 bun run test:web
 bun run build:web
-bun run typecheck:admin
-bun run test:admin
-bun run build:admin
 bun run dev
 ```
 
-`bun run dev` starts both the member web application on `http://localhost:5173` and
-the protected administrator application on `http://localhost:5174` in one terminal.
-Use the role-based member login at `http://localhost:5173/login`; administrators are
-redirected to the administration app. Individual commands remain available when
-needed:
+`bun run dev` starts one role-aware application on `http://localhost:5173`. Use the shared login; administrators are routed to protected `/admin`. GraphQL runs at `http://localhost:8080/graphql` when the Docker stack is up. The direct web command remains available:
 
 ```powershell
 bun run dev:web
-bun run dev:admin
 ```
 
 Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.

@@ -21,9 +21,16 @@ services:
     environment: &notification-environment
       APP_ENV: development
       NOTIFICATION_DATABASE_URL: postgres://matchmate:matchmate@postgres-notification:5432/matchmate_notification?sslmode=disable
-      NOTIFICATION_RABBITMQ_URL: amqp://matchmate:matchmate@host.docker.internal:5672/
+      NOTIFICATION_RABBITMQ_URL: amqp://matchmate:matchmate@rabbitmq:5672/
       NOTIFICATION_EVENT_EXCHANGE: matchmate.events
-      NOTIFICATION_PROVIDER: dev-sink
+      NOTIFICATION_PROVIDER: ${NOTIFICATION_PROVIDER:-dev-sink}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      NOTIFICATION_ACCOUNT_CONTACT_URL: http://account-api:8081/api/v1/internal/notification-recipients
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-matchmate-local-notification-only}
       NOTIFICATION_DEFAULT_LOCALE: en-LK
       NOTIFICATION_MAX_ATTEMPTS: "5"
       NOTIFICATION_POLL_INTERVAL: 1s
@@ -53,7 +60,8 @@ services:
     environment: *notification-environment
     depends_on:
       notification-migrate: {condition: service_completed_successfully}
-    restart: on-failure
+      rabbitmq: {condition: service_healthy}
+    restart: unless-stopped
 
   notification-worker:
     image: matchmate/notification-service:development

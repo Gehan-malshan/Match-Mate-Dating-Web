@@ -1,35 +1,24 @@
-const baseUrl = import.meta.env.VITE_ACCOUNT_API_URL ?? 'http://localhost:8081/api/v1'
-let accessToken = ''
-let refreshRequest: Promise<boolean> | undefined
+import { GraphQLClient, type GraphQLProblem } from '@matchmate/graphql-client'
 
-export type ApiProblem = { code: string; detail: string; fields?: Record<string,string> }
+export const graphqlClient = new GraphQLClient(import.meta.env.VITE_GRAPHQL_API_URL ?? 'http://localhost:8080/graphql')
+export type ApiProblem = GraphQLProblem
 export type Me = { account:{id:string;email:string;status:string;verification:string;roles:string[]};profile:{accountID:string;nickname:string;dateOfBirth:string;broadLocation:string;bio:string;visibility:string;approval:string;interests:string[];version:number};preferences?:{minAge:number;maxAge:number;intentions:string[];interestedIn:string[];languages:string[];dealBreakers:string[]} }
 export type CommunityProfile = { profileId:string;nickname:string;ageBand:string;broadLocation:string;bio:string;interests:string[] }
 export type CommunityPage = { items:CommunityProfile[];nextCursor?:string }
 
-async function request<T>(path:string,init:RequestInit={},retry=true):Promise<T>{
-  const headers = new Headers(init.headers); headers.set('Content-Type','application/json'); if(accessToken) headers.set('Authorization',`Bearer ${accessToken}`)
-  const response=await fetch(`${baseUrl}${path}`,{...init,headers,credentials:'include'})
-  if(response.status===401&&retry&&path!=='/auth/refresh'){const refreshed=await refresh();if(refreshed)return request<T>(path,init,false)}
-  if(!response.ok){throw await response.json() as ApiProblem}
-  return response.status===204 ? undefined as T : response.json() as Promise<T>
+const meFields = `account { id email status verification roles } profile { accountID nickname dateOfBirth broadLocation bio visibility approval interests version } preferences { minAge maxAge intentions interestedIn languages dealBreakers }`
+
+export async function register(input:{email:string;password:string;nickname:string;dateOfBirth:string;consentVersion:string}) {
+  const data=await graphqlClient.execute<{register:{me:Me;verificationToken?:string}}>(`mutation Register($input:RegisterInput!){register(input:$input){me{${meFields}} verificationToken}}`,{input},false)
+  return data.register
 }
-export async function authenticatedRequest<T>(base:string,path:string,init:RequestInit={},retry=true):Promise<T>{
-  const headers=new Headers(init.headers);headers.set('Accept','application/json');if(init.body)headers.set('Content-Type','application/json');if(accessToken)headers.set('Authorization',`Bearer ${accessToken}`)
-  const response=await fetch(`${base}${path}`,{...init,headers,credentials:'include'})
-  if(response.status===401&&retry){const refreshed=await refresh();if(refreshed)return authenticatedRequest<T>(base,path,init,false)}
-  if(!response.ok)throw await response.json() as ApiProblem
-  return response.status===204?undefined as T:response.json() as Promise<T>
-}
-export async function register(input:{email:string;password:string;nickname:string;dateOfBirth:string;consentVersion:string}){return request<{me:Me;verificationToken?:string}>('/auth/register',{method:'POST',body:JSON.stringify(input)})}
-export async function verifyEmail(token:string){return request('/auth/verify-email',{method:'POST',body:JSON.stringify({token})})}
-export async function login(email:string,password:string){const result=await request<{accessToken:string}>('/auth/login',{method:'POST',body:JSON.stringify({email,password})});accessToken=result.accessToken;return result}
-async function performRefresh(){try{const result=await request<{accessToken:string}>('/auth/refresh',{method:'POST'},false);accessToken=result.accessToken;return true}catch{accessToken='';return false}}
-export function refresh(){if(!refreshRequest){refreshRequest=performRefresh().finally(()=>{refreshRequest=undefined})}return refreshRequest}
-export async function logout(){await request('/auth/logout',{method:'POST'},false);accessToken=''}
-export const getMe=()=>request<Me>('/users/me')
-export const updateProfile=(profile:Record<string,unknown>)=>request<Me['profile']>('/users/me/profile',{method:'PATCH',body:JSON.stringify(profile)})
-export const updatePreferences=(preferences:Record<string,unknown>)=>request<Me['preferences']>('/users/me/matching-preferences',{method:'PUT',body:JSON.stringify(preferences)})
-export const listCommunityProfiles=(cursor='')=>request<CommunityPage>(`/community/profiles?limit=8${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
-export const getCommunityProfile=(profileId:string)=>request<CommunityProfile>(`/community/profiles/${encodeURIComponent(profileId)}`)
-export const blockMember=(profileId:string)=>request<void>('/users/me/blocks',{method:'POST',body:JSON.stringify({accountId:profileId})})
+export async function verifyEmail(token:string){await graphqlClient.execute(`mutation VerifyEmail($token:String!){verifyEmail(token:$token){success}}`,{token},false)}
+export async function login(email:string,password:string){const data=await graphqlClient.execute<{login:{accessToken:string;me:Me}}>(`mutation Login($email:String!,$password:String!){login(email:$email,password:$password){accessToken me{${meFields}}}}`,{email,password},false);graphqlClient.setToken(data.login.accessToken);return data.login}
+export const refresh=()=>graphqlClient.refresh()
+export async function logout(){try{await graphqlClient.execute(`mutation Logout{logout{success}}`,{},false)}finally{graphqlClient.clearToken()}}
+export async function getMe(){const data=await graphqlClient.execute<{me:Me}>(`query Me{me{${meFields}}}`);return data.me}
+export async function updateProfile(profile:Record<string,unknown>){const data=await graphqlClient.execute<{updateProfile:Me['profile']}>(`mutation UpdateProfile($input:ProfileInput!){updateProfile(input:$input){accountID nickname dateOfBirth broadLocation bio visibility approval interests version}}`,{input:profile});return data.updateProfile}
+export async function updatePreferences(preferences:Record<string,unknown>){const data=await graphqlClient.execute<{updatePreferences:NonNullable<Me['preferences']>}>(`mutation UpdatePreferences($input:PreferencesInput!){updatePreferences(input:$input){minAge maxAge intentions interestedIn languages dealBreakers}}`,{input:preferences});return data.updatePreferences}
+export async function listCommunityProfiles(cursor=''){const data=await graphqlClient.execute<{communityProfiles:CommunityPage}>(`query Community($cursor:String){communityProfiles(limit:8,cursor:$cursor){items{profileId nickname ageBand broadLocation bio interests} nextCursor}}`,{cursor:cursor||null});return data.communityProfiles}
+export async function getCommunityProfile(profileId:string){const data=await graphqlClient.execute<{communityProfile:CommunityProfile}>(`query CommunityProfile($profileId:ID!){communityProfile(profileId:$profileId){profileId nickname ageBand broadLocation bio interests}}`,{profileId});return data.communityProfile}
+export async function blockMember(accountId:string){await graphqlClient.execute(`mutation Block($accountId:ID!){blockMember(accountId:$accountId){success}}`,{accountId})}

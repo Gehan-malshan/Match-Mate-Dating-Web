@@ -1,8 +1,10 @@
-# Member Web Application
+# Unified MatchMate Web Application
 
-The member-facing React and TanStack application will support registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event matches, responses, and feedback.
+The single React and TanStack application supports role-separated member and administrator routes, registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event administration, deterministic matching operations, responses, and feedback.
 
 ## Implemented foundation and boundaries
+
+Members and administrators share `/login`. The backend-issued role directs administrators to `/admin`; the member and administrator route groups restore the rotating session and reject unauthorized navigation. Frontend guards are user-experience controls only—the GraphQL gateway and owning services enforce authorization again.
 
 - React + TypeScript.
 - Bun for package management, workspace dependency installation, and script execution.
@@ -10,9 +12,9 @@ The member-facing React and TanStack application will support registration, prof
 - TanStack Router for typed route/access structure.
 - TanStack Query for server state; backend services remain authoritative.
 - TanStack Form and Zod for accessible client validation; server validation is mandatory.
-- Shared presentation components from `frontend/packages/ui` and generated OpenAPI client helpers.
+- Shared GraphQL session/HTTP client from `frontend/packages/graphql-client`.
 
-The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the API Gateway over HTTPS.
+The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the GraphQL BFF over HTTPS.
 
 The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
@@ -28,13 +30,13 @@ All new visual work must follow the canonical [Midnight Chemistry base design sy
 
 The member app now provides atomic seat reservation and PayHere checkout initiation on open event detail pages. Event detail loads the authenticated member's bookings and automatically reopens checkout for an existing `PENDING_PAYMENT` hold, so navigating away never forces a duplicate reservation. `/app/bookings` labels that route **Complete payment**, polls authoritative Booking and Payment state, shows pending, confirmed, failed, expired, cancelled, and review outcomes, and allows unpaid holds to be cancelled safely. Browser return parameters are never treated as payment confirmation.
 
-Booking defaults to `http://localhost:8085/api/v1` and Payment to `http://localhost:8084/api/v1`. Configure `VITE_BOOKING_API_URL` and `VITE_PAYMENT_API_URL` alongside the existing Account and Event variables.
+Booking and payment operations are GraphQL mutations at `VITE_GRAPHQL_API_URL`; the BFF calls Booking and Payment internally.
 
 ## In-app notifications
 
 The member header includes an authenticated notification bell, unread badge, recent-items popover, and link to the paginated `/app/notifications` history. TanStack Query polls the owner-scoped Notification API every 10 seconds. Notifications that arrive after the initial successful load appear as dismissible, reduced-motion-safe popup toasts; existing unread history does not repeatedly pop up on reload. Opening an item or using mark-read/mark-all updates server-owned read state.
 
-The frontend never sends a recipient account ID: Notification derives ownership from the Account access-token subject. It defaults to `http://localhost:8086/api/v1`; configure `VITE_NOTIFICATION_API_URL` for another environment. Real email is deliberately not represented as complete.
+The frontend never sends a recipient account ID: Notification derives ownership from the Account access-token subject forwarded by GraphQL. Real email is deliberately not represented as complete.
 
 ## Local commands
 
@@ -50,7 +52,7 @@ bun run build:web
 
 The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
 
-The Account API defaults to `http://localhost:8081/api/v1` and Event API to `http://localhost:8082/api/v1`. Override them with `VITE_ACCOUNT_API_URL` and `VITE_EVENT_API_URL` (see `.env.example`). APIs must allow the exact Vite origin and use TLS/secure cookies in production.
+GraphQL defaults to `http://localhost:8080/graphql`. Override it with `VITE_GRAPHQL_API_URL` (see `.env.example`). The gateway must allow the exact Vite origin and use TLS/secure cookies in production.
 
 ## Brand assets
 

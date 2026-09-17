@@ -7,5 +7,5 @@ import (
 )
 
 type Sender interface {
-	Send(context.Context, domain.Delivery, domain.RenderedMessage) (string, error)
+	Send(context.Context, domain.Delivery, domain.RenderedMessage, string) (string, error)
 }

@@ -1,21 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
-import { ApiProblem, getMe, login } from '../lib/account-api'
+import { ApiProblem, getMe, login, refresh } from '../lib/account-api'
 
 export function LoginPage() {
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search)
+    const googleError = query.get('googleError')
+    if (googleError) {
+      setMessage(googleError === 'GOOGLE_ACCOUNT_NOT_FOUND' ? 'Create and verify your MatchMate profile before using Google sign in.' : 'Google sign in could not be completed. Please try again.')
+      return
+    }
+    if (query.get('google') !== 'success') return
+    void (async () => {
+      try {
+        if (!await refresh()) throw new Error('Google session was not created')
+        const me = await getMe()
+        await navigate({ to: me.account.roles.includes('admin') ? '/admin' : '/app/profile' })
+      } catch {
+        setMessage('Google sign in finished, but the session could not be restored. Please try again.')
+      }
+    })()
+  }, [navigate])
   const form = useForm({
     defaultValues: { email: '', password: '' },
     onSubmit: async ({ value }) => {
       setMessage('')
       try {
-        await login(value.email, value.password)
-        const me = await getMe()
+        const { me } = await login(value.email, value.password)
         if (me.account.roles.includes('admin')) {
-          window.location.assign(import.meta.env.VITE_ADMIN_APP_URL ?? 'http://localhost:5174')
+          await navigate({ to: '/admin' })
           return
         }
         await navigate({ to: '/app/profile' })
@@ -79,6 +97,12 @@ export function LoginPage() {
           {message && <p className="login-message" role="alert">{message}</p>}
 
           <div className="login-divider"><span>Private by design</span></div>
+          <button className="login-google" type="button" onClick={() => {
+            const graphqlURL = import.meta.env.VITE_GRAPHQL_API_URL ?? 'http://localhost:8080/graphql'
+            window.location.assign(new URL('/auth/google/start', graphqlURL).toString())
+          }}>
+            <span aria-hidden="true">G</span> Continue with Google
+          </button>
           <p className="login-privacy-note">Your email, date of birth, and matching preferences stay private.</p>
           <p className="login-register">New to MatchMate? <Link to="/register">Create your private profile</Link></p>
         </div>

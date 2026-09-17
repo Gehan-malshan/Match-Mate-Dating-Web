@@ -29,6 +29,7 @@ type Repository interface {
 	Register(context.Context, domain.RegisterInput, string, []byte, time.Time, domain.Event) (domain.Me, error)
 	VerifyEmail(context.Context, []byte, time.Time, domain.Event) (domain.Account, error)
 	CredentialsByEmail(context.Context, string) (Credential, error)
+	AccountByEmail(context.Context, string) (domain.Account, error)
 	AccountByID(context.Context, string) (domain.Account, error)
 	CreateSession(context.Context, domain.Session) error
 	RotateSession(context.Context, []byte, domain.Session, time.Time) (domain.Account, error)

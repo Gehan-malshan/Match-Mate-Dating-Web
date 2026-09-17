@@ -1,41 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { blockMember, getCommunityProfile, listCommunityProfiles, refresh } from './account-api'
-
-afterEach(() => vi.unstubAllGlobals())
-
-describe('community profile API client', () => {
-  it('loads a bounded community page and encodes its cursor', async () => {
-    const payload = { items: [], nextCursor: 'next' }
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } }))
-    vi.stubGlobal('fetch', fetchMock)
-    await expect(listCommunityProfiles('cursor value')).resolves.toEqual(payload)
-    expect(fetchMock.mock.calls[0][0]).toContain('/community/profiles?limit=8&cursor=cursor%20value')
-  })
-
-  it('encodes profile identifiers for detail requests', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ profileId: 'safe' }), { status: 200 }))
-    vi.stubGlobal('fetch', fetchMock)
-    await getCommunityProfile('id/with spaces')
-    expect(fetchMock.mock.calls[0][0]).toContain('/community/profiles/id%2Fwith%20spaces')
-  })
-
-  it('uses the block endpoint without exposing profile details', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
-    vi.stubGlobal('fetch', fetchMock)
-    await blockMember('profile-1')
-    expect(fetchMock.mock.calls[0][0]).toContain('/users/me/blocks')
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST', body: JSON.stringify({ accountId: 'profile-1' }) })
-  })
-})
-
-describe('account session API client', () => {
-  it('shares one rotating refresh request across concurrent callers', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ accessToken: 'refreshed-token' }), { status: 200 }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-
-    await expect(Promise.all([refresh(), refresh()])).resolves.toEqual([true, true])
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
+import {afterEach,describe,expect,it,vi} from 'vitest'
+import {blockMember,getCommunityProfile,listCommunityProfiles,refresh} from './account-api'
+const response=(data:unknown)=>new Response(JSON.stringify({data}),{status:200,headers:{'Content-Type':'application/json'}})
+afterEach(()=>vi.unstubAllGlobals())
+describe('GraphQL account client',()=>{
+  it('passes community pagination as GraphQL variables',async()=>{const payload={items:[],nextCursor:'next'};const fetchMock=vi.fn().mockResolvedValue(response({communityProfiles:payload}));vi.stubGlobal('fetch',fetchMock);await expect(listCommunityProfiles('cursor value')).resolves.toEqual(payload);const body=JSON.parse(fetchMock.mock.calls[0][1].body);expect(body.variables).toEqual({cursor:'cursor value'});expect(body.query).toContain('communityProfiles(limit:8')})
+  it('passes opaque profile identifiers as variables',async()=>{const fetchMock=vi.fn().mockResolvedValue(response({communityProfile:{profileId:'safe'}}));vi.stubGlobal('fetch',fetchMock);await getCommunityProfile('id/with spaces');expect(JSON.parse(fetchMock.mock.calls[0][1].body).variables.profileId).toBe('id/with spaces')})
+  it('blocks by identifier without exposing profile details',async()=>{const fetchMock=vi.fn().mockResolvedValue(response({blockMember:{success:true}}));vi.stubGlobal('fetch',fetchMock);await blockMember('profile-1');const body=JSON.parse(fetchMock.mock.calls[0][1].body);expect(body.variables).toEqual({accountId:'profile-1'});expect(body.query).toContain('blockMember')})
+  it('shares one rotating refresh request',async()=>{const fetchMock=vi.fn().mockResolvedValue(response({refreshSession:{accessToken:'refreshed-token'}}));vi.stubGlobal('fetch',fetchMock);await expect(Promise.all([refresh(),refresh()])).resolves.toEqual([true,true]);expect(fetchMock).toHaveBeenCalledTimes(1)})
 })

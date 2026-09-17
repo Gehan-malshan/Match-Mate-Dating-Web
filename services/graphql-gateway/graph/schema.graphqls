@@ -1,0 +1,77 @@
+scalar JSON
+
+type Account { id: ID!, email: String!, status: String!, verification: String!, roles: [String!]! }
+type Profile { accountID: ID!, nickname: String!, dateOfBirth: String!, broadLocation: String!, bio: String!, visibility: String!, approval: String!, interests: [String!]!, version: Int! }
+type MatchingPreferences { minAge: Int!, maxAge: Int!, intentions: [String!]!, interestedIn: [String!]!, languages: [String!]!, dealBreakers: [String!]! }
+type Me { account: Account!, profile: Profile!, preferences: MatchingPreferences }
+type AuthPayload { accessToken: String!, me: Me }
+type RegistrationPayload { me: Me!, verificationToken: String }
+
+type CommunityProfile { profileId: ID!, nickname: String!, ageBand: String!, broadLocation: String!, bio: String!, interests: [String!]! }
+type CommunityPage { items: [CommunityProfile!]!, nextCursor: String }
+
+type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int! }
+type EventPage { items: [Event!]!, nextCursor: String, limit: Int! }
+
+type Booking { bookingId: ID!, eventId: ID!, state: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String }
+type BookingPage { items: [Booking!]! }
+type Payment { paymentId: ID!, bookingId: ID!, orderId: String!, amount: String!, currency: String!, provider: String!, state: String!, version: Int!, createdAt: String!, updatedAt: String!, completedAt: String }
+type Checkout { payment: Payment!, actionUrl: String!, fields: JSON! }
+
+type Notification { notificationId: ID!, sourceEventType: String!, category: String!, title: String!, message: String!, actionPath: String!, readAt: String, createdAt: String! }
+type NotificationPage { items: [Notification!]!, nextCursor: String, unreadCount: Int! }
+type UnreadCount { unreadCount: Int! }
+type UpdatedCount { updatedCount: Int! }
+type OperationResult { success: Boolean! }
+
+type Pairing { pairingId: ID, participantA: ID!, participantB: ID!, participantACode: String, participantBCode: String, score: Float!, safeReasons: [String!]!, source: String }
+type Candidate { participantA: ID!, participantB: ID!, eligible: Boolean!, rejectionCodes: [String!], components: JSON, totalScore: Float, safeReasons: [String!] }
+type Unmatched { participantId: ID!, participantCode: String, reason: String! }
+type MatchingRun { runId: ID!, eventId: ID!, runVersion: Int!, version: Int!, status: String!, rulesetVersion: String!, optimizerVersion: String!, tieBreakPolicy: String!, participantCount: Int!, eligiblePairCount: Int!, createdBy: ID!, createdAt: String!, updatedAt: String!, suggestions: [Pairing!], selections: [Pairing!], unmatched: [Unmatched!], candidates: [Candidate!] }
+type MatchingRunPage { items: [MatchingRun!]! }
+
+input RegisterInput { email: String!, password: String!, nickname: String!, dateOfBirth: String!, consentVersion: String! }
+input ProfileInput { nickname: String, broadLocation: String, bio: String, visibility: String, interests: [String!], expectedVersion: Int! }
+input PreferencesInput { minAge: Int, maxAge: Int, intentions: [String!], interestedIn: [String!], languages: [String!], dealBreakers: [String!] }
+input CheckoutCustomerInput { bookingId: ID!, firstName: String!, lastName: String!, email: String!, phone: String!, address: String!, city: String!, country: String! }
+input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, configuredCapacity: Int!, matchingRulesetVersion: String! }
+input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, participantB: ID!, reason: String! }
+
+type Query {
+  me: Me!
+  communityProfiles(limit: Int = 8, cursor: String): CommunityPage!
+  communityProfile(profileId: ID!): CommunityProfile!
+  events(limit: Int = 12, cursor: String): EventPage!
+  event(eventId: ID!): Event!
+  bookings: BookingPage!
+  payment(bookingId: ID!): Payment!
+  notifications(limit: Int = 20, cursor: String): NotificationPage!
+  unreadNotificationCount: UnreadCount!
+  managedEvents(limit: Int = 100): EventPage!
+  matchingRuns(eventId: ID!): MatchingRunPage!
+  matchingRun(runId: ID!): MatchingRun!
+}
+
+type Mutation {
+  register(input: RegisterInput!): RegistrationPayload!
+  verifyEmail(token: String!): OperationResult!
+  login(email: String!, password: String!): AuthPayload!
+  refreshSession: AuthPayload!
+  logout: OperationResult!
+  updateProfile(input: ProfileInput!): Profile!
+  updatePreferences(input: PreferencesInput!): MatchingPreferences!
+  blockMember(accountId: ID!): OperationResult!
+  createBooking(eventId: ID!, idempotencyKey: String!): Booking!
+  cancelBooking(bookingId: ID!, idempotencyKey: String!): Booking!
+  initiatePayment(input: CheckoutCustomerInput!, idempotencyKey: String!): Checkout!
+  markNotificationRead(notificationId: ID!): OperationResult!
+  markAllNotificationsRead: UpdatedCount!
+  createEvent(input: EventInput!): Event!
+  updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!
+  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!, reason: String): Event!
+  generateMatchingRun(eventId: ID!, idempotencyKey: String!): MatchingRun!
+  reviewMatchingRun(runId: ID!, expectedVersion: Int!): MatchingRun!
+  lockMatchingRun(runId: ID!, expectedVersion: Int!, idempotencyKey: String!): MatchingRun!
+  publishMatchingRun(runId: ID!, expectedVersion: Int!, idempotencyKey: String!): MatchingRun!
+  overridePairing(runId: ID!, expectedVersion: Int!, input: PairingOverrideInput!, idempotencyKey: String!): MatchingRun!
+}

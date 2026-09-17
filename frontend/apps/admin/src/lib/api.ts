@@ -1,220 +1,34 @@
-const accountBase = import.meta.env.VITE_ACCOUNT_API_URL ?? 'http://localhost:8081/api/v1'
-const eventBase = import.meta.env.VITE_EVENT_API_URL ?? 'http://localhost:8082/api/v1'
-const matchmakingBase = import.meta.env.VITE_MATCHMAKING_API_URL ?? 'http://localhost:8083/api/v1'
+import {graphqlClient as client,type ApiProblem as GraphQLProblem} from '../../../web/src/lib/account-api'
+export type Problem=GraphQLProblem
+export type AdminAccount={id:string;email?:string;roles:string[]}
+export type EventStatus='DRAFT'|'PUBLISHED'|'REGISTRATION_OPEN'|'REGISTRATION_CLOSED'|'CANCELLED'
+export type ManagedEvent={eventId:string;organizerId:string;name:string;description:string;venueName:string;broadLocation:string;timeZone:string;startsAt:string;endsAt:string;registrationOpensAt:string;registrationClosesAt:string;price:string;currency:string;configuredCapacity:number;capacityPolicyVersion:number;matchingRulesetVersion:string;status:EventStatus;version:number}
+export type EventInput=Omit<ManagedEvent,'eventId'|'status'|'version'|'capacityPolicyVersion'>
+export type Pairing={pairingId?:string;participantA:string;participantB:string;participantACode?:string;participantBCode?:string;score:number;safeReasons:string[];source?:'ALGORITHM'|'OVERRIDE'}
+export type Candidate={participantA:string;participantB:string;eligible:boolean;rejectionCodes?:string[];components?:Record<string,number>;totalScore?:number;safeReasons?:string[]}
+export type Unmatched={participantId:string;participantCode?:string;reason:string}
+export type MatchingRun={runId:string;eventId:string;runVersion:number;version:number;status:'GENERATED'|'UNDER_REVIEW'|'LOCKED'|'PUBLISHED'|'INVALIDATED';rulesetVersion:string;optimizerVersion:string;tieBreakPolicy:string;participantCount:number;eligiblePairCount:number;createdBy:string;createdAt:string;updatedAt:string;suggestions?:Pairing[];selections?:Pairing[];unmatched?:Unmatched[];candidates?:Candidate[]}
 
-let accessToken = ''
-let refreshRequest: Promise<boolean> | undefined
+const accountFields='id email roles'
+const eventFields='eventId organizerId name description venueName broadLocation timeZone startsAt endsAt registrationOpensAt registrationClosesAt price currency configuredCapacity capacityPolicyVersion matchingRulesetVersion status version'
+const pairingFields='pairingId participantA participantB participantACode participantBCode score safeReasons source'
+const runFields=`runId eventId runVersion version status rulesetVersion optimizerVersion tieBreakPolicy participantCount eligiblePairCount createdBy createdAt updatedAt suggestions{${pairingFields}} selections{${pairingFields}} unmatched{participantId participantCode reason} candidates{participantA participantB eligible rejectionCodes components totalScore safeReasons}`
 
-export type Problem = {
-  code: string
-  detail: string
-  fieldErrors?: Record<string, string>
-  status?: number
-}
-
-export type AdminAccount = {
-  id: string
-  email?: string
-  roles: string[]
-}
-
-export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'CANCELLED'
-
-export type ManagedEvent = {
-  eventId: string
-  organizerId: string
-  name: string
-  description: string
-  venueName: string
-  broadLocation: string
-  timeZone: string
-  startsAt: string
-  endsAt: string
-  registrationOpensAt: string
-  registrationClosesAt: string
-  price: string
-  currency: string
-  configuredCapacity: number
-  capacityPolicyVersion: number
-  matchingRulesetVersion: string
-  status: EventStatus
-  version: number
-}
-
-export type EventInput = Omit<ManagedEvent, 'eventId' | 'status' | 'version' | 'capacityPolicyVersion'>
-
-export type Pairing = {
-  pairingId?: string
-  participantA: string
-  participantB: string
-  participantACode?: string
-  participantBCode?: string
-  score: number
-  safeReasons: string[]
-  source?: 'ALGORITHM' | 'OVERRIDE'
-}
-
-export type Candidate = {
-  participantA: string
-  participantB: string
-  eligible: boolean
-  rejectionCodes?: string[]
-  components?: Record<string, number>
-  totalScore?: number
-  safeReasons?: string[]
-}
-
-export type Unmatched = {
-  participantId: string
-  participantCode?: string
-  reason: string
-}
-
-export type MatchingRun = {
-  runId: string
-  eventId: string
-  runVersion: number
-  version: number
-  status: 'GENERATED' | 'UNDER_REVIEW' | 'LOCKED' | 'PUBLISHED' | 'INVALIDATED'
-  rulesetVersion: string
-  optimizerVersion: string
-  tieBreakPolicy: string
-  participantCount: number
-  eligiblePairCount: number
-  createdBy: string
-  createdAt: string
-  updatedAt: string
-  suggestions?: Pairing[]
-  selections?: Pairing[]
-  unmatched?: Unmatched[]
-  candidates?: Candidate[]
-}
-
-async function call<T>(base: string, path: string, init: RequestInit = {}, retry = true): Promise<T> {
-  const headers = new Headers(init.headers)
-  headers.set('Accept', 'application/json')
-  if (init.body) headers.set('Content-Type', 'application/json')
-  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
-  const response = await fetch(base + path, { ...init, headers, credentials: 'include' })
-  if (response.status === 401 && retry && path !== '/auth/refresh') {
-    if (await refresh()) return call<T>(base, path, init, false)
-  }
-  if (!response.ok) throw await response.json() as Problem
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>
-}
-
-function requireAdmin(account: AdminAccount): AdminAccount {
-  if (!account.roles.includes('admin')) {
-    accessToken = ''
-    throw {
-      code: 'ADMIN_ROLE_REQUIRED',
-      detail: 'This workspace is restricted to MatchMate administrators.',
-      status: 403,
-    } satisfies Problem
-  }
-  return account
-}
-
-async function currentAccount() {
-  const me = await call<{ account: AdminAccount }>(accountBase, '/users/me')
-  return requireAdmin(me.account)
-}
-
-export async function login(email: string, password: string) {
-  const auth = await call<{ accessToken: string }>(accountBase, '/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  })
-  accessToken = auth.accessToken
-  return currentAccount()
-}
-
-async function performRefresh() {
-  try {
-    const auth = await call<{ accessToken: string }>(accountBase, '/auth/refresh', { method: 'POST' }, false)
-    accessToken = auth.accessToken
-    return true
-  } catch {
-    accessToken = ''
-    return false
-  }
-}
-
-export function refresh() {
-  if (!refreshRequest) {
-    refreshRequest = performRefresh().finally(() => {
-      refreshRequest = undefined
-    })
-  }
-  return refreshRequest
-}
-
-export async function restoreAdminSession() {
-  if (!await refresh()) return undefined
-  try {
-    return await currentAccount()
-  } catch {
-    return undefined
-  }
-}
-
-export async function logout() {
-  try {
-    await call<void>(accountBase, '/auth/logout', { method: 'POST' }, false)
-  } finally {
-    accessToken = ''
-  }
-}
-
-export const listManagedEvents = () => call<{ items: ManagedEvent[]; nextCursor?: string; limit: number }>(eventBase, '/organizer/events?limit=100')
-
-export const createEvent = (input: EventInput) => call<ManagedEvent>(eventBase, '/events', {
-  method: 'POST',
-  body: JSON.stringify(input),
-})
-
-export const updateEvent = (eventId: string, input: EventInput, expectedVersion: number) => call<ManagedEvent>(eventBase, `/events/${encodeURIComponent(eventId)}`, {
-  method: 'PATCH',
-  body: JSON.stringify({ ...input, expectedVersion }),
-})
-
-export const transitionEvent = (event: ManagedEvent, action: 'publish' | 'open-registration' | 'close-registration' | 'cancel', reason = '') => call<ManagedEvent>(eventBase, `/events/${encodeURIComponent(event.eventId)}/${action}`, {
-  method: 'POST',
-  body: JSON.stringify({ expectedVersion: event.version, reason }),
-})
-
-function commandKey(prefix: string) {
-  return `${prefix}-${crypto.randomUUID()}`
-}
-
-export const listMatchingRuns = (eventId: string) => call<{ items: MatchingRun[] }>(matchmakingBase, `/events/${encodeURIComponent(eventId)}/matching-runs`)
-
-export const getMatchingRun = (runId: string) => call<MatchingRun>(matchmakingBase, `/matching-runs/${encodeURIComponent(runId)}`)
-
-export const generateMatchingRun = (eventId: string) => call<MatchingRun>(matchmakingBase, `/events/${encodeURIComponent(eventId)}/matching-runs`, {
-  method: 'POST',
-  headers: { 'Idempotency-Key': commandKey('generate') },
-})
-
-export const reviewMatchingRun = (run: MatchingRun) => call<MatchingRun>(matchmakingBase, `/matching-runs/${encodeURIComponent(run.runId)}/review`, {
-  method: 'POST',
-  body: JSON.stringify({ expectedVersion: run.version }),
-})
-
-export const lockMatchingRun = (run: MatchingRun) => call<MatchingRun>(matchmakingBase, `/matching-runs/${encodeURIComponent(run.runId)}/lock`, {
-  method: 'POST',
-  headers: { 'Idempotency-Key': commandKey('lock') },
-  body: JSON.stringify({ expectedVersion: run.version }),
-})
-
-export const publishMatchingRun = (run: MatchingRun) => call<MatchingRun>(matchmakingBase, `/matching-runs/${encodeURIComponent(run.runId)}/publish`, {
-  method: 'POST',
-  headers: { 'Idempotency-Key': commandKey('publish') },
-  body: JSON.stringify({ expectedVersion: run.version }),
-})
-
-export const overridePairing = (run: MatchingRun, input: { removeSelectionId: string; participantA: string; participantB: string; reason: string }) => call<MatchingRun>(matchmakingBase, `/matching-runs/${encodeURIComponent(run.runId)}/overrides`, {
-  method: 'POST',
-  headers: { 'Idempotency-Key': commandKey('override') },
-  body: JSON.stringify({ ...input, expectedVersion: run.version }),
-})
+function requireAdmin(account:AdminAccount){if(!account.roles.includes('admin')){client.clearToken();throw {code:'ADMIN_ROLE_REQUIRED',detail:'This workspace is restricted to MatchMate administrators.',status:403} satisfies Problem}return account}
+export async function login(email:string,password:string){const data=await client.execute<{login:{accessToken:string;me:{account:AdminAccount}}}>(`mutation AdminLogin($email:String!,$password:String!){login(email:$email,password:$password){accessToken me{account{${accountFields}}}}}`,{email,password},false);client.setToken(data.login.accessToken);return requireAdmin(data.login.me.account)}
+export async function refresh(){return client.refresh()}
+async function currentAccount(){const data=await client.execute<{me:{account:AdminAccount}}>(`query AdminMe{me{account{${accountFields}}}}`);return requireAdmin(data.me.account)}
+export async function restoreAdminSession(){try{return await currentAccount()}catch{return undefined}}
+export async function logout(){try{await client.execute(`mutation Logout{logout{success}}`,{},false)}finally{client.clearToken()}}
+export async function listManagedEvents(){const data=await client.execute<{managedEvents:{items:ManagedEvent[];nextCursor?:string;limit:number}}>(`query ManagedEvents{managedEvents(limit:100){items{${eventFields}} nextCursor limit}}`);return data.managedEvents}
+export async function createEvent(input:EventInput){const data=await client.execute<{createEvent:ManagedEvent}>(`mutation CreateEvent($input:EventInput!){createEvent(input:$input){${eventFields}}}`,{input});return data.createEvent}
+export async function updateEvent(eventId:string,input:EventInput,expectedVersion:number){const data=await client.execute<{updateEvent:ManagedEvent}>(`mutation UpdateEvent($eventId:ID!,$input:EventInput!,$expectedVersion:Int!){updateEvent(eventId:$eventId,input:$input,expectedVersion:$expectedVersion){${eventFields}}}`,{eventId,input,expectedVersion});return data.updateEvent}
+export async function transitionEvent(event:ManagedEvent,action:'publish'|'open-registration'|'close-registration'|'cancel',reason=''){const data=await client.execute<{transitionEvent:ManagedEvent}>(`mutation TransitionEvent($eventId:ID!,$action:String!,$expectedVersion:Int!,$reason:String){transitionEvent(eventId:$eventId,action:$action,expectedVersion:$expectedVersion,reason:$reason){${eventFields}}}`,{eventId:event.eventId,action,expectedVersion:event.version,reason:reason||null});return data.transitionEvent}
+const key=(prefix:string)=>`${prefix}-${crypto.randomUUID()}`
+export async function listMatchingRuns(eventId:string){const data=await client.execute<{matchingRuns:{items:MatchingRun[]}}>(`query MatchingRuns($eventId:ID!){matchingRuns(eventId:$eventId){items{${runFields}}}}`,{eventId});return data.matchingRuns}
+export async function getMatchingRun(runId:string){const data=await client.execute<{matchingRun:MatchingRun}>(`query MatchingRun($runId:ID!){matchingRun(runId:$runId){${runFields}}}`,{runId});return data.matchingRun}
+export async function generateMatchingRun(eventId:string){const data=await client.execute<{generateMatchingRun:MatchingRun}>(`mutation GenerateRun($eventId:ID!,$key:String!){generateMatchingRun(eventId:$eventId,idempotencyKey:$key){${runFields}}}`,{eventId,key:key('generate')});return data.generateMatchingRun}
+export async function reviewMatchingRun(run:MatchingRun){const data=await client.execute<{reviewMatchingRun:MatchingRun}>(`mutation ReviewRun($runId:ID!,$version:Int!){reviewMatchingRun(runId:$runId,expectedVersion:$version){${runFields}}}`,{runId:run.runId,version:run.version});return data.reviewMatchingRun}
+export async function lockMatchingRun(run:MatchingRun){const data=await client.execute<{lockMatchingRun:MatchingRun}>(`mutation LockRun($runId:ID!,$version:Int!,$key:String!){lockMatchingRun(runId:$runId,expectedVersion:$version,idempotencyKey:$key){${runFields}}}`,{runId:run.runId,version:run.version,key:key('lock')});return data.lockMatchingRun}
+export async function publishMatchingRun(run:MatchingRun){const data=await client.execute<{publishMatchingRun:MatchingRun}>(`mutation PublishRun($runId:ID!,$version:Int!,$key:String!){publishMatchingRun(runId:$runId,expectedVersion:$version,idempotencyKey:$key){${runFields}}}`,{runId:run.runId,version:run.version,key:key('publish')});return data.publishMatchingRun}
+export async function overridePairing(run:MatchingRun,input:{removeSelectionId:string;participantA:string;participantB:string;reason:string}){const data=await client.execute<{overridePairing:MatchingRun}>(`mutation Override($runId:ID!,$version:Int!,$input:PairingOverrideInput!,$key:String!){overridePairing(runId:$runId,expectedVersion:$version,input:$input,idempotencyKey:$key){${runFields}}}`,{runId:run.runId,version:run.version,input,key:key('override')});return data.overridePairing}

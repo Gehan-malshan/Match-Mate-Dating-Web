@@ -30,7 +30,7 @@ func (s *repositoryStub) CompleteAttempt(_ context.Context, _ domain.Delivery, r
 
 type senderStub struct{ err error }
 
-func (s senderStub) Send(context.Context, domain.Delivery, domain.RenderedMessage) (string, error) {
+func (s senderStub) Send(context.Context, domain.Delivery, domain.RenderedMessage, string) (string, error) {
 	if s.err != nil {
 		return "", s.err
 	}
@@ -69,7 +69,7 @@ func TestWorkerClassifiesSuccessfulRetryableAndPermanentResults(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			repository := &repositoryStub{delivery: testDelivery(), found: true, state: test.state}
-			worker := NewWorker(repository, senderStub{err: test.sendErr}, slog.New(slog.NewTextHandler(io.Discard, nil)), 30*time.Second, time.Minute)
+			worker := NewWorker(repository, senderStub{err: test.sendErr}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), 30*time.Second, time.Minute)
 			worker.now = func() time.Time { return now }
 			processed, err := worker.RunOnce(context.Background())
 			if err != nil || !processed {
@@ -89,7 +89,7 @@ func TestWorkerTreatsInvalidTemplateAsPermanent(t *testing.T) {
 	delivery := testDelivery()
 	delivery.Template.SubjectTemplate = ""
 	repository := &repositoryStub{delivery: delivery, found: true, state: domain.DeliveryPermanentlyFailed}
-	worker := NewWorker(repository, senderStub{}, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second, time.Minute)
+	worker := NewWorker(repository, senderStub{}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Second, time.Minute)
 	worker.now = time.Now
 	if _, err := worker.RunOnce(context.Background()); err != nil {
 		t.Fatal(err)

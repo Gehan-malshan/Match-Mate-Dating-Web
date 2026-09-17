@@ -31,8 +31,8 @@ Moderation changes additionally require member/organizer/moderator/admin authori
 ## 3. Test ownership and location
 
 ```text
-frontend/apps/web/                member frontend unit/component tests
-frontend/apps/admin/              admin frontend unit/component tests
+frontend/apps/web/                unified member/admin frontend unit/component tests
+services/graphql-gateway/         GraphQL schema, resolver, auth, and proxy tests
 services/<service>/              service unit/component tests
 contracts/                        schemas and compatibility fixtures
 tests/contract/                   cross-component contract checks
@@ -128,7 +128,13 @@ Use disposable dependency containers or isolated ephemeral databases. Do not sha
 
 ## 6. Contract testing
 
-### REST/OpenAPI
+### GraphQL and REST/OpenAPI
+
+- Validate the GraphQL SDL and regenerate server bindings.
+- Compile every frontend operation against the schema and test variable-only user input.
+- Verify member/admin authorization at route, GraphQL resolver, and owning-service layers.
+- Bound pagination, request size, query depth/complexity, aliases, and resolver fan-out.
+- Detect breaking field/input/enum/nullability changes and keep an explicit migration window.
 
 - Lint every specification.
 - Validate requests/responses/errors against schemas.

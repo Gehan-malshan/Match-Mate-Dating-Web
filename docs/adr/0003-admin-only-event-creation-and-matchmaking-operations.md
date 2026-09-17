@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-29
 
+Frontend topology note: the separate admin runtime described here was superseded by [ADR 0004](0004-unified-role-aware-frontend-and-graphql-bff.md). The administrator-only authorization decision remains active.
+
 ## Context
 
 The initial Event and Matchmaking prototypes treated the assigned organizer and administrator as equivalent privileged operators. The admin frontend therefore accepted either role, Event Service allowed either role to create a draft, and Matchmaking Service allowed an assigned organizer to list, generate, review, override, lock, and publish runs.

@@ -25,6 +25,8 @@ Bookings, event capacity, event catalog, payments, matching scores/pairings, not
 POST   /api/v1/auth/register
 POST   /api/v1/auth/verify-email
 POST   /api/v1/auth/login
+GET    /api/v1/auth/google/start
+GET    /api/v1/auth/google/callback
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
 GET    /api/v1/users/me
@@ -92,6 +94,10 @@ The executable vertical slice is in this directory. `cmd/api` serves REST, `cmd/
 
 Registration creates an adult-only, `PRIVATE`, `PENDING` profile and records the accepted consent policy version. Login requires a verified, active account. Passwords use Argon2id. ES256 access tokens expire after 10 minutes by default and contain subject, roles, and token version—not PII. A 256-bit opaque refresh token rotates in an `HttpOnly`, `SameSite=Lax` cookie; only its SHA-256 hash is stored. Reuse revokes the entire session family. Deactivation increments token version, revokes sessions, hides the profile, and emits a minimum-data event.
 
+Google sign-in is an optional second authentication method for an existing verified MatchMate account. The Account API performs the OAuth authorization-code exchange, validates Google-returned verified email identity through Google's user-info endpoint, protects the browser redirect with a one-time random state cookie, and issues the same MatchMate session as password login. It deliberately does not create a profile because registration must collect MatchMate's adult-age and consent data. Configure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URL` together. The browser reaches these endpoints only through the GraphQL gateway's `/auth/google/*` proxy.
+
+The private `GET /api/v1/internal/notification-recipients/{accountId}` endpoint is not public API. It accepts only the shared `X-MatchMate-Internal-Token`, returns only a verified active member's email, and exists exclusively for Notification's runtime SMTP delivery. It never exposes an email through GraphQL, community APIs, or RabbitMQ facts.
+
 The community projection is an explicit allow-list: profile ID, nickname, five-year age band, broad location, bio, and interests. It requires active + verified + approved + community-visible state and excludes blocks in either direction. Exact DOB, email, preferences, deal-breakers, credentials, and moderation data cannot be serialized by this DTO.
 
 Profile approval/hiding requires `moderator` or `admin` and creates an audit record. Full moderation case/evidence/appeal ownership remains in the future Moderation Service. Profile media and questionnaire answers are intentionally deferred until their policy and schema decisions are approved. Production verification-email delivery also remains an integration task: development may return a token only when `DEV_EXPOSE_VERIFICATION_TOKEN=true`; production must keep it false and connect an approved private delivery path without putting email addresses in public facts.
@@ -123,7 +129,7 @@ $env:DEV_EXPOSE_VERIFICATION_TOKEN='true'
 go run ./cmd/api
 ```
 
-Run the relay in a second terminal with `go run ./cmd/outbox-relay`. Run the frontend from `frontend/apps/web` with `bun run dev`; it uses `http://localhost:8081/api/v1` unless `VITE_ACCOUNT_API_URL` overrides it.
+Run the relay in a second terminal with `go run ./cmd/outbox-relay`. The unified frontend uses the GraphQL gateway at `http://localhost:8080/graphql`; the gateway calls this service internally.
 
 ### Shared development logins
 

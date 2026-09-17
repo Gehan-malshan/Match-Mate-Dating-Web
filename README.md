@@ -2,13 +2,14 @@
 
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.
 
-This repository is a monorepo for the MatchMate member website, protected administration portal, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
+This repository is a monorepo for one role-aware MatchMate website, a Go GraphQL gateway, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
 
 ## Planned technology stack
 
 - Frontend: React, TypeScript, TanStack Router, TanStack Query, TanStack Form, Zod, and Vite
 - Frontend tooling: Bun for package management and script execution; Vite for development and production builds
 - Backend: Go microservices
+- Browser API: schema-first GraphQL BFF; service APIs remain REST/JSON internally
 - Databases: PostgreSQL with independent ownership per service
 - Messaging: RabbitMQ
 - Payments: PayHere
@@ -22,13 +23,15 @@ This repository is a monorepo for the MatchMate member website, protected admini
 Match-Mate-Dating-Web/
 |-- frontend/
 |   |-- apps/
-|   |   |-- web/                   Member-facing React/TanStack application
-|   |   `-- admin/                 Protected event and matchmaking administration
+|   |   |-- web/                   Unified member/admin React/TanStack application
+|   |   `-- admin/                 Admin UI source consumed by the unified web build
 |   `-- packages/
+|       |-- graphql-client/        Shared GraphQL HTTP/session client
 |       |-- ui/                    Shared frontend design system
 |       |-- validation/            Frontend validation and generated client helpers
 |       `-- telemetry/             Frontend observability helpers
 |-- services/
+|   |-- graphql-gateway/           Browser-facing GraphQL schema and BFF resolvers
 |   |-- account-service/           Authentication, profiles, preferences, and blocks
 |   |-- event-service/             Event catalog, schedules, pricing, and policies
 |   |-- matchmaking-service/       Rule-based compatibility and event pairing
@@ -37,7 +40,7 @@ Match-Mate-Dating-Web/
 |   |-- notification-service/      Email, SMS, and other notifications
 |   `-- moderation-service/        Reports, moderation, and safety actions
 |-- contracts/
-|   |-- openapi/                   REST API contracts
+|   |-- openapi/                   Internal service REST API contracts
 |   `-- asyncapi/                  RabbitMQ event contracts
 |-- infrastructure/
 |   |-- docker/                    Container build conventions
@@ -74,12 +77,14 @@ Match-Mate-Dating-Web/
 - The repository is shared, but every application and service remains independently deployable.
 - Each Go service owns its domain logic, database, migrations, and runtime configuration.
 - Services do not read or write another service's database.
-- REST is used for immediate operations; RabbitMQ carries durable business events.
+- The browser uses GraphQL for immediate operations; the gateway calls service-owned REST APIs, while RabbitMQ carries durable business events.
 - Matchmaking uses transparent rules, weighted scoring, and deterministic pairing optimization without machine learning.
 - Personally identifiable information and private matching preferences are not exposed in community profiles.
 - Shared packages contain technical utilities or frontend components, not shared microservice domain models.
 
 ## Current status
+
+The browser-facing migration now uses one GraphQL endpoint and one role-aware web application. The GraphQL gateway is a BFF over the existing service REST contracts; it does not own domain data or replace RabbitMQ.
 
 The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and initial Moderation slices. Moderation reporting/case/action/appeal APIs publish minimum-safe enforcement facts; downstream enforcement consumers and moderator UI remain incremental work.
 
@@ -108,15 +113,13 @@ Start the backend from the repository root:
 docker compose up --build -d
 ```
 
-In a second terminal, start both frontend applications:
+In a second terminal, start the unified frontend:
 
 ```powershell
 bun run dev
 ```
 
-Open `http://localhost:5173` for the member website. The administrator app runs at
-`http://localhost:5174`; administrator login begins at the member login page and is
-redirected by role. Docker automatically runs the idempotent database migration and
+Open `http://localhost:5173`. Members and administrators use the same login. The backend-issued role routes administrators to protected `/admin`; member features remain separately protected. The browser calls `http://localhost:8080/graphql`. Docker automatically runs the idempotent database migration and
 creates the shared development users.
 
 If GNU Make is installed, `make start` performs those two startup steps for you:
@@ -131,7 +134,7 @@ make status
 
 Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8087`, and the long-running workers should show `Up`.
 
-In a second terminal, start both frontend applications:
+In a second terminal, start the unified frontend:
 
 ```bash
 make apps
@@ -160,11 +163,10 @@ Additional development users are `community@example.test`, `moderator@example.te
 ```text
 make help                         Show all commands
 make setup                        Install Bun and Go dependencies
-make start                        Start backend, then both frontend apps in one terminal
+make start                        Start backend, then the unified frontend
 make backend                      Start/rebuild the local backend
-make apps                         Start member and admin frontends together
-make frontend                     Start the frontend only
-make admin                        Start the admin frontend only
+make apps                         Start the unified member/admin frontend
+make frontend                     Start the unified frontend only
 make status                       Show running and completed containers
 make logs                         Follow backend/infrastructure logs
 make test                         Run backend and frontend tests

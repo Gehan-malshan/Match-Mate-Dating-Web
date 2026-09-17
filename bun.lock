@@ -30,6 +30,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@gsap/react": "^2.1.2",
+        "@matchmate/graphql-client": "workspace:*",
         "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-query": "^5.102.8",
         "@tanstack/react-router": "^1.170.32",
@@ -49,6 +50,10 @@
         "vite": "^8.2.2",
         "vitest": "^4.1.11",
       },
+    },
+    "frontend/packages/graphql-client": {
+      "name": "@matchmate/graphql-client",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -85,6 +90,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@matchmate/admin": ["@matchmate/admin@workspace:frontend/apps/admin"],
+
+    "@matchmate/graphql-client": ["@matchmate/graphql-client@workspace:frontend/packages/graphql-client"],
 
     "@matchmate/web": ["@matchmate/web@workspace:frontend/apps/web"],
 

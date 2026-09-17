@@ -94,6 +94,47 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Tok
 	return s.newSession(ctx, c.Account, "", s.now())
 }
 
+// LoginWithGoogle signs in an existing verified MatchMate account after the
+// Account HTTP adapter has verified Google's OAuth identity response. Google is
+// an additional authentication method; registration still collects the DOB and
+// consent records required by MatchMate's safety rules.
+func (s *Service) LoginWithGoogle(ctx context.Context, email string) (domain.TokenPair, error) {
+	normalized, err := domain.NormalizeEmail(email)
+	if err != nil {
+		return domain.TokenPair{}, problem(401, "GOOGLE_IDENTITY_INVALID", "Google identity is invalid", nil)
+	}
+	a, err := s.store.AccountByEmail(ctx, normalized)
+	if errors.Is(err, store.ErrNotFound) {
+		return domain.TokenPair{}, problem(403, "GOOGLE_ACCOUNT_NOT_FOUND", "Create and verify a MatchMate profile before using Google sign in", nil)
+	}
+	if err != nil {
+		return domain.TokenPair{}, err
+	}
+	if a.Status != domain.AccountActive {
+		return domain.TokenPair{}, problem(403, "ACCOUNT_UNAVAILABLE", "Account is not active", nil)
+	}
+	if a.Verification != domain.VerificationVerified {
+		return domain.TokenPair{}, problem(403, "EMAIL_NOT_VERIFIED", "Verify your MatchMate email before using Google sign in", nil)
+	}
+	return s.newSession(ctx, a, "", s.now())
+}
+
+// NotificationRecipient returns a verified active email only to the narrowly
+// authorized internal delivery adapter. It is never emitted in public events.
+func (s *Service) NotificationRecipient(ctx context.Context, id string) (domain.Account, error) {
+	a, err := s.store.AccountByID(ctx, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return domain.Account{}, problem(404, "NOTIFICATION_RECIPIENT_UNAVAILABLE", "Recipient is unavailable", nil)
+	}
+	if err != nil {
+		return domain.Account{}, err
+	}
+	if a.Status != domain.AccountActive || a.Verification != domain.VerificationVerified {
+		return domain.Account{}, problem(404, "NOTIFICATION_RECIPIENT_UNAVAILABLE", "Recipient is unavailable", nil)
+	}
+	return a, nil
+}
+
 func (s *Service) Refresh(ctx context.Context, raw string) (domain.TokenPair, error) {
 	if raw == "" {
 		return domain.TokenPair{}, problem(401, "REFRESH_REQUIRED", "Refresh session is required", nil)
