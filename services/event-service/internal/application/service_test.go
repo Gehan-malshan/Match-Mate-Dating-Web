@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"github.com/gehan-malshan/matchmate/event-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/event-service/internal/store"
 	"testing"
@@ -26,6 +27,7 @@ func (f *fakeRepo) Update(_ context.Context, _ string, in domain.UpdateInput, _ 
 		return domain.Event{}, store.ErrConflict
 	}
 	f.event.Name = in.Name
+	f.event.PaymentOptions = in.PaymentOptions
 	f.event.Version++
 	return f.event, nil
 }
@@ -42,6 +44,13 @@ func (f *fakeRepo) ListDiscoverable(context.Context, string, int, time.Time) (do
 }
 func (f *fakeRepo) ListManaged(context.Context, string, bool, string, int) (domain.Page, error) {
 	return domain.Page{}, nil
+}
+func (f *fakeRepo) SaveImage(_ context.Context, _ string, _ []byte, _, _ string) (domain.Event, error) {
+	f.event.ImageVersion++
+	return f.event, nil
+}
+func (f *fakeRepo) PublicImage(context.Context, string) ([]byte, error) {
+	return nil, store.ErrNotFound
 }
 func appInput() domain.CreateInput {
 	start := time.Now().UTC().Add(10 * 24 * time.Hour)
@@ -76,6 +85,32 @@ func TestStaleTransitionReturnsStableConflict(t *testing.T) {
 	if !ok || p.Code != "EVENT_VERSION_CONFLICT" {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestDraftPaymentChoiceAndLegacyUpdate(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	in := appInput()
+	in.PaymentOptions = "AT_VENUE"
+	e, err := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, in, "c")
+	if err != nil || e.PaymentOptions != "AT_VENUE" {
+		t.Fatalf("create option: %+v %v", e, err)
+	}
+	in.PaymentOptions = ""
+	e, err = s.Update(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, domain.UpdateInput{CreateInput: in, ExpectedVersion: e.Version}, "c")
+	if err != nil || e.PaymentOptions != "AT_VENUE" {
+		t.Fatalf("legacy update changed option: %+v %v", e, err)
+	}
+}
+
+func TestImageUploadRequiresAdminAndValidImage(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	e, err := s.Create(context.Background(), domain.Principal{Subject:"admin",Roles:[]string{"admin"}}, appInput(), "c")
+	if err != nil { t.Fatal(err) }
+	invalid := base64.StdEncoding.EncodeToString([]byte("not a JPEG"))
+	if _,err = s.UploadImage(context.Background(),domain.Principal{Subject:"member",Roles:[]string{"member"}},e.ID,invalid,"c"); err == nil { t.Fatal("member image upload accepted") }
+	if _,err = s.UploadImage(context.Background(),domain.Principal{Subject:"admin",Roles:[]string{"admin"}},e.ID,invalid,"c"); err == nil { t.Fatal("invalid image accepted") }
 }
 
 func TestPublishRejectsExpiredRegistrationWindow(t *testing.T) {

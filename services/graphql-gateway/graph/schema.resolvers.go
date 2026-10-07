@@ -81,9 +81,13 @@ func (r *mutationResolver) BlockMember(ctx context.Context, accountID string) (*
 }
 
 // CreateBooking is the resolver for the createBooking field.
-func (r *mutationResolver) CreateBooking(ctx context.Context, eventID string, idempotencyKey string) (*model.Booking, error) {
+func (r *mutationResolver) CreateBooking(ctx context.Context, eventID string, paymentMethod *string, idempotencyKey string) (*model.Booking, error) {
 	var result model.Booking
-	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/bookings", http.MethodPost, map[string]string{"eventId": eventID}, &result, map[string]string{"Idempotency-Key": idempotencyKey})
+	method := ""
+	if paymentMethod != nil {
+		method = *paymentMethod
+	}
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/bookings", http.MethodPost, map[string]string{"eventId": eventID, "paymentMethod": method}, &result, map[string]string{"Idempotency-Key": idempotencyKey})
 	return &result, err
 }
 
@@ -124,6 +128,16 @@ func (r *mutationResolver) CreateEvent(ctx context.Context, input model.EventInp
 	return &result, err
 }
 
+// UploadEventImage is the resolver for the uploadEventImage field.
+func (r *mutationResolver) UploadEventImage(ctx context.Context, eventID string, imageBase64 string) (*model.Event, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	var result model.Event
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Event, "/events/"+escape(eventID)+"/image", http.MethodPut, map[string]string{"imageBase64": imageBase64}, &result, nil)
+	return &result, err
+}
+
 // UpdateEvent is the resolver for the updateEvent field.
 func (r *mutationResolver) UpdateEvent(ctx context.Context, eventID string, input model.EventInput, expectedVersion int) (*model.Event, error) {
 	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
@@ -133,7 +147,7 @@ func (r *mutationResolver) UpdateEvent(ctx context.Context, eventID string, inpu
 		"organizerId": input.OrganizerID, "name": input.Name, "description": input.Description, "venueName": input.VenueName,
 		"broadLocation": input.BroadLocation, "timeZone": input.TimeZone, "startsAt": input.StartsAt, "endsAt": input.EndsAt,
 		"registrationOpensAt": input.RegistrationOpensAt, "registrationClosesAt": input.RegistrationClosesAt, "price": input.Price,
-		"currency": input.Currency, "configuredCapacity": input.ConfiguredCapacity, "matchingRulesetVersion": input.MatchingRulesetVersion,
+		"currency": input.Currency, "paymentOptions": input.PaymentOptions, "configuredCapacity": input.ConfiguredCapacity, "matchingRulesetVersion": input.MatchingRulesetVersion,
 		"expectedVersion": expectedVersion,
 	}
 	var result model.Event
@@ -225,6 +239,72 @@ func (r *queryResolver) Bookings(ctx context.Context) (*model.BookingPage, error
 	var result model.BookingPage
 	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/bookings", http.MethodGet, nil, &result, nil)
 	return &result, err
+}
+
+// EventRegistrations is the resolver for the eventRegistrations field.
+func (r *queryResolver) EventRegistrations(ctx context.Context, eventID string, limit *int, offset *int) (*model.EventRegistrationPage, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	pageSize, start := 25, 0
+	if limit != nil {
+		pageSize = *limit
+	}
+	if offset != nil {
+		start = *offset
+	}
+	if pageSize < 1 || pageSize > 50 || start < 0 {
+		return nil, errors.New("limit must be 1–50 and offset must be non-negative")
+	}
+	var bookings struct {
+		Items []struct {
+			BookingID     string  `json:"bookingId"`
+			AccountID     string  `json:"accountId"`
+			EventID       string  `json:"eventId"`
+			State         string  `json:"state"`
+			PaymentMethod string  `json:"paymentMethod"`
+			Amount        string  `json:"amount"`
+			Currency      string  `json:"currency"`
+			CreatedAt     string  `json:"createdAt"`
+			ConfirmedAt   *string `json:"confirmedAt"`
+		} `json:"items"`
+		HasMore bool `json:"hasMore"`
+	}
+	path := "/admin/events/" + escape(eventID) + "/registrations" + query(map[string]string{"limit": intValue(&pageSize, 25), "offset": intValue(&start, 0)})
+	if err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, path, http.MethodGet, nil, &bookings, nil); err != nil {
+		return nil, err
+	}
+	items := make([]*model.EventRegistration, 0, len(bookings.Items))
+	ids := make([]string, 0, len(bookings.Items))
+	seen := map[string]bool{}
+	for _, b := range bookings.Items {
+		items = append(items, &model.EventRegistration{BookingID: b.BookingID, AccountID: b.AccountID, EventID: b.EventID, State: b.State, PaymentMethod: b.PaymentMethod, Amount: b.Amount, Currency: b.Currency, CreatedAt: b.CreatedAt, ConfirmedAt: b.ConfirmedAt})
+		if !seen[b.AccountID] {
+			ids = append(ids, b.AccountID)
+			seen[b.AccountID] = true
+		}
+	}
+	if len(ids) > 0 {
+		var identities struct {
+			Items []struct {
+				AccountID string `json:"accountId"`
+				Nickname  string `json:"nickname"`
+				Email     string `json:"email"`
+			} `json:"items"`
+		}
+		if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/admin/member-identities", http.MethodPost, map[string]any{"accountIds": ids}, &identities, nil); err != nil {
+			return nil, err
+		}
+		for _, identity := range identities.Items {
+			for _, item := range items {
+				if item.AccountID == identity.AccountID {
+					item.Nickname = identity.Nickname
+					item.Email = identity.Email
+				}
+			}
+		}
+	}
+	return &model.EventRegistrationPage{Items: items, HasMore: bookings.HasMore}, nil
 }
 
 // Payment is the resolver for the payment field.

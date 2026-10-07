@@ -24,3 +24,16 @@ func TestNormalizeMoney(t *testing.T) {
 		}
 	}
 }
+
+func TestAllowedPaymentMethod(t *testing.T) {
+	for _, tc := range []struct {
+		options, method string
+		want            bool
+	}{
+		{"ONLINE", "ONLINE", true}, {"ONLINE", "AT_VENUE", false}, {"AT_VENUE", "ONLINE", false}, {"AT_VENUE", "AT_VENUE", true}, {"BOTH", "ONLINE", true}, {"BOTH", "AT_VENUE", true}, {"BOTH", "OTHER", false},
+	} {
+		if got := AllowedPaymentMethod(tc.options, tc.method); got != tc.want {
+			t.Errorf("%s/%s = %t", tc.options, tc.method, got)
+		}
+	}
+}

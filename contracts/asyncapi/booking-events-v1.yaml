@@ -40,3 +40,4 @@ components:
             amount: {type: string}
             currency: {type: string}
             state: {type: string}
+            paymentMethod: {type: string, enum: [ONLINE,AT_VENUE], description: Optional additive booking payment method snapshot; absent historical facts are ONLINE}

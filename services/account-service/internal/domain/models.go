@@ -26,6 +26,11 @@ type Account struct {
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
+type AdminMemberIdentity struct {
+	AccountID string `json:"accountId"`
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+}
 type Profile struct {
 	AccountID     string    `json:"accountId"`
 	Nickname      string    `json:"nickname"`

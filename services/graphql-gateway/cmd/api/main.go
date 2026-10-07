@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -46,7 +47,9 @@ func main() {
 	mux.HandleFunc("GET /health/live", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	mux.Handle("GET /auth/google/start", accountOAuthProxy(client, "/auth/google/start"))
 	mux.Handle("GET /auth/google/callback", accountOAuthProxy(client, "/auth/google/callback"))
+	mux.Handle("GET /media/events/{eventId}", eventImageProxy(client))
 	mux.Handle("/graphql", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		server.ServeHTTP(w, r.WithContext(requestcontext.WithHTTP(r.Context(), r, w)))
 	}))
@@ -59,6 +62,37 @@ func main() {
 		logger.Error("graphql_gateway_stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+var eventIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func eventImageProxy(client *upstream.Client) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("eventId")
+		if !eventIDPattern.MatchString(id) {
+			http.NotFound(w, r)
+			return
+		}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, client.Services.Event+"/events/"+id+"/image", nil)
+		if err != nil {
+			http.Error(w, "Image unavailable", http.StatusBadGateway)
+			return
+		}
+		response, err := client.HTTP.Do(req)
+		if err != nil {
+			http.Error(w, "Image unavailable", http.StatusBadGateway)
+			return
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		_, _ = io.Copy(w, io.LimitReader(response.Body, 1<<20))
+	})
 }
 
 // accountOAuthProxy exposes only the browser OAuth redirect endpoints. The

@@ -35,6 +35,7 @@ type Repository interface {
 	RotateSession(context.Context, []byte, domain.Session, time.Time) (domain.Account, error)
 	RevokeSession(context.Context, []byte, time.Time) error
 	GetMe(context.Context, string) (domain.Me, error)
+	AdminMemberIdentities(context.Context, []string) ([]domain.AdminMemberIdentity, error)
 	UpdateProfile(context.Context, string, domain.ProfilePatch, domain.Event) (domain.Profile, error)
 	ReplacePreferences(context.Context, string, domain.PreferenceInput) (domain.Preferences, error)
 	ListCommunity(context.Context, string, string, int) ([]domain.CommunityProfile, string, error)

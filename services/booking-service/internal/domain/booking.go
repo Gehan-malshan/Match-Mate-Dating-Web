@@ -24,6 +24,7 @@ type Booking struct {
 	AccountID     string     `json:"-"`
 	EventID       string     `json:"eventId"`
 	State         State      `json:"state"`
+	PaymentMethod string     `json:"paymentMethod"`
 	Amount        string     `json:"amount"`
 	Currency      string     `json:"currency"`
 	PolicyVersion int64      `json:"policyVersion"`
@@ -38,9 +39,17 @@ type EventSnapshot struct {
 	Status                string    `json:"status"`
 	Price                 string    `json:"price"`
 	Currency              string    `json:"currency"`
+	PaymentOptions        string    `json:"paymentOptions"`
 	ConfiguredCapacity    int       `json:"configuredCapacity"`
 	CapacityPolicyVersion int64     `json:"capacityPolicyVersion"`
 	RegistrationClosesAt  time.Time `json:"registrationClosesAt"`
+}
+
+func AllowedPaymentMethod(options, method string) bool {
+	if options == "" {
+		options = "ONLINE"
+	}
+	return method == "ONLINE" && (options == "ONLINE" || options == "BOTH") || method == "AT_VENUE" && (options == "AT_VENUE" || options == "BOTH")
 }
 
 func ValidateEvent(e EventSnapshot, now time.Time) error {
@@ -50,7 +59,7 @@ func ValidateEvent(e EventSnapshot, now time.Time) error {
 	if !e.RegistrationClosesAt.After(now) {
 		return errors.New("event registration has closed")
 	}
-	if e.ConfiguredCapacity < 1 || !moneyPattern.MatchString(e.Price) || len(e.Currency) != 3 || e.Currency != strings.ToUpper(e.Currency) {
+	if e.ConfiguredCapacity < 1 || !moneyPattern.MatchString(e.Price) || len(e.Currency) != 3 || e.Currency != strings.ToUpper(e.Currency) || (e.PaymentOptions != "" && e.PaymentOptions != "ONLINE" && e.PaymentOptions != "AT_VENUE" && e.PaymentOptions != "BOTH") {
 		return errors.New("event configuration is invalid")
 	}
 	return nil

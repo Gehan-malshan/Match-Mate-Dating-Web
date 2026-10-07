@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { LandingPage } from './LandingPage'
 
 vi.mock('../lib/event-api', () => ({
+  eventImageUrl: () => undefined,
   listEvents: vi.fn().mockResolvedValue({
     items: [{
       eventId: 'preview-event-1',

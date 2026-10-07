@@ -19,6 +19,7 @@ type Booking struct {
 	BookingID     string  `json:"bookingId"`
 	EventID       string  `json:"eventId"`
 	State         string  `json:"state"`
+	PaymentMethod string  `json:"paymentMethod"`
 	Amount        string  `json:"amount"`
 	Currency      string  `json:"currency"`
 	PolicyVersion int     `json:"policyVersion"`
@@ -88,6 +89,8 @@ type Event struct {
 	RegistrationClosesAt   string  `json:"registrationClosesAt"`
 	Price                  string  `json:"price"`
 	Currency               string  `json:"currency"`
+	PaymentOptions         string  `json:"paymentOptions"`
+	ImageVersion           int     `json:"imageVersion"`
 	ConfiguredCapacity     int     `json:"configuredCapacity"`
 	CapacityPolicyVersion  *int    `json:"capacityPolicyVersion,omitempty"`
 	MatchingRulesetVersion string  `json:"matchingRulesetVersion"`
@@ -96,26 +99,46 @@ type Event struct {
 }
 
 type EventInput struct {
-	OrganizerID            string `json:"organizerId"`
-	Name                   string `json:"name"`
-	Description            string `json:"description"`
-	VenueName              string `json:"venueName"`
-	BroadLocation          string `json:"broadLocation"`
-	TimeZone               string `json:"timeZone"`
-	StartsAt               string `json:"startsAt"`
-	EndsAt                 string `json:"endsAt"`
-	RegistrationOpensAt    string `json:"registrationOpensAt"`
-	RegistrationClosesAt   string `json:"registrationClosesAt"`
-	Price                  string `json:"price"`
-	Currency               string `json:"currency"`
-	ConfiguredCapacity     int    `json:"configuredCapacity"`
-	MatchingRulesetVersion string `json:"matchingRulesetVersion"`
+	OrganizerID            string  `json:"organizerId"`
+	Name                   string  `json:"name"`
+	Description            string  `json:"description"`
+	VenueName              string  `json:"venueName"`
+	BroadLocation          string  `json:"broadLocation"`
+	TimeZone               string  `json:"timeZone"`
+	StartsAt               string  `json:"startsAt"`
+	EndsAt                 string  `json:"endsAt"`
+	RegistrationOpensAt    string  `json:"registrationOpensAt"`
+	RegistrationClosesAt   string  `json:"registrationClosesAt"`
+	Price                  string  `json:"price"`
+	Currency               string  `json:"currency"`
+	PaymentOptions         *string `json:"paymentOptions,omitempty"`
+	ConfiguredCapacity     int     `json:"configuredCapacity"`
+	MatchingRulesetVersion string  `json:"matchingRulesetVersion"`
 }
 
 type EventPage struct {
 	Items      []*Event `json:"items"`
 	NextCursor *string  `json:"nextCursor,omitempty"`
 	Limit      int      `json:"limit"`
+}
+
+type EventRegistration struct {
+	BookingID     string  `json:"bookingId"`
+	AccountID     string  `json:"accountId"`
+	Nickname      string  `json:"nickname"`
+	Email         string  `json:"email"`
+	EventID       string  `json:"eventId"`
+	State         string  `json:"state"`
+	PaymentMethod string  `json:"paymentMethod"`
+	Amount        string  `json:"amount"`
+	Currency      string  `json:"currency"`
+	CreatedAt     string  `json:"createdAt"`
+	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
+}
+
+type EventRegistrationPage struct {
+	Items   []*EventRegistration `json:"items"`
+	HasMore bool                 `json:"hasMore"`
 }
 
 type MatchingPreferences struct {

@@ -22,7 +22,7 @@ func main() {
 	if _, e = c.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migration(version integer PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())`); e != nil {
 		panic(e)
 	}
-	for version, file := range []string{"000001_init.up.sql", "000002_cancellation.up.sql"} {
+	for version, file := range []string{"000001_init.up.sql", "000002_cancellation.up.sql", "000003_payment_method.up.sql", "000004_event_registrations.up.sql"} {
 		v := version + 1
 		var applied bool
 		if e = c.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=$1)`, v).Scan(&applied); e != nil {

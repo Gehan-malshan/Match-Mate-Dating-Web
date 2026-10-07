@@ -41,6 +41,9 @@ func Validate(in CreateInput) map[string]string {
 	if !currency.MatchString(in.Currency) {
 		f["currency"] = "must be an uppercase ISO 4217 code"
 	}
+	if in.PaymentOptions != "" && in.PaymentOptions != "ONLINE" && in.PaymentOptions != "AT_VENUE" && in.PaymentOptions != "BOTH" {
+		f["paymentOptions"] = "must be ONLINE, AT_VENUE, or BOTH"
+	}
 	if in.ConfiguredCapacity < 1 || in.ConfiguredCapacity > 10000 {
 		f["configuredCapacity"] = "must be between 1 and 10000"
 	}

@@ -48,6 +48,23 @@ paths:
         "200": {description: Updated event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /events/{eventId}/image:
+    parameters: [{name: eventId, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Fetch the sanitized JPEG of a published event; draft images are not public
+      responses:
+        "200": {description: Event image, content: {image/jpeg: {schema: {type: string, format: binary}}}}
+        "404": {$ref: "#/components/responses/Problem"}
+    put:
+      summary: Replace a draft event image; administrator role required
+      security: [{bearerAuth: []}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, additionalProperties: false, required: [imageBase64], properties: {imageBase64: {type: string, contentEncoding: base64, description: Sanitized JPEG at most 650 KiB and 1600 by 1600 pixels}}}}}}
+      responses:
+        "200": {description: Updated managed event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+        "413": {$ref: "#/components/responses/Problem"}
+        "422": {$ref: "#/components/responses/Problem"}
   /events/{eventId}/{action}:
     parameters:
       - {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
@@ -81,6 +98,7 @@ components:
         registrationClosesAt: {type: string, format: date-time}
         price: {type: string, pattern: "^(0|[1-9][0-9]{0,9})(\\.[0-9]{1,2})?$", example: "4500.00"}
         currency: {type: string, pattern: "^[A-Z]{3}$", example: LKR}
+        paymentOptions: {type: string, enum: [ONLINE,AT_VENUE,BOTH], default: ONLINE, description: Draft payment choices; omitted requests retain legacy online-only behavior}
         configuredCapacity: {type: integer, minimum: 1, maximum: 10000}
         matchingRulesetVersion: {type: string}
     EventUpdate: {allOf: [{$ref: "#/components/schemas/EventInput"}, {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}]}
@@ -88,17 +106,18 @@ components:
       allOf:
         - {$ref: "#/components/schemas/EventInput"}
         - type: object
-          required: [eventId,status,version,capacityPolicyVersion,createdAt,updatedAt]
+          required: [eventId,status,version,imageVersion,capacityPolicyVersion,createdAt,updatedAt]
           properties:
             eventId: {type: string, format: uuid}
             status: {type: string, enum: [DRAFT,PUBLISHED,REGISTRATION_OPEN,REGISTRATION_CLOSED,CANCELLED]}
             version: {type: integer}
+            imageVersion: {type: integer, minimum: 0, description: Zero means no event-owned image}
             capacityPolicyVersion: {type: integer}
             createdAt: {type: string, format: date-time}
             updatedAt: {type: string, format: date-time}
     PublicEvent:
       type: object
-      required: [eventId,name,description,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,configuredCapacity,matchingRulesetVersion,status,version]
+      required: [eventId,name,description,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,paymentOptions,imageVersion,configuredCapacity,matchingRulesetVersion,status,version]
       properties:
         eventId: {type: string, format: uuid}
         name: {type: string}
@@ -111,6 +130,8 @@ components:
         registrationClosesAt: {type: string, format: date-time}
         price: {type: string}
         currency: {type: string}
+        paymentOptions: {type: string, enum: [ONLINE,AT_VENUE,BOTH]}
+        imageVersion: {type: integer, minimum: 0}
         configuredCapacity: {type: integer}
         matchingRulesetVersion: {type: string}
         status: {type: string}

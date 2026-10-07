@@ -18,6 +18,8 @@ type Repository interface {
 	Transition(context.Context, string, int64, domain.Status, string, domain.Fact) (domain.Event, error)
 	ListDiscoverable(context.Context, string, int, time.Time) (domain.Page, error)
 	ListManaged(context.Context, string, bool, string, int) (domain.Page, error)
+	SaveImage(context.Context, string, []byte, string, string) (domain.Event, error)
+	PublicImage(context.Context, string) ([]byte, error)
 }
 
 type OutboxRecord struct {

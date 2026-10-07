@@ -1,5 +1,9 @@
 # MatchMate Testing and Quality Strategy
 
+Event image tests must cover unauthorized upload, invalid/oversized/malformed image, metadata removal, draft-only writes, no public draft exposure, post-publication read, cache/version behavior, and gateway proxy bounds. The current slice includes unit, disposable-schema PostgreSQL, gateway, and frontend checks; production still requires browser E2E, image-rights/moderation policy, abuse-rate and backup-size evidence.
+
+The event payment-choice slice adds unit coverage for allowed methods and server-derived venue confirmation, GraphQL/front-end build checks, and a disposable-schema Booking PostgreSQL component test for one-seat contention and idempotency (`BOOKING_TEST_DATABASE_URL`). Before production, add browser E2E for all three options, migration upgrades from prior schemas, broker redelivery, and PayHere sandbox evidence for online events. Venue confirmation must never be interpreted as payment collection.
+
 This guide defines mandatory testing levels, ownership, critical scenarios, environments, and CI gates. Tests are part of the architecture: they prove privacy, money, capacity, matching, moderation, and compatibility invariants.
 
 ## 1. Principles

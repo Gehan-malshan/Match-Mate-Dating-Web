@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { listEvents } from '../lib/event-api'
+import { eventImageUrl, listEvents } from '../lib/event-api'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
@@ -241,7 +241,7 @@ export function LandingPage() {
 
           {!!events.data?.items.length && <div className="landing-events-grid">
             {events.data.items.slice(0, 3).map((event, index) => <article className="landing-event-card" key={event.eventId}>
-              <img className="landing-event-image" src={['/images/matchmate-rooftop-event.png', '/images/matchmate-about-cafe.png', '/images/matchmate-event-checkin.png'][index % 3]} alt="" aria-hidden="true" />
+              <img className="landing-event-image" src={eventImageUrl(event) ?? ['/images/matchmate-rooftop-event.png', '/images/matchmate-about-cafe.png', '/images/matchmate-event-checkin.png'][index % 3]} alt="" aria-hidden="true" />
               <div className="landing-event-card-wash" aria-hidden="true" />
               <div className="landing-event-card-content">
                 <p className="landing-event-status">{eventStatus(event.status)}</p>

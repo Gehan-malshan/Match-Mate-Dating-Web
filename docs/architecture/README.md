@@ -1,5 +1,11 @@
 # MatchMate System Architecture
 
+Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md). Image rights and moderation remain production gates.
+
+## Current event payment-choice slice
+
+The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**, not processed or marked paid in MatchMate. The member UI shows the due amount and never starts PayHere for venue bookings. Existing events default to online-only. See [ADR-0001](../adr/0001-event-payment-choice.md). Production separation of Payment/Matchmaking services is still an open deployment task.
+
 This is the canonical architecture description for MatchMate. It must remain synchronized with implementation, OpenAPI, AsyncAPI, service READMEs, ADRs, migrations, tests, and runbooks.
 
 ## 1. Product purpose
@@ -48,8 +54,10 @@ Public/community responses must use explicit field allow-lists. Never serialize 
 ```text
 Discover -> register/consent -> verify -> complete safe profile
 -> supply private preferences/questionnaire -> moderation/approval
--> community discovery -> discover event -> time-limited ticket hold
--> PayHere payment -> confirmed booking -> eligible matching pool
+-> community discovery -> discover event -> choose allowed payment method
+-> [online: time-limited hold -> verified PayHere completion -> confirmed booking]
+   OR [venue: confirmed seat immediately -> ticket payment due at entrance]
+-> eligible matching pool when enabled and policy permits
 -> deterministic matching run -> administrator review/override/lock
 -> policy-limited pairing information -> attend event
 -> structured continue/switch/interest response
@@ -238,6 +246,8 @@ Moderation: OPEN -> TRIAGED -> INVESTIGATING -> ACTIONED | DISMISSED
 ```
 
 ## 13. Booking and PayHere flow
+
+For `AT_VENUE`, Booking checks the Event option, uses the same atomic capacity guard, writes a confirmed booking with immutable price/method snapshot and a `BookingConfirmed` outbox fact in one transaction. No PayHere order or expiring hold is created. This is **not** a paid ticket. The flow below applies only to `ONLINE` bookings.
 
 ```text
 Member -> Booking: create hold with Idempotency-Key

@@ -10,11 +10,13 @@ type RegistrationPayload { me: Me!, verificationToken: String }
 type CommunityProfile { profileId: ID!, nickname: String!, ageBand: String!, broadLocation: String!, bio: String!, interests: [String!]! }
 type CommunityPage { items: [CommunityProfile!]!, nextCursor: String }
 
-type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int! }
+type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String!, imageVersion: Int!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int! }
 type EventPage { items: [Event!]!, nextCursor: String, limit: Int! }
 
-type Booking { bookingId: ID!, eventId: ID!, state: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String }
+type Booking { bookingId: ID!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String }
 type BookingPage { items: [Booking!]! }
+type EventRegistration { bookingId: ID!, accountId: ID!, nickname: String!, email: String!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, createdAt: String!, confirmedAt: String }
+type EventRegistrationPage { items: [EventRegistration!]!, hasMore: Boolean! }
 type Payment { paymentId: ID!, bookingId: ID!, orderId: String!, amount: String!, currency: String!, provider: String!, state: String!, version: Int!, createdAt: String!, updatedAt: String!, completedAt: String }
 type Checkout { payment: Payment!, actionUrl: String!, fields: JSON! }
 
@@ -34,7 +36,7 @@ input RegisterInput { email: String!, password: String!, nickname: String!, date
 input ProfileInput { nickname: String, broadLocation: String, bio: String, visibility: String, interests: [String!], expectedVersion: Int! }
 input PreferencesInput { minAge: Int, maxAge: Int, intentions: [String!], interestedIn: [String!], languages: [String!], dealBreakers: [String!] }
 input CheckoutCustomerInput { bookingId: ID!, firstName: String!, lastName: String!, email: String!, phone: String!, address: String!, city: String!, country: String! }
-input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, configuredCapacity: Int!, matchingRulesetVersion: String! }
+input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String, configuredCapacity: Int!, matchingRulesetVersion: String! }
 input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, participantB: ID!, reason: String! }
 
 type Query {
@@ -44,6 +46,7 @@ type Query {
   events(limit: Int = 12, cursor: String): EventPage!
   event(eventId: ID!): Event!
   bookings: BookingPage!
+  eventRegistrations(eventId: ID!, limit: Int = 25, offset: Int = 0): EventRegistrationPage!
   payment(bookingId: ID!): Payment!
   notifications(limit: Int = 20, cursor: String): NotificationPage!
   unreadNotificationCount: UnreadCount!
@@ -61,12 +64,13 @@ type Mutation {
   updateProfile(input: ProfileInput!): Profile!
   updatePreferences(input: PreferencesInput!): MatchingPreferences!
   blockMember(accountId: ID!): OperationResult!
-  createBooking(eventId: ID!, idempotencyKey: String!): Booking!
+  createBooking(eventId: ID!, paymentMethod: String, idempotencyKey: String!): Booking!
   cancelBooking(bookingId: ID!, idempotencyKey: String!): Booking!
   initiatePayment(input: CheckoutCustomerInput!, idempotencyKey: String!): Checkout!
   markNotificationRead(notificationId: ID!): OperationResult!
   markAllNotificationsRead: UpdatedCount!
   createEvent(input: EventInput!): Event!
+  uploadEventImage(eventId: ID!, imageBase64: String!): Event!
   updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!
   transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!, reason: String): Event!
   generateMatchingRun(eventId: ID!, idempotencyKey: String!): MatchingRun!

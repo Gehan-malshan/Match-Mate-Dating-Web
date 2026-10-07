@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/gehan-malshan/matchmate/event-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/event-service/internal/store"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"time"
@@ -22,7 +24,7 @@ func (r *Repository) Create(ctx context.Context, e domain.Event, f domain.Fact) 
 		return e, err
 	}
 	defer tx.Rollback(ctx)
-	_, err = tx.Exec(ctx, `INSERT INTO event(event_id,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::numeric,$13,$14,$15,$16,$17,$18,$19,$20)`, e.ID, e.OrganizerID, e.Name, e.Description, e.VenueName, e.BroadLocation, e.TimeZone, e.StartsAt, e.EndsAt, e.RegistrationOpensAt, e.RegistrationClosesAt, e.Price, e.Currency, e.ConfiguredCapacity, e.CapacityPolicyVersion, e.MatchingRulesetVersion, e.Status, e.Version, e.CreatedAt, e.UpdatedAt)
+	_, err = tx.Exec(ctx, `INSERT INTO event(event_id,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::numeric,$13,$14,$15,$16,$17,$18,$19,$20,$21)`, e.ID, e.OrganizerID, e.Name, e.Description, e.VenueName, e.BroadLocation, e.TimeZone, e.StartsAt, e.EndsAt, e.RegistrationOpensAt, e.RegistrationClosesAt, e.Price, e.Currency, e.ConfiguredCapacity, e.CapacityPolicyVersion, e.MatchingRulesetVersion, e.Status, e.Version, e.CreatedAt, e.UpdatedAt, e.PaymentOptions)
 	if err != nil {
 		return e, err
 	}
@@ -32,13 +34,13 @@ func (r *Repository) Create(ctx context.Context, e domain.Event, f domain.Fact) 
 	return e, tx.Commit(ctx)
 }
 
-const selectEvent = `SELECT event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at FROM event`
+const selectEvent = `SELECT event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version FROM event`
 
 type row interface{ Scan(...any) error }
 
 func scan(q row) (domain.Event, error) {
 	var e domain.Event
-	err := q.Scan(&e.ID, &e.OrganizerID, &e.Name, &e.Description, &e.VenueName, &e.BroadLocation, &e.TimeZone, &e.StartsAt, &e.EndsAt, &e.RegistrationOpensAt, &e.RegistrationClosesAt, &e.Price, &e.Currency, &e.ConfiguredCapacity, &e.CapacityPolicyVersion, &e.MatchingRulesetVersion, &e.Status, &e.Version, &e.CreatedAt, &e.UpdatedAt)
+	err := q.Scan(&e.ID, &e.OrganizerID, &e.Name, &e.Description, &e.VenueName, &e.BroadLocation, &e.TimeZone, &e.StartsAt, &e.EndsAt, &e.RegistrationOpensAt, &e.RegistrationClosesAt, &e.Price, &e.Currency, &e.ConfiguredCapacity, &e.CapacityPolicyVersion, &e.MatchingRulesetVersion, &e.Status, &e.Version, &e.CreatedAt, &e.UpdatedAt, &e.PaymentOptions, &e.ImageVersion)
 	return e, err
 }
 func (r *Repository) Get(ctx context.Context, id string) (domain.Event, error) {
@@ -48,6 +50,50 @@ func (r *Repository) Get(ctx context.Context, id string) (domain.Event, error) {
 	}
 	return e, err
 }
+func (r *Repository) SaveImage(ctx context.Context, id string, data []byte, actor, corr string) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	defer tx.Rollback(ctx)
+	var status domain.Status
+	var previous int64
+	err = tx.QueryRow(ctx, `SELECT status,image_version FROM event WHERE event_id=$1 FOR UPDATE`, id).Scan(&status, &previous)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Event{}, store.ErrNotFound
+	}
+	if err != nil {
+		return domain.Event{}, err
+	}
+	if status != domain.Draft {
+		return domain.Event{}, store.ErrConflict
+	}
+	now := time.Now().UTC()
+	_, err = tx.Exec(ctx, `INSERT INTO event_image(event_id,content_type,image_bytes,updated_at) VALUES($1,'image/jpeg',$2,$3) ON CONFLICT(event_id) DO UPDATE SET image_bytes=excluded.image_bytes,updated_at=excluded.updated_at`, id, data, now)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET image_version=image_version+1,updated_at=$2 WHERE event_id=$1 RETURNING event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version`, id, now))
+	if err != nil {
+		return e, err
+	}
+	if corr == "" {
+		corr = uuid.NewString()
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO event_audit(audit_id,event_id,actor_id,action,reason,prior_state,new_state,correlation_id,occurred_at) VALUES(gen_random_uuid(),$1,$2,'EventImageUpdated','',$3::jsonb,$4::jsonb,$5,$6)`, id, actor, fmt.Sprintf(`{"imageVersion":%d}`, previous), fmt.Sprintf(`{"imageVersion":%d}`, e.ImageVersion), corr, now)
+	if err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+func (r *Repository) PublicImage(ctx context.Context, id string) ([]byte, error) {
+	var data []byte
+	err := r.pool.QueryRow(ctx, `SELECT i.image_bytes FROM event_image i JOIN event e ON e.event_id=i.event_id WHERE e.event_id=$1 AND e.status IN('PUBLISHED','REGISTRATION_OPEN','REGISTRATION_CLOSED')`, id).Scan(&data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, store.ErrNotFound
+	}
+	return data, err
+}
 func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInput, f domain.Fact) (domain.Event, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -55,7 +101,7 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInpu
 	}
 	defer tx.Rollback(ctx)
 	now := time.Now().UTC()
-	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET organizer_id=$3,name=$4,description=$5,venue_name=$6,broad_location=$7,venue_time_zone=$8,starts_at=$9,ends_at=$10,registration_opens_at=$11,registration_closes_at=$12,price=$13::numeric,currency=$14,configured_capacity=$15,capacity_policy_version=CASE WHEN configured_capacity<>$15 THEN capacity_policy_version+1 ELSE capacity_policy_version END,matching_ruleset_version=$16,version=version+1,updated_at=$17 WHERE event_id=$1 AND version=$2 RETURNING event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at`, id, in.ExpectedVersion, in.OrganizerID, in.Name, in.Description, in.VenueName, in.BroadLocation, in.TimeZone, in.StartsAt.UTC(), in.EndsAt.UTC(), in.RegistrationOpensAt.UTC(), in.RegistrationClosesAt.UTC(), in.Price, in.Currency, in.ConfiguredCapacity, in.MatchingRulesetVersion, now))
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET organizer_id=$3,name=$4,description=$5,venue_name=$6,broad_location=$7,venue_time_zone=$8,starts_at=$9,ends_at=$10,registration_opens_at=$11,registration_closes_at=$12,price=$13::numeric,currency=$14,configured_capacity=$15,capacity_policy_version=CASE WHEN configured_capacity<>$15 THEN capacity_policy_version+1 ELSE capacity_policy_version END,matching_ruleset_version=$16,version=version+1,updated_at=$17,payment_options=$18 WHERE event_id=$1 AND version=$2 RETURNING event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version`, id, in.ExpectedVersion, in.OrganizerID, in.Name, in.Description, in.VenueName, in.BroadLocation, in.TimeZone, in.StartsAt.UTC(), in.EndsAt.UTC(), in.RegistrationOpensAt.UTC(), in.RegistrationClosesAt.UTC(), in.Price, in.Currency, in.ConfiguredCapacity, in.MatchingRulesetVersion, now, in.PaymentOptions))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return e, store.ErrConflict
 	}
@@ -76,7 +122,7 @@ func (r *Repository) Transition(ctx context.Context, id string, expected int64, 
 	}
 	defer tx.Rollback(ctx)
 	now := time.Now().UTC()
-	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET status=$3,version=version+1,updated_at=$4 WHERE event_id=$1 AND version=$2 RETURNING event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at`, id, expected, to, now))
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET status=$3,version=version+1,updated_at=$4 WHERE event_id=$1 AND version=$2 RETURNING event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version`, id, expected, to, now))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return e, store.ErrConflict
 	}

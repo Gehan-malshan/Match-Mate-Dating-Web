@@ -42,8 +42,30 @@ func main() {
 			panic(err)
 		}
 	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=2)`).Scan(&applied); err != nil {
+		panic(err)
+	}
+	if !applied {
+		if _, err = tx.Exec(ctx, migrations.PaymentOptionsUp); err != nil {
+			panic(err)
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO schema_migration VALUES(2,now())`); err != nil {
+			panic(err)
+		}
+	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=3)`).Scan(&applied); err != nil {
+		panic(err)
+	}
+	if !applied {
+		if _, err = tx.Exec(ctx, migrations.EventImageUp); err != nil {
+			panic(err)
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO schema_migration VALUES(3,now())`); err != nil {
+			panic(err)
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		panic(err)
 	}
-	fmt.Println("event-service migration 1 ready")
+	fmt.Println("event-service migrations 1-3 ready")
 }

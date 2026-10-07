@@ -1,5 +1,7 @@
 # Unified MatchMate Web Application
 
+Published events now use their Event-owned image on the landing preview, event catalogue, and detail hero when `imageVersion>0`. Existing stock artwork remains the fallback. The browser fetches public bytes from the GraphQL gateway's narrow media route; no Event Service address or image bytes are embedded in GraphQL lists.
+
 The single React and TanStack application supports role-separated member and administrator routes, registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event administration, deterministic matching operations, responses, and feedback.
 
 ## Implemented foundation and boundaries
@@ -27,6 +29,8 @@ GSAP and `@gsap/react` provide progressive entrance and scroll motion. Motion is
 All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). The landing page now implements its semantic dark surfaces, brand gradient, 12-column rhythm, tonal elevation, responsive gutters, approved logo, and motion rules. Future changes must preserve the varied composition and must not drift back toward repeated generic cards or unsupported product claims.
 
 ## Booking and payment journey
+
+For `AT_VENUE` events the web app reserves a confirmed seat without checkout and displays the ticket amount due at the entrance. For `BOTH` events the member selects venue or PayHere online before booking. My bookings does not query Payment for venue reservations. A confirmed venue booking is not a paid ticket. Staff collection/check-in and a payment-free production deployment remain separate work.
 
 The member app now provides atomic seat reservation and PayHere checkout initiation on open event detail pages. Event detail loads the authenticated member's bookings and automatically reopens checkout for an existing `PENDING_PAYMENT` hold, so navigating away never forces a duplicate reservation. `/app/bookings` labels that route **Complete payment**, polls authoritative Booking and Payment state, shows pending, confirmed, failed, expired, cancelled, and review outcomes, and allows unpaid holds to be cancelled safely. Browser return parameters are never treated as payment confirmation.
 

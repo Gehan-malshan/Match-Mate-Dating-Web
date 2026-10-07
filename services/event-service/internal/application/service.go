@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"github.com/gehan-malshan/matchmate/event-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/event-service/internal/store"
@@ -26,7 +27,10 @@ func (s *Service) Create(ctx context.Context, p domain.Principal, in domain.Crea
 		return domain.Event{}, problem(422, "EVENT_VALIDATION_FAILED", "Event configuration is invalid", f)
 	}
 	now := s.now()
-	e := domain.Event{ID: uuid.NewString(), OrganizerID: strings.TrimSpace(in.OrganizerID), Name: strings.TrimSpace(in.Name), Description: strings.TrimSpace(in.Description), VenueName: strings.TrimSpace(in.VenueName), BroadLocation: strings.TrimSpace(in.BroadLocation), TimeZone: in.TimeZone, StartsAt: in.StartsAt.UTC(), EndsAt: in.EndsAt.UTC(), RegistrationOpensAt: in.RegistrationOpensAt.UTC(), RegistrationClosesAt: in.RegistrationClosesAt.UTC(), Price: in.Price, Currency: in.Currency, ConfiguredCapacity: in.ConfiguredCapacity, CapacityPolicyVersion: 1, MatchingRulesetVersion: strings.TrimSpace(in.MatchingRulesetVersion), Status: domain.Draft, Version: 1, CreatedAt: now, UpdatedAt: now}
+	if in.PaymentOptions == "" {
+		in.PaymentOptions = "ONLINE"
+	}
+	e := domain.Event{ID: uuid.NewString(), OrganizerID: strings.TrimSpace(in.OrganizerID), Name: strings.TrimSpace(in.Name), Description: strings.TrimSpace(in.Description), VenueName: strings.TrimSpace(in.VenueName), BroadLocation: strings.TrimSpace(in.BroadLocation), TimeZone: in.TimeZone, StartsAt: in.StartsAt.UTC(), EndsAt: in.EndsAt.UTC(), RegistrationOpensAt: in.RegistrationOpensAt.UTC(), RegistrationClosesAt: in.RegistrationClosesAt.UTC(), Price: in.Price, Currency: in.Currency, PaymentOptions: in.PaymentOptions, ConfiguredCapacity: in.ConfiguredCapacity, CapacityPolicyVersion: 1, MatchingRulesetVersion: strings.TrimSpace(in.MatchingRulesetVersion), Status: domain.Draft, Version: 1, CreatedAt: now, UpdatedAt: now}
 	return s.repo.Create(ctx, e, fact("EventCreated", e, p, corr))
 }
 func (s *Service) Get(ctx context.Context, id string) (domain.Event, error) {
@@ -52,6 +56,9 @@ func (s *Service) Update(ctx context.Context, p domain.Principal, id string, in 
 	}
 	if f := domain.Validate(in.CreateInput); len(f) > 0 {
 		return domain.Event{}, problem(422, "EVENT_VALIDATION_FAILED", "Event configuration is invalid", f)
+	}
+	if in.PaymentOptions == "" {
+		in.PaymentOptions = e.PaymentOptions
 	}
 	v, err := s.repo.Update(ctx, id, in, fact("EventUpdated", e, p, corr))
 	if errors.Is(err, store.ErrConflict) {
@@ -108,6 +115,43 @@ func (s *Service) ListManaged(ctx context.Context, p domain.Principal, cursor st
 	return s.repo.ListManaged(ctx, p.Subject, p.HasRole("admin"), cursor, limit)
 }
 func (s *Service) Ready(ctx context.Context) error { return s.repo.Ping(ctx) }
+func (s *Service) UploadImage(ctx context.Context, p domain.Principal, id, encoded, corr string) (domain.Event, error) {
+	if !p.HasRole("admin") {
+		return domain.Event{}, problem(403, "EVENT_ADMIN_REQUIRED", "Only an administrator can upload an event image", nil)
+	}
+	if _, err := uuid.Parse(id); err != nil {
+		return domain.Event{}, problem(404, "EVENT_NOT_FOUND", "Event was not found", nil)
+	}
+	if len(encoded) > base64.StdEncoding.EncodedLen(domain.MaxImageInputBytes) {
+		return domain.Event{}, problem(413, "EVENT_IMAGE_TOO_LARGE", "Image exceeds the allowed size", nil)
+	}
+	raw, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return domain.Event{}, problem(422, "EVENT_IMAGE_INVALID", "Image is invalid", nil)
+	}
+	safe, err := domain.SanitizeImage(raw)
+	if err != nil {
+		return domain.Event{}, problem(422, "EVENT_IMAGE_INVALID", "Use a JPEG no larger than 650 KiB and 1600 by 1600 pixels", nil)
+	}
+	e, err := s.repo.SaveImage(ctx, id, safe, p.Subject, corr)
+	if errors.Is(err, store.ErrNotFound) {
+		return e, problem(404, "EVENT_NOT_FOUND", "Event was not found", nil)
+	}
+	if errors.Is(err, store.ErrConflict) {
+		return e, problem(409, "EVENT_STATE_CONFLICT", "Images can be changed only while the event is a draft", nil)
+	}
+	return e, err
+}
+func (s *Service) PublicImage(ctx context.Context, id string) ([]byte, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, problem(404, "EVENT_IMAGE_NOT_FOUND", "Image was not found", nil)
+	}
+	data, err := s.repo.PublicImage(ctx, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, problem(404, "EVENT_IMAGE_NOT_FOUND", "Image was not found", nil)
+	}
+	return data, err
+}
 func (s *Service) authorize(ctx context.Context, p domain.Principal, id string) (domain.Event, error) {
 	e, err := s.Get(ctx, id)
 	if err != nil {
