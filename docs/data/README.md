@@ -1,5 +1,9 @@
 # MatchMate Data Architecture
 
+Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version and writes an audit row in one transaction; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
+
+Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state, not a collected-payment state. No venue collection ledger exists yet. Do not infer a paid ticket from the Booking state.
+
 This guide defines service data ownership, proposed schemas, constraints, consistency, migrations, retention, and recovery. Table names are proposed until service migrations are accepted; ownership and invariants are architecture decisions.
 
 ## 1. Non-negotiable ownership rules

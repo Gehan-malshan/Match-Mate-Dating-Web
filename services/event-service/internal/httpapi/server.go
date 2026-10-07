@@ -44,9 +44,11 @@ func (s *Server) routes() {
 	})
 	s.mux.HandleFunc("GET /api/v1/events", s.list)
 	s.mux.HandleFunc("GET /api/v1/events/{eventId}", s.get)
+	s.mux.HandleFunc("GET /api/v1/events/{eventId}/image", s.image)
 	s.mux.Handle("GET /api/v1/organizer/events", s.protected(http.HandlerFunc(s.managed)))
 	s.mux.Handle("POST /api/v1/events", s.protected(http.HandlerFunc(s.create)))
 	s.mux.Handle("PATCH /api/v1/events/{eventId}", s.protected(http.HandlerFunc(s.update)))
+	s.mux.Handle("PUT /api/v1/events/{eventId}/image", s.protected(http.HandlerFunc(s.uploadImage)))
 	for path, status := range map[string]domain.Status{"publish": domain.Published, "open-registration": domain.RegistrationOpen, "close-registration": domain.RegistrationClosed, "cancel": domain.Cancelled} {
 		to := status
 		s.mux.Handle("POST /api/v1/events/{eventId}/"+path, s.protected(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.transition(w, r, to) })))
@@ -82,6 +84,30 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, 200, e.Public())
+}
+func (s *Server) image(w http.ResponseWriter, r *http.Request) {
+	data, err := s.app.PublicImage(r.Context(), r.PathValue("eventId"))
+	if handle(w, r, err) {
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ImageBase64 string `json:"imageBase64"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	e, err := s.app.UploadImage(r.Context(), principal(r), r.PathValue("eventId"), in.ImageBase64, correlation(r))
+	if handle(w, r, err) {
+		return
+	}
+	write(w, http.StatusOK, e)
 }
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var in domain.CreateInput
@@ -157,7 +183,7 @@ func (s *Server) middleware(next http.Handler) http.Handler {
 			}
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Correlation-ID")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(204)
 			return

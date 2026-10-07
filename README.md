@@ -1,5 +1,9 @@
 # MatchMate
 
+Administrators can attach one optional image while an event is a draft. The Event Service stores a sanitized JPEG, and published event pages use it instead of rotating artwork. See [ADR-0002](docs/adr/0002-event-image-storage.md).
+
+Event drafts now support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until the member pays at the entrance. Existing events retain online-only behavior. Venue collection/check-in and a production deployment without Payment/Matchmaking remain separate work.
+
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.
 
 This repository is a monorepo for one role-aware MatchMate website, a Go GraphQL gateway, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.

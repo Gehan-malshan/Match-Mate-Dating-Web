@@ -6,10 +6,12 @@ import (
 	"errors"
 	"github.com/gehan-malshan/matchmate/booking-service/internal/application"
 	"github.com/gehan-malshan/matchmate/booking-service/internal/auth"
+	"github.com/gehan-malshan/matchmate/booking-service/internal/domain"
 	"github.com/google/uuid"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -33,6 +35,7 @@ func New(app *application.Service, v Verifier, log *slog.Logger) http.Handler {
 	m.Handle("POST /api/v1/bookings", s.protect(http.HandlerFunc(s.create)))
 	m.Handle("GET /api/v1/bookings/{bookingId}", s.protect(http.HandlerFunc(s.get)))
 	m.Handle("GET /api/v1/bookings", s.protect(http.HandlerFunc(s.list)))
+	m.Handle("GET /api/v1/admin/events/{eventId}/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("POST /api/v1/bookings/{bookingId}/cancel", s.protect(http.HandlerFunc(s.cancel)))
 	m.Handle("GET /internal/v1/bookings/{bookingId}/payment-snapshot", s.protect(http.HandlerFunc(s.snapshot)))
 	return m
@@ -53,7 +56,8 @@ func principal(r *http.Request) auth.Principal {
 }
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		EventID string `json:"eventId"`
+		EventID       string `json:"eventId"`
+		PaymentMethod string `json:"paymentMethod"`
 	}
 	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
 	d.DisallowUnknownFields()
@@ -61,7 +65,7 @@ func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "INVALID_REQUEST", "Request body is invalid.")
 		return
 	}
-	b, err := s.app.Create(r.Context(), principal(r).Subject, in.EventID, r.Header.Get("Idempotency-Key"))
+	b, err := s.app.Create(r.Context(), principal(r).Subject, in.EventID, in.PaymentMethod, r.Header.Get("Idempotency-Key"))
 	if handle(w, err) {
 		return
 	}
@@ -80,6 +84,42 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	write(w, 200, map[string]any{"items": items})
+}
+func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
+	allowed := false
+	for _, role := range principal(r).Roles {
+		if role == "admin" {
+			allowed = true
+		}
+	}
+	if !allowed {
+		problem(w, 403, "ADMIN_ROLE_REQUIRED", "Administrator access is required.")
+		return
+	}
+	limit, e1 := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, e2 := strconv.Atoi(r.URL.Query().Get("offset"))
+	if e1 != nil || e2 != nil || limit < 1 || limit > 50 || offset < 0 {
+		problem(w, 400, "INVALID_REQUEST", "Limit must be 1–50 and offset must be non-negative.")
+		return
+	}
+	items, err := s.app.ListForEvent(r.Context(), r.PathValue("eventId"), limit+1, offset)
+	if handle(w, err) {
+		return
+	}
+	hasMore := len(items) > limit
+	if hasMore {
+		items = items[:limit]
+	}
+	type registration struct {
+		domain.Booking
+		AccountID string `json:"accountId"`
+	}
+	result := make([]registration, 0, len(items))
+	for _, b := range items {
+		result = append(result, registration{Booking: b, AccountID: b.AccountID})
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	write(w, 200, map[string]any{"items": result, "hasMore": hasMore})
 }
 func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
 	b, err := s.app.Cancel(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"))

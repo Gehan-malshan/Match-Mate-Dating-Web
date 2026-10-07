@@ -25,6 +25,17 @@ type Service struct {
 func New(repo store.Repository, tokens *auth.Manager, access, refresh, verification time.Duration, minimumAge int, consentVersion string, expose bool) *Service {
 	return &Service{store: repo, tokens: tokens, accessTTL: access, refreshTTL: refresh, verificationTTL: verification, minimumAge: minimumAge, consentVersion: consentVersion, exposeVerification: expose, now: func() time.Time { return time.Now().UTC() }}
 }
+func (s *Service) AdminMemberIdentities(ctx context.Context, ids []string) ([]domain.AdminMemberIdentity, error) {
+	if len(ids) > 50 {
+		return nil, problem(422, "INVALID_REQUEST", "Too many account IDs", nil)
+	}
+	for _, id := range ids {
+		if _, err := uuid.Parse(id); err != nil {
+			return nil, problem(422, "INVALID_REQUEST", "Account ID is invalid", nil)
+		}
+	}
+	return s.store.AdminMemberIdentities(ctx, ids)
+}
 
 func (s *Service) Register(ctx context.Context, in domain.RegisterInput, correlation string) (domain.Registration, error) {
 	var err error

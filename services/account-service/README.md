@@ -37,9 +37,12 @@ GET    /api/v1/community/profiles/{profileId}
 POST   /api/v1/users/me/blocks
 DELETE /api/v1/users/me/blocks/{accountId}
 POST   /api/v1/admin/profiles/{accountId}/decision
+POST   /api/v1/admin/member-identities
 DELETE /api/v1/users/me
 GET    /.well-known/jwks.json
 ```
+
+The member-identities endpoint requires an admin bearer token and accepts at most 50 account IDs. It returns only account ID, nickname and email for the restricted event-registration view; public community visibility does not govern this operational lookup.
 
 Self-service identity comes from the access-token subject. Admin paths require explicit scopes and audit.
 

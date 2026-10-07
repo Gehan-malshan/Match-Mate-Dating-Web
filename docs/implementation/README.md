@@ -1,5 +1,9 @@
 # MatchMate Implementation Guide
 
+Event image slice: Admin chooses an optional photo in draft creation/editing; browser prepares a bounded JPEG, Event stores a validated, metadata-stripped copy, and public pages show it only after publication. Saving and image upload are separate calls; an upload error leaves the draft intact for retry. Production launch still requires image rights/moderation policy, abuse protection, and browser E2E. See [ADR-0002](../adr/0002-event-image-storage.md).
+
+Current payment-choice slice: Event draft editor supports venue, online, or both; Booking validates and snapshots the choice, and venue reservations consume confirmed capacity without PayHere. The member UI shows payment due at entrance. Before a payment-free production launch, still implement a separate deployment topology/feature gates, staff collection and check-in policy, confirmed-venue cancellation policy, production capacity and browser E2E evidence, and privacy/security operational checks. See [ADR-0001](../adr/0001-event-payment-choice.md).
+
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
 ## 1. Delivery strategy
@@ -160,7 +164,7 @@ Organizers can manage events and members can discover eligible published events.
 
 ### Business outcome
 
-A member can reserve an available ticket for a limited time without overselling the event.
+A member can reserve a confirmed pay-at-venue seat immediately, or an online-payment hold for a limited time, without overselling the event.
 
 ### Backend deliverables
 

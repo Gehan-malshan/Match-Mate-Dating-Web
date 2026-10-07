@@ -49,6 +49,12 @@ func testService(t *testing.T, repo store.Repository) *Service {
 	s.now = func() time.Time { return time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC) }
 	return s
 }
+func TestAdminMemberIdentityInputIsBounded(t *testing.T) {
+	s := testService(t, &fakeRepo{})
+	if _, err := s.AdminMemberIdentities(context.Background(), []string{"not-a-uuid"}); err == nil { t.Fatal("expected invalid account ID") }
+	ids := make([]string, 51)
+	if _, err := s.AdminMemberIdentities(context.Background(), ids); err == nil { t.Fatal("expected batch limit") }
+}
 func TestRegisterCreatesPrivatePendingProfileAndHash(t *testing.T) {
 	repo := &fakeRepo{}
 	s := testService(t, repo)

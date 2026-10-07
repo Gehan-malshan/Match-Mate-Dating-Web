@@ -1,5 +1,7 @@
 # MatchMate Base Design System — Midnight Chemistry
 
+Event-specific artwork may replace the existing catalogue and detail hero images only when attached by an administrator to a draft and served through the Event media route after publication. Keep the current dark gradient wash for legible text, cover crop rather than stretch, and the existing project artwork as fallback. Avoid imagery that reveals attendees, contact details, or exact private venue details without approved rights and consent. See [ADR-0002](../adr/0002-event-image-storage.md).
+
 This document is the canonical visual-design source of truth for MatchMate applications and shared UI packages. It incorporates the approved **Midnight Chemistry** design reference into the repository while remaining subordinate to `AGENTS.md`, accepted ADRs, accessibility requirements, and MatchMate's privacy and safety boundaries.
 
 ## 1. Status and authority

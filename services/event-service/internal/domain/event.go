@@ -26,6 +26,8 @@ type Event struct {
 	RegistrationClosesAt   time.Time `json:"registrationClosesAt"`
 	Price                  string    `json:"price"`
 	Currency               string    `json:"currency"`
+	PaymentOptions         string    `json:"paymentOptions"`
+	ImageVersion           int64     `json:"imageVersion"`
 	ConfiguredCapacity     int       `json:"configuredCapacity"`
 	CapacityPolicyVersion  int64     `json:"capacityPolicyVersion"`
 	MatchingRulesetVersion string    `json:"matchingRulesetVersion"`
@@ -48,6 +50,7 @@ type CreateInput struct {
 	RegistrationClosesAt   time.Time `json:"registrationClosesAt"`
 	Price                  string    `json:"price"`
 	Currency               string    `json:"currency"`
+	PaymentOptions         string    `json:"paymentOptions"`
 	ConfiguredCapacity     int       `json:"configuredCapacity"`
 	MatchingRulesetVersion string    `json:"matchingRulesetVersion"`
 }
@@ -72,6 +75,8 @@ type PublicEvent struct {
 	RegistrationClosesAt   time.Time `json:"registrationClosesAt"`
 	Price                  string    `json:"price"`
 	Currency               string    `json:"currency"`
+	PaymentOptions         string    `json:"paymentOptions"`
+	ImageVersion           int64     `json:"imageVersion"`
 	ConfiguredCapacity     int       `json:"configuredCapacity"`
 	MatchingRulesetVersion string    `json:"matchingRulesetVersion"`
 	Status                 Status    `json:"status"`
@@ -79,7 +84,7 @@ type PublicEvent struct {
 }
 
 func (e Event) Public() PublicEvent {
-	return PublicEvent{e.ID, e.Name, e.Description, e.BroadLocation, e.TimeZone, e.StartsAt, e.EndsAt, e.RegistrationOpensAt, e.RegistrationClosesAt, e.Price, e.Currency, e.ConfiguredCapacity, e.MatchingRulesetVersion, e.Status, e.Version}
+	return PublicEvent{e.ID, e.Name, e.Description, e.BroadLocation, e.TimeZone, e.StartsAt, e.EndsAt, e.RegistrationOpensAt, e.RegistrationClosesAt, e.Price, e.Currency, e.PaymentOptions, e.ImageVersion, e.ConfiguredCapacity, e.MatchingRulesetVersion, e.Status, e.Version}
 }
 
 type Principal struct {

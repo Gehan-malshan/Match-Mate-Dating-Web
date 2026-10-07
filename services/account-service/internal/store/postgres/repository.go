@@ -19,6 +19,22 @@ type Repository struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Repository             { return &Repository{pool} }
 func (r *Repository) Ping(ctx context.Context) error { return r.pool.Ping(ctx) }
+func (r *Repository) AdminMemberIdentities(ctx context.Context, ids []string) ([]domain.AdminMemberIdentity, error) {
+	rows, err := r.pool.Query(ctx, `SELECT a.account_id::text, COALESCE(p.nickname,''), a.normalized_email FROM account a LEFT JOIN profile p USING(account_id) WHERE a.account_id::text = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]domain.AdminMemberIdentity, 0, len(ids))
+	for rows.Next() {
+		var item domain.AdminMemberIdentity
+		if err := rows.Scan(&item.AccountID, &item.Nickname, &item.Email); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
 
 func (r *Repository) Register(ctx context.Context, in domain.RegisterInput, passwordHash string, verificationHash []byte, verificationExpiry time.Time, event domain.Event) (domain.Me, error) {
 	tx, err := r.pool.Begin(ctx)

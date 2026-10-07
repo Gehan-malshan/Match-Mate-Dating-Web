@@ -24,6 +24,7 @@ type Repository interface {
 	Create(context.Context, domain.Booking, string, string, int) (domain.Booking, bool, error)
 	Get(context.Context, string, string) (domain.Booking, error)
 	List(context.Context, string, int) ([]domain.Booking, error)
+	ListForEvent(context.Context, string, int, int) ([]domain.Booking, error)
 	Cancel(context.Context, string, string, string, time.Time) (domain.Booking, bool, error)
 	Expire(context.Context, time.Time, int) (int, error)
 }
@@ -37,7 +38,7 @@ type Service struct {
 func New(repo Repository, events EventReader, hold time.Duration) *Service {
 	return &Service{repo: repo, events: events, hold: hold, now: time.Now}
 }
-func (s *Service) Create(ctx context.Context, actor, eventID, key string) (domain.Booking, error) {
+func (s *Service) Create(ctx context.Context, actor, eventID, method, key string) (domain.Booking, error) {
 	if eventID == "" || key == "" {
 		return domain.Booking{}, fmt.Errorf("%w: eventId and Idempotency-Key are required", ErrInvalid)
 	}
@@ -49,8 +50,18 @@ func (s *Service) Create(ctx context.Context, actor, eventID, key string) (domai
 	if err = domain.ValidateEvent(e, now); err != nil {
 		return domain.Booking{}, fmt.Errorf("%w: %v", ErrConflict, err)
 	}
-	b := domain.Booking{ID: uuid.NewString(), AccountID: actor, EventID: e.EventID, State: domain.Pending, Amount: domain.NormalizeMoney(e.Price), Currency: e.Currency, PolicyVersion: e.CapacityPolicyVersion, ExpiresAt: now.Add(s.hold), Version: 1, CreatedAt: now}
-	b, _, err = s.repo.Create(ctx, b, key, eventID, e.ConfiguredCapacity)
+	if method == "" && (e.PaymentOptions == "" || e.PaymentOptions == "ONLINE") {
+		method = "ONLINE"
+	}
+	if !domain.AllowedPaymentMethod(e.PaymentOptions, method) {
+		return domain.Booking{}, fmt.Errorf("%w: payment method is not available for this event", ErrInvalid)
+	}
+	b := domain.Booking{ID: uuid.NewString(), AccountID: actor, EventID: e.EventID, State: domain.Pending, PaymentMethod: method, Amount: domain.NormalizeMoney(e.Price), Currency: e.Currency, PolicyVersion: e.CapacityPolicyVersion, ExpiresAt: now.Add(s.hold), Version: 1, CreatedAt: now}
+	if method == "AT_VENUE" {
+		b.State = domain.Confirmed
+		b.ConfirmedAt = &now
+	}
+	b, _, err = s.repo.Create(ctx, b, key, eventID+":"+method, e.ConfiguredCapacity)
 	return b, err
 }
 func (s *Service) Get(ctx context.Context, actor, id string) (domain.Booking, error) {
@@ -61,6 +72,12 @@ func (s *Service) List(ctx context.Context, actor string, limit int) ([]domain.B
 		limit = 20
 	}
 	return s.repo.List(ctx, actor, limit)
+}
+func (s *Service) ListForEvent(ctx context.Context, eventID string, limit, offset int) ([]domain.Booking, error) {
+	if _, err := uuid.Parse(eventID); err != nil || limit < 1 || limit > 51 || offset < 0 {
+		return nil, ErrInvalid
+	}
+	return s.repo.ListForEvent(ctx, eventID, limit, offset)
 }
 func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Booking, error) {
 	if id == "" || key == "" {
@@ -74,7 +91,7 @@ func (s *Service) Snapshot(ctx context.Context, actor, id string) (domain.Bookin
 	if err != nil {
 		return b, err
 	}
-	if b.State != domain.Pending {
+	if b.State != domain.Pending || b.PaymentMethod != "ONLINE" {
 		return b, fmt.Errorf("%w: booking is not pending payment", ErrConflict)
 	}
 	if !b.ExpiresAt.After(s.now().UTC()) {

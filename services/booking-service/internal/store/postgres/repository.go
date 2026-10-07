@@ -21,11 +21,11 @@ type OutboxRecord struct {
 
 func New(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
 
-const cols = `id,account_id,event_id,state,amount::text,currency,policy_version,expires_at,version,created_at,confirmed_at,cancelled_at`
+const cols = `id,account_id,event_id,state,amount::text,currency,policy_version,expires_at,version,created_at,confirmed_at,cancelled_at,payment_method`
 
 func scan(row pgx.Row) (domain.Booking, error) {
 	var b domain.Booking
-	err := row.Scan(&b.ID, &b.AccountID, &b.EventID, &b.State, &b.Amount, &b.Currency, &b.PolicyVersion, &b.ExpiresAt, &b.Version, &b.CreatedAt, &b.ConfirmedAt, &b.CancelledAt)
+	err := row.Scan(&b.ID, &b.AccountID, &b.EventID, &b.State, &b.Amount, &b.Currency, &b.PolicyVersion, &b.ExpiresAt, &b.Version, &b.CreatedAt, &b.ConfirmedAt, &b.CancelledAt, &b.PaymentMethod)
 	return b, err
 }
 func (r *Repository) Ready(ctx context.Context) error { return r.pool.Ping(ctx) }
@@ -51,14 +51,18 @@ func (r *Repository) Create(ctx context.Context, b domain.Booking, key, fingerpr
 	if err != nil {
 		return b, false, err
 	}
-	tag, err := tx.Exec(ctx, `UPDATE capacity_allocation SET held_count=held_count+1,version=version+1 WHERE event_id=$1 AND policy_version=$2 AND held_count+confirmed_count<configured_capacity`, b.EventID, b.PolicyVersion)
+	countColumn := "held_count"
+	if b.PaymentMethod == "AT_VENUE" {
+		countColumn = "confirmed_count"
+	}
+	tag, err := tx.Exec(ctx, `UPDATE capacity_allocation SET `+countColumn+`=`+countColumn+`+1,version=version+1 WHERE event_id=$1 AND policy_version=$2 AND held_count+confirmed_count<configured_capacity`, b.EventID, b.PolicyVersion)
 	if err != nil {
 		return b, false, err
 	}
 	if tag.RowsAffected() != 1 {
 		return b, false, application.ErrCapacity
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO booking(id,account_id,event_id,state,amount,currency,policy_version,expires_at,version,created_at) VALUES($1,$2,$3,'PENDING_PAYMENT',$4,$5,$6,$7,1,$8)`, b.ID, b.AccountID, b.EventID, b.Amount, b.Currency, b.PolicyVersion, b.ExpiresAt, b.CreatedAt)
+	_, err = tx.Exec(ctx, `INSERT INTO booking(id,account_id,event_id,state,amount,currency,policy_version,expires_at,version,created_at,confirmed_at,payment_method) VALUES($1,$2,$3,$4,$5,$6,$7,$8,1,$9,$10,$11)`, b.ID, b.AccountID, b.EventID, b.State, b.Amount, b.Currency, b.PolicyVersion, b.ExpiresAt, b.CreatedAt, b.ConfirmedAt, b.PaymentMethod)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -70,7 +74,11 @@ func (r *Repository) Create(ctx context.Context, b domain.Booking, key, fingerpr
 	if err != nil {
 		return b, false, err
 	}
-	if err = insertFact(ctx, tx, "BookingPending", b, "", b.AccountID, b.CreatedAt); err != nil {
+	factName := "BookingPending"
+	if b.PaymentMethod == "AT_VENUE" {
+		factName = "BookingConfirmed"
+	}
+	if err = insertFact(ctx, tx, factName, b, "", b.AccountID, b.CreatedAt); err != nil {
 		return b, false, err
 	}
 	return b, false, tx.Commit(ctx)
@@ -84,6 +92,22 @@ func (r *Repository) Get(ctx context.Context, actor, id string) (domain.Booking,
 }
 func (r *Repository) List(ctx context.Context, actor string, limit int) ([]domain.Booking, error) {
 	rows, err := r.pool.Query(ctx, `SELECT `+cols+` FROM booking WHERE account_id=$1 ORDER BY created_at DESC LIMIT $2`, actor, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]domain.Booking, 0)
+	for rows.Next() {
+		b, e := scan(rows)
+		if e != nil {
+			return nil, e
+		}
+		items = append(items, b)
+	}
+	return items, rows.Err()
+}
+func (r *Repository) ListForEvent(ctx context.Context, eventID string, limit, offset int) ([]domain.Booking, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+cols+` FROM booking WHERE event_id=$1 ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3`, eventID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +157,11 @@ func (r *Repository) Cancel(ctx context.Context, actor, id, key string, now time
 	if err != nil {
 		return b, false, err
 	}
-	_, err = tx.Exec(ctx, `UPDATE capacity_allocation SET held_count=held_count-1,version=version+1 WHERE event_id=$1 AND held_count>0`, b.EventID)
+	countColumn := "held_count"
+	if b.PaymentMethod == "AT_VENUE" {
+		countColumn = "confirmed_count"
+	}
+	_, err = tx.Exec(ctx, `UPDATE capacity_allocation SET `+countColumn+`=`+countColumn+`-1,version=version+1 WHERE event_id=$1 AND `+countColumn+`>0`, b.EventID)
 	if err != nil {
 		return b, false, err
 	}
@@ -186,7 +214,7 @@ func (r *Repository) Expire(ctx context.Context, now time.Time, limit int) (int,
 	return len(list), tx.Commit(ctx)
 }
 func insertFact(ctx context.Context, tx pgx.Tx, eventType string, b domain.Booking, causation, actor string, at time.Time) error {
-	payload, _ := json.Marshal(map[string]any{"bookingId": b.ID, "eventId": b.EventID, "accountId": b.AccountID, "amount": b.Amount, "currency": b.Currency, "state": b.State})
+	payload, _ := json.Marshal(map[string]any{"bookingId": b.ID, "eventId": b.EventID, "accountId": b.AccountID, "amount": b.Amount, "currency": b.Currency, "state": b.State, "paymentMethod": b.PaymentMethod})
 	_, err := tx.Exec(ctx, `INSERT INTO outbox(event_id,event_type,schema_version,aggregate_id,correlation_id,causation_id,actor_id,payload,occurred_at) VALUES($1,$2,1,$3,$4,NULLIF($5,'')::uuid,$6,$7,$8)`, uuid.NewString(), eventType, b.ID, uuid.NewString(), causation, actor, payload, at)
 	return err
 }

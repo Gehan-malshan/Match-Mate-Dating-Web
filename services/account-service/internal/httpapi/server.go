@@ -70,6 +70,7 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/v1/users/me/blocks", s.protected(http.HandlerFunc(s.block)))
 	s.mux.Handle("DELETE /api/v1/users/me/blocks/{accountId}", s.protected(http.HandlerFunc(s.unblock)))
 	s.mux.Handle("POST /api/v1/admin/profiles/{accountId}/decision", s.protected(s.roles("moderator", "admin", http.HandlerFunc(s.moderate))))
+	s.mux.Handle("POST /api/v1/admin/member-identities", s.protected(s.roles("admin", "admin", http.HandlerFunc(s.adminMemberIdentities))))
 	s.mux.HandleFunc("GET /api/v1/internal/notification-recipients/{accountId}", s.notificationRecipient)
 }
 
@@ -356,6 +357,20 @@ func (s *Server) moderate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(204)
+}
+func (s *Server) adminMemberIdentities(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		AccountIDs []string `json:"accountIds"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	items, err := s.app.AdminMemberIdentities(r.Context(), in.AccountIDs)
+	if handle(w, r, err) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	write(w, 200, map[string]any{"items": items})
 }
 
 func (s *Server) protected(next http.Handler) http.Handler {

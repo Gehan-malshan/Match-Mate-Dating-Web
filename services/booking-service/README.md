@@ -8,6 +8,10 @@ The executable member slice provides authenticated hold creation/read/list, idem
 
 The local API uses port `8085` because the upstream Matchmaking prototype owns port `8083`.
 
+Administrators can list an event's booking records with `GET /api/v1/admin/events/{eventId}/registrations?limit=25&offset=0`. The endpoint enforces the admin role from the signed token, returns account IDs only to authorized callers, and includes `hasMore` for pagination. Migration 4 indexes the event/date ordering. The GraphQL gateway's `eventRegistrations` query joins these booking records to Account-owned nickname/email via an admin-only batch lookup. This is a booking list, not an attendance or payment-collection ledger: `CONFIRMED` + `AT_VENUE` means the seat is reserved, not paid.
+
+Migration 3 adds the immutable `paymentMethod` booking snapshot. A member can select `AT_VENUE` only when Event permits it. That reservation atomically increments confirmed capacity and publishes `BookingConfirmed` without starting PayHere. Its confirmed status means the seat is reserved, **not that payment was collected**. `ONLINE` retains the expiring hold and verified-Payment confirmation flow. Existing bookings default to `ONLINE`. Confirmed venue cancellations, staff collection, and check-in are not implemented pending policy; do not present those as available actions. `BOOKING_TEST_DATABASE_URL` enables the disposable-schema PostgreSQL last-seat/idempotency component test.
+
 It must prevent overselling through transactional allocation controls and idempotent commands.
 
 ## Responsibilities

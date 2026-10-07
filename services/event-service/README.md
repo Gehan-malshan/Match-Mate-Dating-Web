@@ -1,6 +1,10 @@
 # Event Service
 
+Admin draft images are now owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft, re-encodes it to strip metadata, and audits the replacement. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. See [ADR-0002](../../docs/adr/0002-event-image-storage.md). Production image-rights/moderation and storage scaling remain open.
+
 Owns the event catalog, organizer ownership, event lifecycle, venue, schedule, ticket price, configured capacity, registration windows, and event discovery.
+
+Event drafts now choose `paymentOptions`: `AT_VENUE`, `ONLINE`, or `BOTH`. Existing events and omitted API fields default to `ONLINE`; administrators choose the value in the event editor before publication. Published events cannot be edited by the current API. Public discovery includes the option but never exact venue details. Event does not track whether an individual ticket has been paid. Migration 2 adds the constrained option column with a legacy-online default.
 
 The Booking Service remains authoritative for consumed capacity and active ticket holds.
 
