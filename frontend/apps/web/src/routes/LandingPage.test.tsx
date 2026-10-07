@@ -1,10 +1,39 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { LandingPage } from './LandingPage'
+
+vi.mock('../lib/event-api', () => ({
+  listEvents: vi.fn().mockResolvedValue({
+    items: [{
+      eventId: 'preview-event-1',
+      name: 'Preview Event',
+      description: 'A public preview event for this page.',
+      broadLocation: 'Colombo 03',
+      timeZone: 'Asia/Colombo',
+      startsAt: '2026-11-04T12:30:00Z',
+      endsAt: '2026-11-04T15:30:00Z',
+      registrationOpensAt: '2026-10-21T12:30:00Z',
+      registrationClosesAt: '2026-11-03T12:30:00Z',
+      price: '3000.00',
+      currency: 'LKR',
+      configuredCapacity: 36,
+      matchingRulesetVersion: 'development-v1',
+      status: 'PUBLISHED',
+      version: 1,
+    }],
+    limit: 12,
+  }),
+}))
+
+function renderLandingPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(<QueryClientProvider client={queryClient}><LandingPage /></QueryClientProvider>)
+}
 
 describe('LandingPage', () => {
   it('presents the privacy-first, no-chat, and no-ML product boundaries', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       'Less swiping.More meaningful meetings.',
@@ -15,7 +44,7 @@ describe('LandingPage', () => {
   })
 
   it('provides navigation to the redesigned landing-page chapters', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     const navigation = within(
       screen.getByRole('navigation', { name: 'Primary navigation' }),
@@ -36,7 +65,7 @@ describe('LandingPage', () => {
   })
 
   it('shows the full matchmaking journey without hiding steps behind controls', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     const process = screen.getByRole('list', { name: 'How MatchMate works' })
     expect(within(process).getAllByRole('listitem')).toHaveLength(5)
@@ -45,14 +74,14 @@ describe('LandingPage', () => {
   })
 
   it('explains the complete five-step matchmaking process in plain language', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     expect(screen.getByText(/preferences, deal-breakers, and shared values/i)).toBeInTheDocument()
     expect(screen.getByText(/unless both people choose to continue/i)).toBeInTheDocument()
   })
 
   it('uses the approved MatchMate logo in the header and footer', () => {
-    const { container } = render(<LandingPage />)
+    const { container } = renderLandingPage()
 
     const logoMarks = container.querySelectorAll<HTMLImageElement>(
       'img.brand-mark[src="/brand/matchmate-logo-nav.png"]',
@@ -67,23 +96,23 @@ describe('LandingPage', () => {
     )
   })
 
-  it('uses distinct local images for the About, process, and event chapters', () => {
-    const { container } = render(<LandingPage />)
+  it('uses distinct local images for the About, process, and event chapters', async () => {
+    const { container } = renderLandingPage()
 
     expect(container.querySelector('img[src="/images/matchmate-about-cafe.png"]')).toBeInTheDocument()
     expect(container.querySelector('img[src="/images/matchmate-event-checkin.png"]')).toBeInTheDocument()
-    expect(container.querySelector('img[src="/images/matchmate-rooftop-event.png"]')).toBeInTheDocument()
+    await waitFor(() => expect(container.querySelector('img[src="/images/matchmate-rooftop-event.png"]')).toBeInTheDocument())
   })
 
   it('uses the generated happy-couple artwork as the hero background', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Less swiping.More meaningful meetings.')
     expect(screen.queryByLabelText('MatchMate privacy principle')).not.toBeInTheDocument()
   })
 
   it('provides structured footer navigation without inventing unavailable pages', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
     expect(screen.getByRole('navigation', { name: 'Footer navigation' })).toBeVisible()
     expect(screen.getByRole('navigation', { name: 'Trust and safety navigation' })).toBeVisible()
@@ -92,8 +121,8 @@ describe('LandingPage', () => {
   })
 
   it('links the event action to implemented event discovery', () => {
-    render(<LandingPage />)
+    renderLandingPage()
 
-    expect(screen.getAllByRole('link', { name: /browse confirmed events/i })[0]).toHaveAttribute('href', '/events')
+    expect(screen.getByRole('link', { name: /view more events/i })).toHaveAttribute('href', '/events')
   })
 })

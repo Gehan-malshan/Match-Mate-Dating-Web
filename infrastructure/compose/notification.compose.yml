@@ -16,7 +16,7 @@ services:
 
   notification-migrate:
     image: matchmate/notification-service:development
-    build: {context: ../../services/notification-service}
+    pull_policy: never
     entrypoint: ["/notification-migrate"]
     environment: &notification-environment
       APP_ENV: development
@@ -55,7 +55,7 @@ services:
 
   notification-consumer:
     image: matchmate/notification-service:development
-    build: {context: ../../services/notification-service}
+    pull_policy: never
     entrypoint: ["/notification-consumer"]
     environment: *notification-environment
     depends_on:
@@ -65,7 +65,7 @@ services:
 
   notification-worker:
     image: matchmate/notification-service:development
-    build: {context: ../../services/notification-service}
+    pull_policy: never
     entrypoint: ["/notification-worker"]
     environment: *notification-environment
     depends_on:

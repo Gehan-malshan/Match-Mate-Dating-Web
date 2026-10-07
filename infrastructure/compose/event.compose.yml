@@ -15,8 +15,7 @@ services:
     volumes: ["event-postgres:/var/lib/postgresql/data"]
   event-migrate:
     image: matchmate/event-service:development
-    build:
-      context: ../../services/event-service
+    pull_policy: never
     entrypoint: ["/event-migrate"]
     environment:
       APP_ENV: development
@@ -41,8 +40,7 @@ services:
         condition: service_completed_successfully
   event-seed:
     image: matchmate/event-service:development
-    build:
-      context: ../../services/event-service
+    pull_policy: never
     entrypoint: ["/event-seed"]
     environment:
       APP_ENV: development
@@ -53,8 +51,7 @@ services:
     restart: "no"
   event-outbox-relay:
     image: matchmate/event-service:development
-    build:
-      context: ../../services/event-service
+    pull_policy: never
     entrypoint: ["/event-outbox-relay"]
     environment:
       APP_ENV: development

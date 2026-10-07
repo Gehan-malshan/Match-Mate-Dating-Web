@@ -15,8 +15,7 @@ services:
     volumes: ["matchmaking-postgres:/var/lib/postgresql/data"]
   matchmaking-migrate:
     image: matchmate/matchmaking-service:development
-    build:
-      context: ../../services/matchmaking-service
+    pull_policy: never
     entrypoint: ["/matchmaking-migrate"]
     environment:
       APP_ENV: development
@@ -27,8 +26,7 @@ services:
     restart: "no"
   matchmaking-seed:
     image: matchmate/matchmaking-service:development
-    build:
-      context: ../../services/matchmaking-service
+    pull_policy: never
     entrypoint: ["/matchmaking-seed-dev"]
     environment:
       APP_ENV: development

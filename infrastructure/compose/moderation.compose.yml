@@ -8,7 +8,7 @@ services:
     volumes: ["moderation-postgres:/var/lib/postgresql/data"]
   moderation-migrate:
     image: matchmate/moderation-service:development
-    build: {context: ../../services/moderation-service}
+    pull_policy: never
     entrypoint: ["/moderation-migrate"]
     environment: &moderation-environment
       APP_ENV: development
@@ -33,14 +33,14 @@ services:
     restart: unless-stopped
   moderation-outbox-relay:
     image: matchmate/moderation-service:development
-    build: {context: ../../services/moderation-service}
+    pull_policy: never
     entrypoint: ["/moderation-outbox-relay"]
     environment: *moderation-environment
     depends_on: {moderation-migrate: {condition: service_completed_successfully}, rabbitmq: {condition: service_healthy}}
     restart: unless-stopped
   moderation-expiry-worker:
     image: matchmate/moderation-service:development
-    build: {context: ../../services/moderation-service}
+    pull_policy: never
     entrypoint: ["/moderation-expiry-worker"]
     environment: *moderation-environment
     depends_on: {moderation-migrate: {condition: service_completed_successfully}}
