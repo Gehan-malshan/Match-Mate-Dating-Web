@@ -1,7 +1,9 @@
 import { useRef, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { listEvents } from '../lib/event-api'
 
 gsap.registerPlugin(useGSAP, ScrollTrigger)
 
@@ -68,8 +70,27 @@ const journey = [
 
 const revealSentence = 'Clear rules. Better introductions. Nothing hidden.'
 
+function eventDate(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat('en-LK', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone,
+  }).format(new Date(value))
+}
+
+function eventStatus(status: string) {
+  if (status === 'REGISTRATION_OPEN') return 'Registration open'
+  if (status === 'REGISTRATION_CLOSED') return 'Registration closed'
+  return 'Event announced'
+}
+
 export function LandingPage() {
   const pageRef = useRef<HTMLElement>(null)
+  const events = useQuery({
+    queryKey: ['events'],
+    queryFn: () => listEvents(),
+    staleTime: 30_000,
+  })
 
   useGSAP(() => {
     if (typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -110,20 +131,6 @@ export function LandingPage() {
       },
     )
 
-    gsap.fromTo('.event-image',
-      { scale: 0.82, opacity: 0.3 },
-      {
-        scale: 1,
-        opacity: 1,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: '.event-stage',
-          start: 'top bottom',
-          end: 'center center',
-          scrub: 0.8,
-        },
-      },
-    )
   }, { scope: pageRef })
 
   return (
@@ -218,6 +225,42 @@ export function LandingPage() {
         </div>
       </section>
 
+      <section className="landing-events" id="events" aria-labelledby="landing-events-title" aria-busy={events.isPending}>
+        <div className="landing-events-shell">
+          <header className="landing-events-heading">
+            <div>
+              <p className="eyebrow"><span /> Open to everyone</p>
+              <h2 id="landing-events-title">Real plans.<br /><em>Worth showing up for.</em></h2>
+            </div>
+            <p>Explore published MatchMate events without signing in. Event details show the date, broad area, price, and registration status while keeping attendee identities and exact venues private.</p>
+          </header>
+
+          {events.isPending && <p className="landing-events-message" role="status">Loading public events…</p>}
+          {events.isError && <div className="landing-events-message" role="alert"><strong>Events are temporarily unavailable.</strong><span>Please try again in a moment.</span><button className="button button-ghost" type="button" onClick={() => void events.refetch()}>Try again</button></div>}
+          {!events.isPending && !events.isError && events.data?.items.length === 0 && <p className="landing-events-message">No events have been published yet. Check back soon for confirmed dates.</p>}
+
+          {!!events.data?.items.length && <div className="landing-events-grid">
+            {events.data.items.slice(0, 3).map((event, index) => <article className="landing-event-card" key={event.eventId}>
+              <img className="landing-event-image" src={['/images/matchmate-rooftop-event.png', '/images/matchmate-about-cafe.png', '/images/matchmate-event-checkin.png'][index % 3]} alt="" aria-hidden="true" />
+              <div className="landing-event-card-wash" aria-hidden="true" />
+              <div className="landing-event-card-content">
+                <p className="landing-event-status">{eventStatus(event.status)}</p>
+                <p className="landing-event-location">{event.broadLocation}</p>
+                <h3>{event.name}</h3>
+                <p className="landing-event-date">{eventDate(event.startsAt, event.timeZone)}</p>
+                <p className="landing-event-description">{event.description}</p>
+                <div className="landing-event-footer">
+                  <span>{event.currency} {event.price}</span>
+                  <a href={`/events/${encodeURIComponent(event.eventId)}`} aria-label={`View details for ${event.name}`}>View details <b aria-hidden="true">→</b></a>
+                </div>
+              </div>
+            </article>)}
+          </div>}
+
+          <div className="landing-events-action"><a className="button" href="/events">View more events <Icon name="arrow" /></a></div>
+        </div>
+      </section>
+
       <section className="matching section-shell" aria-labelledby="matching-title">
         <div className="matching-layout">
           <div className="matching-copy">
@@ -239,19 +282,6 @@ export function LandingPage() {
           <div><span className="matching-number">01</span><h3>Preferences first</h3><p>Eligibility, deal-breakers, and boundaries are respected.</p></div>
           <div><span className="matching-number">02</span><h3>Explainable results</h3><p>Clear, repeatable rules guide every introduction.</p></div>
           <div><span className="matching-number">03</span><h3>Human oversight</h3><p>Organizer decisions are reviewed and recorded.</p></div>
-        </div>
-      </section>
-
-      <section className="event-stage" id="events">
-        <img className="event-image" src="/images/matchmate-rooftop-event.png" alt="Young professionals having guided conversations at a warmly lit rooftop event" />
-        <div className="event-wash" aria-hidden="true" />
-        <div className="event-content section-shell">
-          <span className="event-icon"><Icon name="calendar" /></span>
-          <h2>Meet compatible people<br /><em>in the real world.</em></h2>
-          <p>MatchMate events bring compatible introductions together in comfortable Colombo venues. Dates, prices, eligibility, and safety details are published after every event is confirmed.</p>
-          <a className="button event-action" href="/events">
-            Browse confirmed events <Icon name="arrow" />
-          </a>
         </div>
       </section>
 
@@ -278,7 +308,7 @@ export function LandingPage() {
           <div className="footer-status" id="event-updates">
             <strong>Event updates</strong>
             <span><i /> Colombo event announcements</span>
-            <p>New dates and booking details will be published here after confirmation.</p>
+            <p>Browse public event details any time, with or without an account.</p>
           </div>
         </div>
         <div className="footer-bottom">
