@@ -100,6 +100,7 @@ type ComplexityRoot struct {
 	}
 
 	Event struct {
+		ArchivedAt             func(childComplexity int) int
 		BroadLocation          func(childComplexity int) int
 		CapacityPolicyVersion  func(childComplexity int) int
 		ConfiguredCapacity     func(childComplexity int) int
@@ -187,6 +188,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		ArchiveEvent             func(childComplexity int, eventID string, expectedVersion int) int
 		BlockMember              func(childComplexity int, accountID string) int
 		CancelBooking            func(childComplexity int, bookingID string, idempotencyKey string) int
 		CreateBooking            func(childComplexity int, eventID string, paymentMethod *string, idempotencyKey string) int
@@ -202,8 +204,9 @@ type ComplexityRoot struct {
 		PublishMatchingRun       func(childComplexity int, runID string, expectedVersion int, idempotencyKey string) int
 		RefreshSession           func(childComplexity int) int
 		Register                 func(childComplexity int, input model.RegisterInput) int
+		RestoreEvent             func(childComplexity int, eventID string, expectedVersion int) int
 		ReviewMatchingRun        func(childComplexity int, runID string, expectedVersion int) int
-		TransitionEvent          func(childComplexity int, eventID string, action string, expectedVersion int, reason *string) int
+		TransitionEvent          func(childComplexity int, eventID string, action string, expectedVersion int) int
 		UpdateEvent              func(childComplexity int, eventID string, input model.EventInput, expectedVersion int) int
 		UpdatePreferences        func(childComplexity int, input model.PreferencesInput) int
 		UpdateProfile            func(childComplexity int, input model.ProfileInput) int
@@ -270,13 +273,14 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		AdminRegistrations      func(childComplexity int, limit *int, offset *int) int
 		Bookings                func(childComplexity int) int
 		CommunityProfile        func(childComplexity int, profileID string) int
 		CommunityProfiles       func(childComplexity int, limit *int, cursor *string) int
 		Event                   func(childComplexity int, eventID string) int
 		EventRegistrations      func(childComplexity int, eventID string, limit *int, offset *int) int
 		Events                  func(childComplexity int, limit *int, cursor *string) int
-		ManagedEvents           func(childComplexity int, limit *int) int
+		ManagedEvents           func(childComplexity int, limit *int, archived *bool) int
 		MatchingRun             func(childComplexity int, runID string) int
 		MatchingRuns            func(childComplexity int, eventID string) int
 		Me                      func(childComplexity int) int
@@ -326,7 +330,9 @@ type MutationResolver interface {
 	CreateEvent(ctx context.Context, input model.EventInput) (*model.Event, error)
 	UploadEventImage(ctx context.Context, eventID string, imageBase64 string) (*model.Event, error)
 	UpdateEvent(ctx context.Context, eventID string, input model.EventInput, expectedVersion int) (*model.Event, error)
-	TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int, reason *string) (*model.Event, error)
+	TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int) (*model.Event, error)
+	ArchiveEvent(ctx context.Context, eventID string, expectedVersion int) (*model.Event, error)
+	RestoreEvent(ctx context.Context, eventID string, expectedVersion int) (*model.Event, error)
 	GenerateMatchingRun(ctx context.Context, eventID string, idempotencyKey string) (*model.MatchingRun, error)
 	ReviewMatchingRun(ctx context.Context, runID string, expectedVersion int) (*model.MatchingRun, error)
 	LockMatchingRun(ctx context.Context, runID string, expectedVersion int, idempotencyKey string) (*model.MatchingRun, error)
@@ -341,10 +347,11 @@ type QueryResolver interface {
 	Event(ctx context.Context, eventID string) (*model.Event, error)
 	Bookings(ctx context.Context) (*model.BookingPage, error)
 	EventRegistrations(ctx context.Context, eventID string, limit *int, offset *int) (*model.EventRegistrationPage, error)
+	AdminRegistrations(ctx context.Context, limit *int, offset *int) (*model.EventRegistrationPage, error)
 	Payment(ctx context.Context, bookingID string) (*model.Payment, error)
 	Notifications(ctx context.Context, limit *int, cursor *string) (*model.NotificationPage, error)
 	UnreadNotificationCount(ctx context.Context) (*model.UnreadCount, error)
-	ManagedEvents(ctx context.Context, limit *int) (*model.EventPage, error)
+	ManagedEvents(ctx context.Context, limit *int, archived *bool) (*model.EventPage, error)
 	MatchingRuns(ctx context.Context, eventID string) (*model.MatchingRunPage, error)
 	MatchingRun(ctx context.Context, runID string) (*model.MatchingRun, error)
 }
@@ -603,6 +610,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.CommunityProfile.ProfileID(childComplexity), true
 
+	case "Event.archivedAt":
+		if e.ComplexityRoot.Event.ArchivedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Event.ArchivedAt(childComplexity), true
 	case "Event.broadLocation":
 		if e.ComplexityRoot.Event.BroadLocation == nil {
 			break
@@ -989,6 +1002,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Me.Profile(childComplexity), true
 
+	case "Mutation.archiveEvent":
+		if e.ComplexityRoot.Mutation.ArchiveEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_archiveEvent_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ArchiveEvent(childComplexity, args["eventId"].(string), args["expectedVersion"].(int)), true
 	case "Mutation.blockMember":
 		if e.ComplexityRoot.Mutation.BlockMember == nil {
 			break
@@ -1139,6 +1163,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.Register(childComplexity, args["input"].(model.RegisterInput)), true
+	case "Mutation.restoreEvent":
+		if e.ComplexityRoot.Mutation.RestoreEvent == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_restoreEvent_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.RestoreEvent(childComplexity, args["eventId"].(string), args["expectedVersion"].(int)), true
 	case "Mutation.reviewMatchingRun":
 		if e.ComplexityRoot.Mutation.ReviewMatchingRun == nil {
 			break
@@ -1160,7 +1195,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.TransitionEvent(childComplexity, args["eventId"].(string), args["action"].(string), args["expectedVersion"].(int), args["reason"].(*string)), true
+		return e.ComplexityRoot.Mutation.TransitionEvent(childComplexity, args["eventId"].(string), args["action"].(string), args["expectedVersion"].(int)), true
 	case "Mutation.updateEvent":
 		if e.ComplexityRoot.Mutation.UpdateEvent == nil {
 			break
@@ -1463,6 +1498,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Profile.Visibility(childComplexity), true
 
+	case "Query.adminRegistrations":
+		if e.ComplexityRoot.Query.AdminRegistrations == nil {
+			break
+		}
+
+		args, err := ec.field_Query_adminRegistrations_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.AdminRegistrations(childComplexity, args["limit"].(*int), args["offset"].(*int)), true
 	case "Query.bookings":
 		if e.ComplexityRoot.Query.Bookings == nil {
 			break
@@ -1535,7 +1581,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.ManagedEvents(childComplexity, args["limit"].(*int)), true
+		return e.ComplexityRoot.Query.ManagedEvents(childComplexity, args["limit"].(*int), args["archived"].(*bool)), true
 	case "Query.matchingRun":
 		if e.ComplexityRoot.Query.MatchingRun == nil {
 			break
@@ -1913,6 +1959,8 @@ func (ec *executionContext) childFields_Event(ctx context.Context, field graphql
 		return ec.fieldContext_Event_status(ctx, field)
 	case "version":
 		return ec.fieldContext_Event_version(ctx, field)
+	case "archivedAt":
+		return ec.fieldContext_Event_archivedAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Event", field.Name)
 }
@@ -2315,6 +2363,28 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_archiveEvent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["eventId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "expectedVersion",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["expectedVersion"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_blockMember_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2587,6 +2657,28 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_restoreEvent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["eventId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "expectedVersion",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["expectedVersion"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_reviewMatchingRun_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2636,14 +2728,6 @@ func (ec *executionContext) field_Mutation_transitionEvent_args(ctx context.Cont
 		return nil, err
 	}
 	args["expectedVersion"] = arg2
-	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "reason",
-		func(ctx context.Context, v any) (*string, error) {
-			return ec.unmarshalOString2ᚖstring(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["reason"] = arg3
 	return args, nil
 }
 
@@ -2752,6 +2836,28 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_adminRegistrations_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset",
+		func(ctx context.Context, v any) (*int, error) {
+			return ec.unmarshalOInt2ᚖint(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg1
 	return args, nil
 }
 
@@ -2868,6 +2974,14 @@ func (ec *executionContext) field_Query_managedEvents_args(ctx context.Context, 
 		return nil, err
 	}
 	args["limit"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "archived",
+		func(ctx context.Context, v any) (*bool, error) {
+			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["archived"] = arg1
 	return args, nil
 }
 
@@ -4363,6 +4477,29 @@ func (ec *executionContext) _Event_version(ctx context.Context, field graphql.Co
 }
 func (ec *executionContext) fieldContext_Event_version(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Event", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _Event_archivedAt(ctx context.Context, field graphql.CollectedField, obj *model.Event) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Event_archivedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ArchivedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Event_archivedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Event", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _EventPage_items(ctx context.Context, field graphql.CollectedField, obj *model.EventPage) (ret graphql.Marshaler) {
@@ -6122,7 +6259,7 @@ func (ec *executionContext) _Mutation_transitionEvent(ctx context.Context, field
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().TransitionEvent(ctx, fc.Args["eventId"].(string), fc.Args["action"].(string), fc.Args["expectedVersion"].(int), fc.Args["reason"].(*string))
+			return ec.Resolvers.Mutation().TransitionEvent(ctx, fc.Args["eventId"].(string), fc.Args["action"].(string), fc.Args["expectedVersion"].(int))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Event) graphql.Marshaler {
@@ -6150,6 +6287,94 @@ func (ec *executionContext) fieldContext_Mutation_transitionEvent(ctx context.Co
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_transitionEvent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_archiveEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_archiveEvent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ArchiveEvent(ctx, fc.Args["eventId"].(string), fc.Args["expectedVersion"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Event) graphql.Marshaler {
+			return ec.marshalNEvent2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐEvent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_archiveEvent(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Event(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_archiveEvent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_restoreEvent(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_restoreEvent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().RestoreEvent(ctx, fc.Args["eventId"].(string), fc.Args["expectedVersion"].(int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Event) graphql.Marshaler {
+			return ec.marshalNEvent2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐEvent(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_restoreEvent(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Event(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_restoreEvent_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7589,6 +7814,50 @@ func (ec *executionContext) fieldContext_Query_eventRegistrations(ctx context.Co
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_adminRegistrations(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_adminRegistrations(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().AdminRegistrations(ctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.EventRegistrationPage) graphql.Marshaler {
+			return ec.marshalNEventRegistrationPage2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐEventRegistrationPage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_adminRegistrations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_EventRegistrationPage(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_adminRegistrations_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_payment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7719,7 +7988,7 @@ func (ec *executionContext) _Query_managedEvents(ctx context.Context, field grap
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().ManagedEvents(ctx, fc.Args["limit"].(*int))
+			return ec.Resolvers.Query().ManagedEvents(ctx, fc.Args["limit"].(*int), fc.Args["archived"].(*bool))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.EventPage) graphql.Marshaler {
@@ -10166,6 +10435,11 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "archivedAt":
+			out.Values[i] = ec._Event_archivedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10768,6 +11042,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "transitionEvent":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_transitionEvent(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "archiveEvent":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_archiveEvent(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "restoreEvent":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_restoreEvent(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11388,6 +11676,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_eventRegistrations(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "adminRegistrations":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_adminRegistrations(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

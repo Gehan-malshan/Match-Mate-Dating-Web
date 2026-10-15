@@ -1,6 +1,8 @@
 # Event Service
 
-Admin draft images are now owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft, re-encodes it to strip metadata, and audits the replacement. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. See [ADR-0002](../../docs/adr/0002-event-image-storage.md). Production image-rights/moderation and storage scaling remain open.
+Migration 4 adds a recoverable event archive (`archived_at`). Admin-only `POST /events/{eventId}/archive` implements the UI's Delete button; it requires an expected version and accepts only drafts or cancelled events. `POST /events/{eventId}/restore` returns the event to the managed list but does not undo cancellation. Archive/restore emit outbox facts. Event and booking rows are not hard-deleted. Migration 5 removes the Event audit table, including any existing records. `GET /organizer/events` excludes archived records by default; administrators may use `?archived=true` to review deleted events. See [ADR-0003](../../docs/adr/0003-event-recoverable-delete.md).
+
+Admin draft images are now owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft and re-encodes it to strip metadata. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. See [ADR-0002](../../docs/adr/0002-event-image-storage.md). Production image-rights/moderation and storage scaling remain open.
 
 Owns the event catalog, organizer ownership, event lifecycle, venue, schedule, ticket price, configured capacity, registration windows, and event discovery.
 
@@ -31,13 +33,15 @@ POST   /api/v1/events/{eventId}/publish
 POST   /api/v1/events/{eventId}/open-registration
 POST   /api/v1/events/{eventId}/close-registration
 POST   /api/v1/events/{eventId}/cancel
+POST   /api/v1/events/{eventId}/archive
+POST   /api/v1/events/{eventId}/restore
 ```
 
-Draft creation requires the `admin` role. Existing-event updates and lifecycle transitions retain assigned-organizer/admin scope, optimistic concurrency, reason/audit where appropriate, and valid state transitions.
+Draft creation requires the `admin` role. Existing-event updates and lifecycle transitions retain assigned-organizer/admin scope, optimistic concurrency, and valid state transitions.
 
 ## Implemented data
 
-The first migration creates `event`, `event_audit`, and `outbox`. Location, capacity policy, and matching policy are versioned on the event aggregate for this first slice; separate policy history tables are deferred until published-policy replacement and Booking validation are implemented.
+The first migration creates `event` and `outbox`; migration 3 adds `event_image`. Migration 5 drops `event_audit` on existing databases. Location, capacity policy, and matching policy are versioned on the event aggregate for this first slice; separate policy history tables are deferred until published-policy replacement and Booking validation are implemented.
 
 Key invariants:
 
@@ -74,13 +78,13 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 
 ## Completion criteria
 
-An administrator can create an event, an assigned organizer or administrator can manage approved later states, and a member can discover only eligible published events. Configuration is versioned, authorized, auditable, observable, and safe for Booking/Matchmaking consumers.
+An administrator can create an event, an assigned organizer or administrator can manage approved later states, and a member can discover only eligible published events. Configuration is versioned, authorized, observable, and safe for Booking/Matchmaking consumers. The Event service does not maintain an audit history.
 
 Update this README, architecture/data docs, contracts, and tests whenever behavior changes. Record the before/after impact in the pull request; this repository deliberately does not maintain a merge-prone shared change-log file.
 
 ## Current implementation boundary
 
-The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL database. Administrator-only draft creation, draft replacement, assigned-organizer listing, publish, open registration, close registration, cancellation, public discovery, and public detail are implemented. Every update uses `expectedVersion`; stale writes return `EVENT_VERSION_CONFLICT`. Mutation authorization validates an ES256 access token using Account Service JWK discovery or a configured static public key. Creation requires `admin`; later updates remain limited to the assigned organizer or an administrator. Lifecycle changes create audit and transactional outbox records. `cmd/outbox-relay` claims unpublished records safely, publishes persistent messages with RabbitMQ publisher confirms, and marks them published only after acknowledgement.
+The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL database. Administrator-only draft creation, draft replacement, assigned-organizer listing, publish, open registration, close registration, cancellation, public discovery, and public detail are implemented. Every update uses `expectedVersion`; stale writes return `EVENT_VERSION_CONFLICT`. Mutation authorization validates an ES256 access token using Account Service JWK discovery or a configured static public key. Creation requires `admin`; later updates remain limited to the assigned organizer or an administrator. Lifecycle changes create transactional outbox records, not Event audit records. `cmd/outbox-relay` claims unpublished records safely, publishes persistent messages with RabbitMQ publisher confirms, and marks them published only after acknowledgement.
 
 Discovery intentionally omits organizer IDs and the exact venue name. It returns only future events in `PUBLISHED`, `REGISTRATION_OPEN`, or `REGISTRATION_CLOSED` state. Configured capacity is a catalog value and is not an availability promise; Booking remains authoritative for holds and consumed seats.
 

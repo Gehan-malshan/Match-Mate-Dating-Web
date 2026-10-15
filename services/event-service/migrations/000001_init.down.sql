@@ -1,3 +1,2 @@
 DROP TABLE IF EXISTS outbox;
-DROP TABLE IF EXISTS event_audit;
 DROP TABLE IF EXISTS event;

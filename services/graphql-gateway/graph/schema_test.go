@@ -32,7 +32,7 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 	defer account.Close()
 	booking := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bookingCalls++
-		if r.URL.Path != "/admin/events/event-id/registrations" || r.URL.Query().Get("limit") != "25" {
+		if (r.URL.Path != "/admin/events/event-id/registrations" && r.URL.Path != "/admin/registrations") || r.URL.Query().Get("limit") != "25" {
 			t.Errorf("unexpected booking path: %s", r.URL.String())
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -41,8 +41,7 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 	defer booking.Close()
 	client := upstream.New(upstream.Services{Account: account.URL, Booking: booking.URL})
 	server := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: &Resolver{Upstream: client}}))
-	query := `{"query":"query { eventRegistrations(eventId: \"event-id\") { items { nickname email state paymentMethod } hasMore } }"}`
-	call := func() map[string]any {
+	call := func(query string) map[string]any {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewBufferString(query))
 		request.Header.Set("Content-Type", "application/json")
@@ -53,14 +52,22 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 		}
 		return payload
 	}
-	adminResult := call()
-	if adminResult["errors"] != nil || !bytes.Contains([]byte(toJSON(adminResult)), []byte(`"nickname":"Asha"`)) {
-		t.Fatalf("admin result: %v", adminResult)
+	queries := []string{
+		`{"query":"query { eventRegistrations(eventId: \"event-id\") { items { nickname email state paymentMethod } hasMore } }"}`,
+		`{"query":"query { adminRegistrations { items { nickname email state paymentMethod eventId } hasMore } }"}`,
+	}
+	for _, query := range queries {
+		adminResult := call(query)
+		if adminResult["errors"] != nil || !bytes.Contains([]byte(toJSON(adminResult)), []byte(`"nickname":"Asha"`)) {
+			t.Fatalf("admin result: %v", adminResult)
+		}
 	}
 	member = true
-	memberResult := call()
-	if memberResult["errors"] == nil || bookingCalls != 1 {
-		t.Fatalf("member was not denied before booking access: %v, calls %d", memberResult, bookingCalls)
+	for _, query := range queries {
+		memberResult := call(query)
+		if memberResult["errors"] == nil || bookingCalls != 2 {
+			t.Fatalf("member was not denied before booking access: %v, calls %d", memberResult, bookingCalls)
+		}
 	}
 }
 
@@ -84,5 +91,49 @@ func TestPublicEventsQueryUsesEventService(t *testing.T) {
 	server.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK || bytes.Contains(recorder.Body.Bytes(), []byte(`"errors"`)) {
 		t.Fatalf("unexpected GraphQL response: %d %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestArchiveEventRequiresAdminAndForwardsVersion(t *testing.T) {
+	member := false
+	account := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		role := "admin"
+		if member {
+			role = "member"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"account":{"id":"actor","email":"admin@example.test","status":"ACTIVE","verification":"VERIFIED","roles":["` + role + `"]}}`))
+	}))
+	defer account.Close()
+	archiveCalls := 0
+	events := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		archiveCalls++
+		if r.URL.Path != "/events/event-id/archive" || r.Method != http.MethodPost {
+			t.Errorf("unexpected event request: %s %s", r.Method, r.URL.Path)
+		}
+		var body struct {
+			ExpectedVersion int `json:"expectedVersion"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ExpectedVersion != 3 {
+			t.Errorf("unexpected archive body: %+v %v", body, err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"eventId":"event-id","version":4,"archivedAt":"2026-09-01T12:00:00Z"}`))
+	}))
+	defer events.Close()
+	server := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: &Resolver{Upstream: upstream.New(upstream.Services{Account: account.URL, Event: events.URL})}}))
+	call := func() []byte {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewBufferString(`{"query":"mutation { archiveEvent(eventId: \"event-id\", expectedVersion: 3) { eventId version archivedAt } }"}`))
+		request.Header.Set("Content-Type", "application/json")
+		server.ServeHTTP(recorder, request)
+		return recorder.Body.Bytes()
+	}
+	if response := call(); bytes.Contains(response, []byte(`"errors"`)) || !bytes.Contains(response, []byte(`"archivedAt"`)) {
+		t.Fatalf("admin archive failed: %s", response)
+	}
+	member = true
+	if response := call(); !bytes.Contains(response, []byte(`"errors"`)) || archiveCalls != 1 {
+		t.Fatalf("member archive was not denied: %s calls=%d", response, archiveCalls)
 	}
 }

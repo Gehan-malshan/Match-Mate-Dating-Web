@@ -10,3 +10,9 @@ var PaymentOptionsUp string
 
 //go:embed 000003_event_image.up.sql
 var EventImageUp string
+
+//go:embed 000004_event_archive.up.sql
+var EventArchiveUp string
+
+//go:embed 000005_remove_event_audit.up.sql
+var RemoveEventAuditUp string

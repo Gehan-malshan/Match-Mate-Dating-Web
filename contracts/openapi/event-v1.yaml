@@ -11,6 +11,7 @@ paths:
       parameters:
         - {name: cursor, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+        - {name: archived, in: query, schema: {type: boolean, default: false}, description: Archived=true is restricted to administrators}
       responses:
         "200": {description: Managed event page, content: {application/json: {schema: {$ref: "#/components/schemas/ManagedEventPage"}}}}
         "401": {$ref: "#/components/responses/Problem"}
@@ -77,6 +78,26 @@ paths:
         "200": {description: Updated event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
         "409": {$ref: "#/components/responses/Problem"}
         "422": {$ref: "#/components/responses/Problem"}
+  /events/{eventId}/archive:
+    post:
+      summary: Administrator-only recoverable delete for draft or cancelled events
+      security: [{bearerAuth: []}]
+      parameters: [{name: eventId, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ArchiveInput"}}}}
+      responses:
+        "200": {description: Archived event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
+  /events/{eventId}/restore:
+    post:
+      summary: Administrator-only restore of an archived event to managed visibility
+      security: [{bearerAuth: []}]
+      parameters: [{name: eventId, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ArchiveInput"}}}}
+      responses:
+        "200": {description: Restored event, content: {application/json: {schema: {$ref: "#/components/schemas/Event"}}}}
+        "403": {$ref: "#/components/responses/Problem"}
+        "409": {$ref: "#/components/responses/Problem"}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
   responses:
@@ -115,6 +136,7 @@ components:
             capacityPolicyVersion: {type: integer}
             createdAt: {type: string, format: date-time}
             updatedAt: {type: string, format: date-time}
+            archivedAt: {type: string, format: date-time, description: Present only when removed from the active admin list}
     PublicEvent:
       type: object
       required: [eventId,name,description,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,paymentOptions,imageVersion,configuredCapacity,matchingRulesetVersion,status,version]
@@ -138,5 +160,6 @@ components:
         version: {type: integer}
     EventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/PublicEvent"}}, nextCursor: {type: string}, limit: {type: integer}}}
     ManagedEventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/Event"}}, nextCursor: {type: string}, limit: {type: integer}}}
-    TransitionInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}, reason: {type: string}}}
+    TransitionInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}
+    ArchiveInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}
     Problem: {type: object, required: [type,title,status,code,detail,instance,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, instance: {type: string}, traceId: {type: string}, fieldErrors: {type: object, additionalProperties: {type: string}}}}

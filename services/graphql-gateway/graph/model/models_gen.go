@@ -96,6 +96,7 @@ type Event struct {
 	MatchingRulesetVersion string  `json:"matchingRulesetVersion"`
 	Status                 string  `json:"status"`
 	Version                int     `json:"version"`
+	ArchivedAt             *string `json:"archivedAt,omitempty"`
 }
 
 type EventInput struct {

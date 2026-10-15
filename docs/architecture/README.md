@@ -34,7 +34,7 @@ Important open questions include exact age policy, verification method, gender/g
 | Administrator | Event creation, matching runs/overrides/locks/publication, roles, configuration, rulesets, audit access, emergency controls |
 | Service account | Machine identity with only required integration scopes |
 
-Possession of a role never bypasses ownership, event scope, resource state, privacy policy, or audit requirements.
+Possession of a role never bypasses ownership, event scope, resource state, or privacy policy. Other services may retain domain-specific audit requirements; Event does not store a separate audit history.
 
 ## 4. Data visibility model
 
@@ -116,7 +116,7 @@ Owns identity, credentials, verification, roles, sessions, lifecycle, community 
 
 ### Event Service
 
-Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity.
+Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity. The Event service does not store a separate audit history; its outbox remains for cross-service event delivery.
 
 ### Booking Service
 
@@ -311,7 +311,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 
 ## 18. Observability and planning SLOs
 
-Every service emits sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, OpenTelemetry traces, and separate business audit records.
+Services emit sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, and OpenTelemetry traces. Domain-specific business audit records remain in services that require them; Event does not retain a separate audit history.
 
 Planning targets requiring approval:
 

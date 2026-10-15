@@ -1,6 +1,6 @@
 # MatchMate Data Architecture
 
-Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version and writes an audit row in one transaction; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
+Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
 
 Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state, not a collected-payment state. No venue collection ledger exists yet. Do not infer a paid ticket from the Booking state.
 
@@ -59,7 +59,7 @@ Constraints and privacy:
 
 ## 4. Event database
 
-The first executable slice implements an Event-owned `event` aggregate table, `event_audit`, and transactional `outbox`. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
+The Event service owns `event`, `event_image`, and transactional `outbox` tables. Migration 5 drops the former `event_audit` table and permanently removes any records it contained; new databases do not create it. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
 
 Suggested tables:
 

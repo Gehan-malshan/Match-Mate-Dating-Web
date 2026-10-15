@@ -1,5 +1,7 @@
 # MatchMate GraphQL Gateway
 
+Event `archivedAt`, `managedEvents(archived:)`, and admin-only `archiveEvent`/`restoreEvent` expose recoverable deletion. The gateway checks the admin role, and Event repeats authorization and lifecycle checks. Archive does not delete booking history. The Event service no longer stores an event audit trail.
+
 Event `imageVersion` is included in the GraphQL model. `uploadEventImage(eventId,imageBase64)` is admin-only and forwards to Event; media bytes are read through the narrow public `GET /media/events/{eventId}` route, not GraphQL lists. Draft bytes remain private because Event returns 404 until publication. See [ADR-0002](../../docs/adr/0002-event-image-storage.md).
 
 The GraphQL gateway is the single browser-facing Backend for Frontend. It exposes `POST /graphql` on port `8080`, maps typed operations to the existing Go service REST APIs, forwards Account-issued bearer tokens and rotating refresh cookies, and performs an additional administrator-role check on privileged event and matchmaking operations.
@@ -9,6 +11,8 @@ It owns no database and no business state. Account, Event, Booking, Payment, Not
 The schema exposes Event `paymentOptions`, Booking `paymentMethod`, and optional `createBooking(paymentMethod:)`. The gateway forwards the choice; Event and Booking remain authoritative. Existing online-only clients can omit the argument.
 
 `eventRegistrations(eventId, limit, offset)` is administrator-only. It loads event-filtered bookings from Booking, then resolves a bounded page of nicknames and email addresses from Account's admin-only batch endpoint. Member-facing `bookings` remains scoped to the caller. GraphQL responses use `Cache-Control: no-store` because registrations contain personal data.
+
+`adminRegistrations(limit, offset)` uses the same protected join but pages bookings across all events. Both queries are bounded to 50 records per page; the admin frontend requests 25.
 
 ## Run
 

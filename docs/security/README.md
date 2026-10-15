@@ -111,7 +111,7 @@ Never log passwords, tokens, secrets, raw identity evidence, full callback paylo
 
 Use sanitized IDs/hashes and structured fields. Metrics labels must remain low-cardinality and contain no personal data.
 
-Business audit records include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive.
+Where a service retains business audit records, they include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive. The Event service does not retain a separate audit history.
 
 ## 10. Moderation and safety
 

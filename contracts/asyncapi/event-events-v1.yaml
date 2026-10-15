@@ -9,7 +9,7 @@ operations:
   publishLifecycle:
     action: send
     channel: {$ref: "#/channels/eventFacts"}
-    summary: Event Service publishes transactionally persisted facts with routing keys event.EventCreated, event.EventUpdated, event.EventPublished, event.EventRegistrationOpened, event.EventRegistrationClosed, and event.EventCancelled.
+    summary: Event Service publishes transactionally persisted facts with routing keys event.EventCreated, event.EventUpdated, event.EventPublished, event.EventRegistrationOpened, event.EventRegistrationClosed, event.EventCancelled, event.EventArchived, and event.EventRestored.
 components:
   messages:
     EventLifecycleFact:
@@ -19,7 +19,7 @@ components:
         required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,causationId,actorId,payload]
         properties:
           eventId: {type: string, format: uuid}
-          eventType: {type: string, enum: [EventCreated,EventUpdated,EventPublished,EventRegistrationOpened,EventRegistrationClosed,EventCancelled]}
+          eventType: {type: string, enum: [EventCreated,EventUpdated,EventPublished,EventRegistrationOpened,EventRegistrationClosed,EventCancelled,EventArchived,EventRestored]}
           schemaVersion: {type: integer, const: 1}
           occurredAt: {type: string, format: date-time}
           aggregateId: {type: string, format: uuid}
@@ -33,3 +33,4 @@ components:
               eventId: {type: string, format: uuid}
               status: {type: string}
               version: {type: integer}
+              archived: {type: boolean, description: Present on archive/restore facts}

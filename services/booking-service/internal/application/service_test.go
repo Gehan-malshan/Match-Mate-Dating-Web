@@ -31,6 +31,9 @@ func (f *fakeRepo) List(context.Context, string, int) ([]domain.Booking, error) 
 func (f *fakeRepo) ListForEvent(context.Context, string, int, int) ([]domain.Booking, error) {
 	return []domain.Booking{f.created}, nil
 }
+func (f *fakeRepo) ListRegistrations(context.Context, int, int) ([]domain.Booking, error) {
+	return []domain.Booking{f.created}, nil
+}
 func (f *fakeRepo) Cancel(_ context.Context, _ string, _ string, _ string, at time.Time) (domain.Booking, bool, error) {
 	f.created.State = domain.Cancelled
 	f.created.CancelledAt = &at
