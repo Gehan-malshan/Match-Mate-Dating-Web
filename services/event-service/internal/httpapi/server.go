@@ -49,6 +49,8 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/v1/events", s.protected(http.HandlerFunc(s.create)))
 	s.mux.Handle("PATCH /api/v1/events/{eventId}", s.protected(http.HandlerFunc(s.update)))
 	s.mux.Handle("PUT /api/v1/events/{eventId}/image", s.protected(http.HandlerFunc(s.uploadImage)))
+	s.mux.Handle("POST /api/v1/events/{eventId}/archive", s.protected(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.setArchived(w, r, true) })))
+	s.mux.Handle("POST /api/v1/events/{eventId}/restore", s.protected(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.setArchived(w, r, false) })))
 	for path, status := range map[string]domain.Status{"publish": domain.Published, "open-registration": domain.RegistrationOpen, "close-registration": domain.RegistrationClosed, "cancel": domain.Cancelled} {
 		to := status
 		s.mux.Handle("POST /api/v1/events/{eventId}/"+path, s.protected(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { s.transition(w, r, to) })))
@@ -56,11 +58,33 @@ func (s *Server) routes() {
 }
 func (s *Server) managed(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	p, err := s.app.ListManaged(r.Context(), principal(r), r.URL.Query().Get("cursor"), limit)
+	archived := false
+	if raw := r.URL.Query().Get("archived"); raw != "" {
+		var parseErr error
+		archived, parseErr = strconv.ParseBool(raw)
+		if parseErr != nil {
+			problem(w, r, 400, "EVENT_ARCHIVED_FILTER_INVALID", "Archived filter is invalid", nil)
+			return
+		}
+	}
+	p, err := s.app.ListManaged(r.Context(), principal(r), archived, r.URL.Query().Get("cursor"), limit)
 	if handle(w, r, err) {
 		return
 	}
 	write(w, 200, p)
+}
+func (s *Server) setArchived(w http.ResponseWriter, r *http.Request, archive bool) {
+	var in struct {
+		ExpectedVersion int64 `json:"expectedVersion"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	e, err := s.app.SetArchived(r.Context(), principal(r), r.PathValue("eventId"), in.ExpectedVersion, archive, correlation(r))
+	if handle(w, r, err) {
+		return
+	}
+	write(w, 200, e)
 }
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -103,7 +127,7 @@ func (s *Server) uploadImage(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	e, err := s.app.UploadImage(r.Context(), principal(r), r.PathValue("eventId"), in.ImageBase64, correlation(r))
+	e, err := s.app.UploadImage(r.Context(), principal(r), r.PathValue("eventId"), in.ImageBase64)
 	if handle(w, r, err) {
 		return
 	}
@@ -133,13 +157,12 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) transition(w http.ResponseWriter, r *http.Request, to domain.Status) {
 	var in struct {
-		ExpectedVersion int64  `json:"expectedVersion"`
-		Reason          string `json:"reason"`
+		ExpectedVersion int64 `json:"expectedVersion"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	e, err := s.app.Transition(r.Context(), principal(r), r.PathValue("eventId"), in.ExpectedVersion, to, in.Reason, correlation(r))
+	e, err := s.app.Transition(r.Context(), principal(r), r.PathValue("eventId"), in.ExpectedVersion, to, correlation(r))
 	if handle(w, r, err) {
 		return
 	}

@@ -16,10 +16,10 @@ GraphQL carries the authenticated, bounded upload mutation. The gateway exposes 
 
 ## Consequences and open work
 
-The schema migration is additive; existing events have `image_version=0`. Saving a new draft followed by upload is a two-step UI workflow. A failed image upload leaves the draft intact and visible for retry. Image replacement increments `image_version` and is audited, while the event configuration version remains unchanged. Rollback should retain the Event-owned bytes; do not drop `event_image` while uploaded images exist.
+The schema migration is additive; existing events have `image_version=0`. Saving a new draft followed by upload is a two-step UI workflow. A failed image upload leaves the draft intact and visible for retry. Image replacement increments `image_version` while the event configuration version remains unchanged. Rollback should retain the Event-owned bytes; do not drop `event_image` while uploaded images exist.
 
 PostgreSQL byte storage is deliberately bounded for the current small catalogue. Moving to object storage/CDN later requires a new ADR, migration, backup/retention plan, and URL compatibility strategy. Before production, review image rights, consent, manual approval/moderation, malware scanning, rate limits, abuse handling, backup size, and accessibility text policy. Upload is admin-only, but that is not a substitute for those controls.
 
 ## Verification
 
-Unit tests cover image validation/metadata stripping. Disposable-schema PostgreSQL tests cover draft-only storage, public visibility after publication, audit, and image version. Gateway tests cover narrow proxy behavior. Browser build/tests cover image URL selection and fallback. Production release additionally requires end-to-end image upload and publication checks.
+Unit tests cover image validation/metadata stripping. Disposable-schema PostgreSQL tests cover draft-only storage, public visibility after publication, and image version. Gateway tests cover narrow proxy behavior. Browser build/tests cover image URL selection and fallback. Production release additionally requires end-to-end image upload and publication checks.

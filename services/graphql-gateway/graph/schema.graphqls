@@ -10,7 +10,7 @@ type RegistrationPayload { me: Me!, verificationToken: String }
 type CommunityProfile { profileId: ID!, nickname: String!, ageBand: String!, broadLocation: String!, bio: String!, interests: [String!]! }
 type CommunityPage { items: [CommunityProfile!]!, nextCursor: String }
 
-type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String!, imageVersion: Int!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int! }
+type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String!, imageVersion: Int!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int!, archivedAt: String }
 type EventPage { items: [Event!]!, nextCursor: String, limit: Int! }
 
 type Booking { bookingId: ID!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String }
@@ -47,10 +47,11 @@ type Query {
   event(eventId: ID!): Event!
   bookings: BookingPage!
   eventRegistrations(eventId: ID!, limit: Int = 25, offset: Int = 0): EventRegistrationPage!
+  adminRegistrations(limit: Int = 25, offset: Int = 0): EventRegistrationPage!
   payment(bookingId: ID!): Payment!
   notifications(limit: Int = 20, cursor: String): NotificationPage!
   unreadNotificationCount: UnreadCount!
-  managedEvents(limit: Int = 100): EventPage!
+  managedEvents(limit: Int = 100, archived: Boolean = false): EventPage!
   matchingRuns(eventId: ID!): MatchingRunPage!
   matchingRun(runId: ID!): MatchingRun!
 }
@@ -72,7 +73,9 @@ type Mutation {
   createEvent(input: EventInput!): Event!
   uploadEventImage(eventId: ID!, imageBase64: String!): Event!
   updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!
-  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!, reason: String): Event!
+  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!): Event!
+  archiveEvent(eventId: ID!, expectedVersion: Int!): Event!
+  restoreEvent(eventId: ID!, expectedVersion: Int!): Event!
   generateMatchingRun(eventId: ID!, idempotencyKey: String!): MatchingRun!
   reviewMatchingRun(runId: ID!, expectedVersion: Int!): MatchingRun!
   lockMatchingRun(runId: ID!, expectedVersion: Int!, idempotencyKey: String!): MatchingRun!

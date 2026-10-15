@@ -25,6 +25,7 @@ type Repository interface {
 	Get(context.Context, string, string) (domain.Booking, error)
 	List(context.Context, string, int) ([]domain.Booking, error)
 	ListForEvent(context.Context, string, int, int) ([]domain.Booking, error)
+	ListRegistrations(context.Context, int, int) ([]domain.Booking, error)
 	Cancel(context.Context, string, string, string, time.Time) (domain.Booking, bool, error)
 	Expire(context.Context, time.Time, int) (int, error)
 }
@@ -78,6 +79,12 @@ func (s *Service) ListForEvent(ctx context.Context, eventID string, limit, offse
 		return nil, ErrInvalid
 	}
 	return s.repo.ListForEvent(ctx, eventID, limit, offset)
+}
+func (s *Service) ListRegistrations(ctx context.Context, limit, offset int) ([]domain.Booking, error) {
+	if limit < 1 || limit > 51 || offset < 0 {
+		return nil, ErrInvalid
+	}
+	return s.repo.ListRegistrations(ctx, limit, offset)
 }
 func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Booking, error) {
 	if id == "" || key == "" {

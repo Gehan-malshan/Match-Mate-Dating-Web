@@ -1,10 +1,14 @@
 # Administrator UI Source
 
+Event manager has **Delete** for draft/cancelled events (published or open events must first be cancelled). Delete requests confirmation, then archives the record; it is removed from the normal list without erasing bookings. **Show deleted** displays archived cards and **Restore** returns one to the managed list. Restoring a cancelled event does not reopen registration. Event audit history is not stored.
+
 The draft event editor now has an optional event-photo picker and preview. It accepts JPEG/PNG/WebP, compresses to a bounded JPEG, saves the draft, then uploads the image. If upload fails, the draft remains saved and can be reopened to retry. Images cannot be replaced after publication. Choose only artwork the project has rights and consent to publish.
 
 The event draft editor lets an administrator choose pay at venue, PayHere online, or both. The setting is visible in managed events and becomes immutable after publication under the current draft-only edit API. New drafts default to pay at venue; older events stay online-only until deliberately edited while still drafts.
 
 In Event manager, choose **View registrations** on an event card to see the admin-only, paginated booking list with member nickname/email, booking state, payment method, and amount. `CONFIRMED` pay-at-venue reservations are explicitly labelled as not collected in the app. Pending, expired, cancelled, and payment-review records remain distinguishable; this is not yet a check-in screen.
+
+The sidebar **Registrations** section is the main ledger across all events. Its event selector narrows the server query to one event, and previous/next load bounded pages. Event cards open this section with their event preselected. The list includes event name, booking reference, creation/confirmation times, and payment method; it does not claim to record venue collections or attendance.
 
 This directory contains the existing administrator workspace components and styles. It is no longer a separately deployed or separately started application: `frontend/apps/web/src/routes/AdminPage.tsx` bundles this source into the unified frontend at `/admin`.
 

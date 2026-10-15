@@ -36,6 +36,7 @@ func New(app *application.Service, v Verifier, log *slog.Logger) http.Handler {
 	m.Handle("GET /api/v1/bookings/{bookingId}", s.protect(http.HandlerFunc(s.get)))
 	m.Handle("GET /api/v1/bookings", s.protect(http.HandlerFunc(s.list)))
 	m.Handle("GET /api/v1/admin/events/{eventId}/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
+	m.Handle("GET /api/v1/admin/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("POST /api/v1/bookings/{bookingId}/cancel", s.protect(http.HandlerFunc(s.cancel)))
 	m.Handle("GET /internal/v1/bookings/{bookingId}/payment-snapshot", s.protect(http.HandlerFunc(s.snapshot)))
 	return m
@@ -102,7 +103,13 @@ func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "INVALID_REQUEST", "Limit must be 1–50 and offset must be non-negative.")
 		return
 	}
-	items, err := s.app.ListForEvent(r.Context(), r.PathValue("eventId"), limit+1, offset)
+	var items []domain.Booking
+	var err error
+	if eventID := r.PathValue("eventId"); eventID != "" {
+		items, err = s.app.ListForEvent(r.Context(), eventID, limit+1, offset)
+	} else {
+		items, err = s.app.ListRegistrations(r.Context(), limit+1, offset)
+	}
 	if handle(w, err) {
 		return
 	}

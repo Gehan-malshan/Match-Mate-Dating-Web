@@ -1,5 +1,9 @@
 # MatchMate Testing and Quality Strategy
 
+Event Delete/Restore checks must prove administrator-only authorization, draft/cancelled-only deletion, stale-version conflicts, no hard deletion, active-versus-archived list separation, restoration, and preserved booking references. Browser E2E for the confirmation interaction remains a production gate. Event audit history is no longer stored.
+
+Admin registration-feed checks cover role denial at Booking and GraphQL, bounded pagination, the global PostgreSQL ordering/index, the member identity join, and frontend build behavior. Browser E2E with real bookings remains required before production; pay-at-venue confirmation must never be labelled as collected payment.
+
 Event image tests must cover unauthorized upload, invalid/oversized/malformed image, metadata removal, draft-only writes, no public draft exposure, post-publication read, cache/version behavior, and gateway proxy bounds. The current slice includes unit, disposable-schema PostgreSQL, gateway, and frontend checks; production still requires browser E2E, image-rights/moderation policy, abuse-rate and backup-size evidence.
 
 The event payment-choice slice adds unit coverage for allowed methods and server-derived venue confirmation, GraphQL/front-end build checks, and a disposable-schema Booking PostgreSQL component test for one-seat contention and idempotency (`BOOKING_TEST_DATABASE_URL`). Before production, add browser E2E for all three options, migration upgrades from prior schemas, broker redelivery, and PayHere sandbox evidence for online events. Venue confirmation must never be interpreted as payment collection.

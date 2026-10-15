@@ -119,17 +119,24 @@ button { color: inherit; }
 .status-draft, .status-generated { border-color: rgba(255,155,213,.24); background: rgba(255,47,194,.08); color: var(--pink); }
 .status-under_review, .status-locked { border-color: rgba(255,183,117,.22); background: rgba(255,140,66,.08); color: #ffc08b; }
 .status-cancelled, .status-invalidated { color: var(--red); }
+.danger-action:disabled { opacity: .45; cursor: not-allowed; }
 .empty-state { margin: 28px 0 0; padding: 24px; border: 1px dashed var(--line); border-radius: 12px; color: var(--quiet); line-height: 1.6; text-align: center; }
 .empty-state.is-error, .operation-message.is-error { color: var(--red); }
 .operation-message { margin: 22px 0 0; padding: 13px 15px; border-left: 3px solid var(--pink-strong); background: rgba(255,47,194,.06); color: #ead8e3; line-height: 1.5; }
 .registrations-panel { padding: 28px; margin: 0 0 24px; }
 .registrations-panel .panel-heading p:last-child { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.registration-controls { display: flex; align-items: end; gap: 16px; margin-top: 26px; }
+.registration-controls label { display: grid; gap: 8px; min-width: min(100%, 330px); color: var(--muted); font-size: 11px; font-weight: 700; }
+.registration-controls select { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: #1c1920; color: var(--text); font: inherit; font-size: 13px; }
+.registration-hint { color: var(--quiet); font-size: 12px; }
+.registration-hint.is-error { color: var(--red); }
 .registrations-scroll { overflow-x: auto; margin-top: 24px; }
 .registrations-scroll table { width: 100%; border-collapse: collapse; text-align: left; }
 .registrations-scroll th, .registrations-scroll td { padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; font-size: 12px; }
 .registrations-scroll th { color: var(--quiet); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .registrations-scroll td strong, .registrations-scroll td small { display: block; }
 .registrations-scroll td small { margin-top: 5px; color: var(--quiet); }
+.registrations-scroll td code { color: var(--quiet); font-size: 10px; }
 .registrations-pagination { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
 .registrations-pagination span { color: var(--muted); font-size: 12px; }
 .registrations-pagination button:disabled { opacity: .45; cursor: not-allowed; }

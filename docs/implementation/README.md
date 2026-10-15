@@ -1,5 +1,9 @@
 # MatchMate Implementation Guide
 
+Event deletion (before → after): Cancellation previously left a cancelled card in the only admin event list, with no way to remove it. Now administrators can Delete a cancelled or draft event into a recoverable archive and use Show deleted → Restore. Published/open events require cancellation before Delete. Booking references remain intact; restoring visibility never reverses cancellation. Event audit history is not retained.
+
+Admin registrations navigation (before → after): Previously an administrator had to open a single event card and could only see that event's booking page. Now the sidebar has a dedicated Registrations section with a bounded newest-first feed across all events, an event filter, and per-event deep links from cards. Booking remains the source of booking state; Account alone supplies nickname/email through an admin-only lookup. The feed is not a venue collection or attendance ledger.
+
 Event image slice: Admin chooses an optional photo in draft creation/editing; browser prepares a bounded JPEG, Event stores a validated, metadata-stripped copy, and public pages show it only after publication. Saving and image upload are separate calls; an upload error leaves the draft intact for retry. Production launch still requires image rights/moderation policy, abuse protection, and browser E2E. See [ADR-0002](../adr/0002-event-image-storage.md).
 
 Current payment-choice slice: Event draft editor supports venue, online, or both; Booking validates and snapshots the choice, and venue reservations consume confirmed capacity without PayHere. The member UI shows payment due at entrance. Before a payment-free production launch, still implement a separate deployment topology/feature gates, staff collection and check-in policy, confirmed-venue cancellation policy, production capacity and browser E2E evidence, and privacy/security operational checks. See [ADR-0001](../adr/0001-event-payment-choice.md).
@@ -158,7 +162,7 @@ Organizers can manage events and members can discover eligible published events.
 
 - A published/open event is discoverable by an eligible member.
 - Only assigned organizers/admins can mutate it.
-- Event states and changes are auditable and versioned.
+- Event states and changes are versioned; the Event service does not retain an audit trail.
 
 ## 7. Phase 3 — Booking and capacity
 
@@ -394,7 +398,7 @@ When implementation starts, maintain this table in the same pull request as phas
 |---|---|---|---|---|
 | 0 Foundation | In progress | Project team | Root Bun workspace and tested `frontend/apps/web` public landing slice | Product/policy decisions and contracts |
 | 1 Account/Profile | In review | Project team | Go API/migration/outbox relay, PostgreSQL schema, v1 contracts, web registration/login/profile routes, unit tests | Production email delivery, rate-limit/gateway policy, integration/E2E/security evidence |
-| 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, audit/outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
+| 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
 | 3 Booking | In progress | Project team | Go API/domain, PostgreSQL capacity/booking migration, Event price snapshot adapter, expiry worker, Payment inbox consumer, outbox relay, v1 contracts and unit tests | Cancellation/waitlist/attendance policy; component/contention/failure evidence |
 | 4 Payment | In progress | Project team | Go API/domain/provider adapter, PostgreSQL migration, initiation/callback/status v1 contracts, unit tests, audit/outbox relay, pending reconciliation classification, Booking snapshot/consumer integration, sandbox/live runbook | PayHere refund/provider-resolution policy; component/sandbox/failure evidence |
 | 5 Matchmaking | In progress | Project team | Deterministic Go engine, PostgreSQL migration, `prototype-v1` fixtures, admin-only lifecycle API/UI, member APIs, v1 contracts, optimizer and admin-client tests | Production questionnaire/groups/rounds approval, Booking/Moderation consumers, relay/performance/concurrency evidence |

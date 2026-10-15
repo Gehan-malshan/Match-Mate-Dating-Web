@@ -122,6 +122,22 @@ func (r *Repository) ListForEvent(ctx context.Context, eventID string, limit, of
 	}
 	return items, rows.Err()
 }
+func (r *Repository) ListRegistrations(ctx context.Context, limit, offset int) ([]domain.Booking, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+cols+` FROM booking ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]domain.Booking, 0)
+	for rows.Next() {
+		b, e := scan(rows)
+		if e != nil {
+			return nil, e
+		}
+		items = append(items, b)
+	}
+	return items, rows.Err()
+}
 func (r *Repository) Cancel(ctx context.Context, actor, id, key string, now time.Time) (domain.Booking, bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

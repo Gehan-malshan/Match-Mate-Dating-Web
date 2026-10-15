@@ -66,7 +66,7 @@ func (s *Service) Update(ctx context.Context, p domain.Principal, id string, in 
 	}
 	return v, err
 }
-func (s *Service) Transition(ctx context.Context, p domain.Principal, id string, expected int64, to domain.Status, reason, corr string) (domain.Event, error) {
+func (s *Service) Transition(ctx context.Context, p domain.Principal, id string, expected int64, to domain.Status, corr string) (domain.Event, error) {
 	e, err := s.authorize(ctx, p, id)
 	if err != nil {
 		return e, err
@@ -77,9 +77,6 @@ func (s *Service) Transition(ctx context.Context, p domain.Principal, id string,
 	if to == domain.Published && !s.now().Before(e.RegistrationClosesAt) {
 		return e, problem(409, "EVENT_PUBLICATION_WINDOW_EXPIRED", "An event cannot be published after registration has closed", nil)
 	}
-	if to == domain.Cancelled && strings.TrimSpace(reason) == "" {
-		return e, problem(422, "EVENT_CANCELLATION_REASON_REQUIRED", "A cancellation reason is required", map[string]string{"reason": "required"})
-	}
 	if to == domain.RegistrationOpen {
 		now := s.now()
 		if now.Before(e.RegistrationOpensAt) || !now.Before(e.RegistrationClosesAt) {
@@ -87,7 +84,31 @@ func (s *Service) Transition(ctx context.Context, p domain.Principal, id string,
 		}
 	}
 	name := map[domain.Status]string{domain.Published: "EventPublished", domain.RegistrationOpen: "EventRegistrationOpened", domain.RegistrationClosed: "EventRegistrationClosed", domain.Cancelled: "EventCancelled"}[to]
-	v, err := s.repo.Transition(ctx, id, expected, to, reason, fact(name, e, p, corr))
+	v, err := s.repo.Transition(ctx, id, expected, to, fact(name, e, p, corr))
+	if errors.Is(err, store.ErrConflict) {
+		return v, problem(409, "EVENT_VERSION_CONFLICT", "Event changed; reload and retry", nil)
+	}
+	return v, err
+}
+func (s *Service) SetArchived(ctx context.Context, p domain.Principal, id string, expected int64, archive bool, corr string) (domain.Event, error) {
+	if !p.HasRole("admin") {
+		return domain.Event{}, problem(403, "EVENT_ADMIN_REQUIRED", "Only an administrator can delete or restore an event", nil)
+	}
+	e, err := s.Get(ctx, id)
+	if err != nil {
+		return e, err
+	}
+	if archive && e.Status != domain.Draft && e.Status != domain.Cancelled {
+		return e, problem(409, "EVENT_ARCHIVE_STATE_INVALID", "Cancel a published event before deleting it", nil)
+	}
+	if archive && e.ArchivedAt != nil || !archive && e.ArchivedAt == nil {
+		return e, problem(409, "EVENT_ARCHIVE_STATE_INVALID", "Event is already in the requested archive state", nil)
+	}
+	name := "EventRestored"
+	if archive {
+		name = "EventArchived"
+	}
+	v, err := s.repo.SetArchived(ctx, id, expected, archive, fact(name, e, p, corr))
 	if errors.Is(err, store.ErrConflict) {
 		return v, problem(409, "EVENT_VERSION_CONFLICT", "Event changed; reload and retry", nil)
 	}
@@ -102,9 +123,12 @@ func (s *Service) List(ctx context.Context, cursor string, limit int) (domain.Pa
 	}
 	return s.repo.ListDiscoverable(ctx, cursor, limit, s.now())
 }
-func (s *Service) ListManaged(ctx context.Context, p domain.Principal, cursor string, limit int) (domain.Page, error) {
+func (s *Service) ListManaged(ctx context.Context, p domain.Principal, archived bool, cursor string, limit int) (domain.Page, error) {
 	if !p.HasRole("admin") && !p.HasRole("organizer") {
 		return domain.Page{}, problem(403, "EVENT_FORBIDDEN", "Organizer or admin role is required", nil)
+	}
+	if archived && !p.HasRole("admin") {
+		return domain.Page{}, problem(403, "EVENT_ADMIN_REQUIRED", "Archived events are restricted to administrators", nil)
 	}
 	if limit == 0 {
 		limit = 50
@@ -112,10 +136,10 @@ func (s *Service) ListManaged(ctx context.Context, p domain.Principal, cursor st
 	if limit < 1 || limit > 100 {
 		return domain.Page{}, problem(422, "EVENT_LIMIT_INVALID", "Limit must be between 1 and 100", map[string]string{"limit": "out_of_range"})
 	}
-	return s.repo.ListManaged(ctx, p.Subject, p.HasRole("admin"), cursor, limit)
+	return s.repo.ListManaged(ctx, p.Subject, p.HasRole("admin"), archived, cursor, limit)
 }
 func (s *Service) Ready(ctx context.Context) error { return s.repo.Ping(ctx) }
-func (s *Service) UploadImage(ctx context.Context, p domain.Principal, id, encoded, corr string) (domain.Event, error) {
+func (s *Service) UploadImage(ctx context.Context, p domain.Principal, id, encoded string) (domain.Event, error) {
 	if !p.HasRole("admin") {
 		return domain.Event{}, problem(403, "EVENT_ADMIN_REQUIRED", "Only an administrator can upload an event image", nil)
 	}
@@ -133,7 +157,7 @@ func (s *Service) UploadImage(ctx context.Context, p domain.Principal, id, encod
 	if err != nil {
 		return domain.Event{}, problem(422, "EVENT_IMAGE_INVALID", "Use a JPEG no larger than 650 KiB and 1600 by 1600 pixels", nil)
 	}
-	e, err := s.repo.SaveImage(ctx, id, safe, p.Subject, corr)
+	e, err := s.repo.SaveImage(ctx, id, safe)
 	if errors.Is(err, store.ErrNotFound) {
 		return e, problem(404, "EVENT_NOT_FOUND", "Event was not found", nil)
 	}
