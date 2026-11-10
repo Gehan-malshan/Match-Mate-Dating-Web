@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
+	"regexp"
 	"strings"
 )
 
@@ -21,6 +22,9 @@ type Notification struct {
 	MerchantID, OrderID, PaymentID, Amount, Currency, StatusCode, Signature string
 }
 
+var callbackAmount = regexp.MustCompile(`^(0|[1-9][0-9]*)\.[0-9]{2}$`)
+var callbackCurrency = regexp.MustCompile(`^[A-Z]{3}$`)
+
 func digest(value string) string {
 	sum := md5.Sum([]byte(value))
 	return strings.ToUpper(hex.EncodeToString(sum[:]))
@@ -35,8 +39,19 @@ func NotificationHash(n Notification, secret string) string {
 }
 
 func VerifyNotification(n Notification, cfg Config) error {
-	if n.MerchantID == "" || n.OrderID == "" || n.Amount == "" || n.Currency == "" || n.StatusCode == "" || n.Signature == "" {
+	if n.MerchantID == "" || n.OrderID == "" || n.PaymentID == "" || n.Amount == "" || n.Currency == "" || n.StatusCode == "" || n.Signature == "" {
 		return errors.New("missing required callback field")
+	}
+	if !callbackAmount.MatchString(n.Amount) || !callbackCurrency.MatchString(n.Currency) {
+		return errors.New("invalid callback money")
+	}
+	switch n.StatusCode {
+	case "2", "0", "-1", "-2", "-3":
+	default:
+		return errors.New("unsupported callback status")
+	}
+	if len(n.Signature) != 32 {
+		return errors.New("invalid callback signature")
 	}
 	if subtle.ConstantTimeCompare([]byte(n.MerchantID), []byte(cfg.MerchantID)) != 1 {
 		return errors.New("merchant mismatch")

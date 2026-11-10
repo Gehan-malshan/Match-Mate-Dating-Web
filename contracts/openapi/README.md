@@ -4,6 +4,8 @@ Event v1 now includes the optional event image workflow: admin-only draft JPEG r
 
 Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, the first Payment slice in `payment-v1.yaml`, and the authenticated member feed in `notification-v1.yaml`.
 
+Payment v1 additionally documents an administrator-only, audited, read-only cursor-paged reconciliation queue and strict PayHere callback rejection. No refund endpoint is implemented under the current no-refunds direction.
+
 This directory contains canonical versioned REST contracts. Account, Event, first Booking, Matchmaking prototype, first Payment, Notification, and the first Moderation reporting/case-status/action/appeal API are implemented. API implementation and generated clients must conform to these files.
 
 ## Planned organization

@@ -25,7 +25,7 @@ This guide defines service data ownership, proposed schemas, constraints, consis
 | Account/Profile | Accounts, credentials, roles, sessions, verification, profile, preferences, visibility, interests, blocks | Email uniqueness, credential/session security, source profile/preferences, account/block status |
 | Event | Event, location, schedule, price, configured capacity/policy, organizer, lifecycle | Event state, configured limits, price definition, registration window |
 | Booking | Booking, hold, allocation, price/policy snapshot, attendance, inbox/outbox | No oversell, one active booking, hold expiry, confirmed participation |
-| Payment | Payment, provider callback, refund, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment/refund state |
+| Payment | Payment, provider callback, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment state |
 | Matchmaking | Ruleset, snapshots, candidates, scores, runs, suggestions, overrides, locked pairs, responses, consent, feedback | Eligibility/scoring reproducibility, unique pairing/response, immutable run history |
 | Notification | Template, delivery, attempt, suppression/channel preference | Delivery idempotency, retry history, suppression |
 | Moderation | Report, case, evidence reference, action, appeal, safety audit | Enforcement state, restricted evidence/audit, appeal history |
@@ -104,7 +104,7 @@ Constraints:
 
 ## 6. Payment database
 
-Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `inbox`, and `outbox`. Refund and reconciliation tables remain planned until finance policy is approved. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
+Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `reconciliation_item`, `inbox`, and `outbox`. The current no-automatic-refunds policy has no refund table or command. Verified callback mismatches and conflicting results create open reconciliation items in the same transaction as state/audit/outbox changes; old pending-result items close when a final result arrives. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
 
 Suggested tables:
 
@@ -112,7 +112,7 @@ Suggested tables:
 |---|---|
 | `payment` | ID, booking unique active relation, order ID unique, amount/currency, state, provider, created/updated/completed time, version |
 | `provider_callback` | provider event/payment ID or fingerprint unique, order, received time, verification result, sanitized metadata hash/reference |
-| `refund` | payment, amount/currency, reason, state, provider reference, requested/completed times |
+| `refund` | Not implemented under the current no-refunds policy; any exception workflow needs a separate decision and migration. |
 | `reconciliation_item` | payment/order, discrepancy type, status, owner, notes/audit, resolution |
 | `payment_audit` | append-only state transition and verification decision metadata |
 | `inbox` / `outbox` | idempotent integration |
@@ -124,7 +124,7 @@ Constraints:
 - Valid duplicate callbacks do not republish completion.
 - Preserve immutable callback/audit evidence according to approved retention.
 - Do not store card data or provider credentials.
-- Refund cannot exceed captured amount minus completed refunds.
+- No refund ledger or endpoint exists under the current policy; provider disputes still require preserved evidence and manual review.
 
 ## 7. Matchmaking database
 

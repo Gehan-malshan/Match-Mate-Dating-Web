@@ -14,14 +14,37 @@ import (
 
 var ErrConflict = errors.New("conflict")
 var ErrNotFound = errors.New("not found")
+var ErrInvalidCallback = errors.New("invalid provider callback")
+var ErrInvalidCursor = errors.New("invalid review cursor")
 
 type BookingReader interface {
 	Snapshot(context.Context, string, string) (domain.BookingSnapshot, error)
 }
 type Repository interface {
+	Ping(context.Context) error
 	Initiate(context.Context, domain.Payment, string, string) (domain.Payment, bool, error)
 	FindByBooking(context.Context, string, string) (domain.Payment, error)
 	ApplyCallback(context.Context, payhere.Notification, string, time.Time) (domain.Payment, bool, error)
+	ListReview(context.Context, string, int, string) (ReviewPage, error)
+}
+
+type ReviewPage struct {
+	Items      []ReviewItem `json:"items"`
+	NextCursor string       `json:"nextCursor,omitempty"`
+}
+
+func (s *Service) Ready(ctx context.Context) error { return s.repo.Ping(ctx) }
+
+type ReviewItem struct {
+	ID        string    `json:"id"`
+	PaymentID string    `json:"paymentId,omitempty"`
+	BookingID string    `json:"bookingId,omitempty"`
+	OrderID   string    `json:"orderId"`
+	Amount    string    `json:"amount,omitempty"`
+	Currency  string    `json:"currency,omitempty"`
+	State     string    `json:"state"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 type Clock func() time.Time
 type Service struct {
@@ -78,12 +101,21 @@ func (s *Service) Get(ctx context.Context, actor, bookingID string) (domain.Paym
 	return s.repo.FindByBooking(ctx, actor, bookingID)
 }
 
+func (s *Service) ListReview(ctx context.Context, actor string, limit int, cursor string) (ReviewPage, error) {
+	if limit < 1 {
+		limit = 25
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	return s.repo.ListReview(ctx, actor, limit, cursor)
+}
+
 func (s *Service) Callback(ctx context.Context, n payhere.Notification) error {
 	now := s.now().UTC()
-	verification := "VERIFIED"
 	if err := payhere.VerifyNotification(n, s.provider); err != nil {
-		verification = "REJECTED_" + err.Error()
+		return ErrInvalidCallback
 	}
-	_, _, err := s.repo.ApplyCallback(ctx, n, verification, now)
+	_, _, err := s.repo.ApplyCallback(ctx, n, "VERIFIED", now)
 	return err
 }

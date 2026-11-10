@@ -6,6 +6,8 @@ Event `paymentOptions` is `ONLINE`, `AT_VENUE`, or `BOTH`; old Event create requ
 
 The browser-facing GraphQL SDL at `services/graphql-gateway/graph/schema.graphqls` and versioned internal-service OpenAPI files under `contracts/openapi/` are authoritative for their respective boundaries.
 
+Payment REST now provides administrator-only `GET /api/v1/payments/reconciliation?limit=25&cursor=...` for read-only manual review. It returns open pending-result, callback-mismatch, conflicting-provider-result, and verified unknown-order items without payment contact/card details. This endpoint is for operators; the browser member checkout remains GraphQL. Invalid callback signatures/merchant data return `400` before payment state changes. The no-automatic-refunds policy exposes no refund command.
+
 ## Public edge
 
 - Browser endpoint: `/graphql`; internal service base path: `/api/v1`.

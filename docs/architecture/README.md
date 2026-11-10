@@ -126,9 +126,9 @@ The first executable slice implements Event-derived immutable pricing, atomic ca
 
 ### Payment Service
 
-Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, refunds, and payment audit. It never trusts client amount/currency and never allocates capacity.
+Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, and payment audit. The current policy offers no refunds. It never trusts client amount/currency and never allocates capacity.
 
-The first executable slice implements initiation, callback verification/replay evidence, member status, audit, transactional outbox persistence, and publisher-confirmed RabbitMQ relay. Booking integration/consumption, scheduled reconciliation, refunds, and production delivery remain incomplete, so this slice is not yet an end-to-end payment capability.
+The executable slice implements initiation, callback verification/replay evidence, member status, Booking completion consumption, audit, transactional outbox and publisher-confirmed RabbitMQ relay. It now rejects invalid callbacks before state change, serializes booking checkout initiation, flags contradictory signed results for manual review, and exposes an administrator-only, read-only reconciliation queue. The scheduled worker opens pending-result items after 30 minutes. The approved product direction is no automatic refunds; provider retrieval/automatic resolution and production PayHere evidence remain incomplete. Review items require finance investigation, including late success and chargebacks.
 
 ### Matchmaking Service
 

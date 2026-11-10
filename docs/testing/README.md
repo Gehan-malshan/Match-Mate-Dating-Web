@@ -81,6 +81,8 @@ The first executable slice has deterministic tests for Event registration valida
 
 ### Payment
 
+`PAYMENT_TEST_DATABASE_URL` enables a disposable-schema PostgreSQL component test for concurrent initiation, verified/invalid/duplicate callbacks, amount mismatch, contradictory provider result, outbox uniqueness, and review queue paging. Without it this test is skipped; a green default Go run alone is not production payment evidence. Live RabbitMQ failure/redelivery and PayHere sandbox checks remain required.
+
 The first executable slice has deterministic unit coverage for snapshot money/state validation, PayHere request hashing, callback signature verification, tampering rejection, and provider status mapping. The Booking consumer is implemented, but real PostgreSQL migration/repository concurrency, HTTP/auth contract, broker outage/redelivery, sandbox E2E, and recovery evidence remain required before release.
 
 - Request/hash adapter inputs.

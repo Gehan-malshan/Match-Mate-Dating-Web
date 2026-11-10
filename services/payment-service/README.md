@@ -1,6 +1,6 @@
 # Payment Service
 
-Owns PayHere payment initiation, provider order references, trusted price verification, callback validation, payment state, reconciliation, refunds, and payment audit records.
+Owns PayHere payment initiation, provider order references, trusted price verification, callback validation, payment state, reconciliation, and payment audit records.
 
 Amounts and currency must come from an immutable server-side booking price snapshot, never from client input.
 
@@ -8,7 +8,9 @@ Amounts and currency must come from an immutable server-side booking price snaps
 
 The first executable slice includes a Go API, ES256 access-token validation, constrained Booking snapshot client, PayHere sandbox/live checkout adapter, initiation idempotency, callback verification and replay fingerprints, member-owned status reads, migration 1, audit records, and transactional outbox facts. The Booking service now supplies the owner-authorized immutable snapshot and consumes completion/review facts.
 
-The Payment outbox relay publishes persistent events with publisher confirms and crash-safe claims. A scheduled worker opens restricted reconciliation items for payments still pending after 30 minutes; provider retrieval and automatic resolution remain disabled. Still required before release: real PostgreSQL/RabbitMQ tests, gateway callback rate limits, approved refund/provider-resolution policy, and PayHere sandbox/live evidence. See `docs/runbooks/payment-payhere.md`.
+The Payment outbox relay publishes persistent events with publisher confirms and crash-safe claims. A scheduled worker opens restricted reconciliation items for payments still pending after 30 minutes. Invalid or ambiguous PayHere callbacks now return an error before touching payment state; verified amount/order conflicts and contradictory provider results enter manual review. An administrator can page through open discrepancies with `GET /api/v1/payments/reconciliation?limit=25&cursor=...`; this is a read-only operational queue. `GET /health/ready` checks PostgreSQL connectivity. Concurrent initiation attempts for one booking are serialized, and completed payments cannot produce a new checkout.
+
+**Product decision: no automatic refunds.** No refund command is exposed. Disputed, duplicate, charged-back, late, or mismatched payments still require manual finance review and an approved exception process where applicable. PayHere provider retrieval/automatic reconciliation, real credentials, gateway callback rate limits, live PostgreSQL/RabbitMQ tests, and sandbox/live evidence remain release gates. See `docs/runbooks/payment-payhere.md`. The added PostgreSQL component suite runs only when `PAYMENT_TEST_DATABASE_URL` points at a disposable test database.
 
 Local verification:
 
@@ -31,8 +33,8 @@ go run ./cmd/reconciliation-worker
 - Validate callback signature, merchant, order, exact amount/currency, expected booking, state transition, and replay.
 - Persist callback fingerprint/provider reference before state transition.
 - Publish payment facts through outbox.
-- Reconcile pending, late, mismatched, failed, and refunded transactions.
-- Manage refund state/provider references according to approved finance policy.
+- Classify pending, late, mismatched, failed, and charged-back transactions for manual review.
+- Preserve provider and finance evidence for disputed transactions under the current no-refunds policy.
 - Provide restricted support/finance views and tamper-evident audit.
 
 ## Does not own
@@ -45,15 +47,14 @@ Ticket capacity, booking eligibility rules, event price definition, account prof
 POST /api/v1/payments/initiate
 POST /api/v1/payments/payhere/callback
 GET  /api/v1/bookings/{bookingId}/payment
-POST /api/v1/payments/{paymentId}/refund          finance/admin
-GET  /api/v1/payments/reconciliation             restricted support/finance
+GET  /api/v1/payments/reconciliation             administrator-only, read-only, cursor-paged
 ```
 
-Initiation accepts booking ID, not authoritative amount/currency. Initiation/refund require idempotency keys. Callback is provider-authenticated through exact verification, not member JWT.
+Initiation accepts booking ID, not authoritative amount/currency, and requires an idempotency key. Callback is provider-authenticated through exact verification, not member JWT. `GET /payments/reconciliation` cannot resolve an item, confirm a payment, or refund a customer.
 
 ## Proposed data
 
-`payment`, `provider_callback`, `refund`, `reconciliation_item`, `payment_audit`, `inbox`, and `outbox`.
+`payment`, `provider_callback`, `reconciliation_item`, `payment_audit`, `inbox`, and `outbox`. There is no refund table because the current policy does not provide an automated refund workflow.
 
 Key invariants:
 
@@ -61,22 +62,21 @@ Key invariants:
 - Stored amount/currency exactly match Booking snapshot and verified callback.
 - One callback can cause at most one state transition and completion event.
 - Failed/mismatched verification never changes payment to completed.
-- Refund total cannot exceed captured amount.
 - Provider credentials and card data are never stored/logged.
 
 ## State
 
 ```text
 PENDING -> COMPLETED | FAILED
-COMPLETED -> REFUND_PENDING -> REFUNDED
+COMPLETED -> REVIEW when a later signed provider result conflicts
 Verification/booking mismatch -> REVIEW
 ```
 
 ## Events
 
-Produces `PaymentInitiated`, `PaymentCompleted`, `PaymentFailed`, `PaymentReviewRequired`, `RefundRequested`, and `PaymentRefunded` as approved.
+Produces `PaymentInitiated`, `PaymentCompleted`, `PaymentFailed`, and `PaymentReviewRequired`.
 
-Consumes booking cancellation/expiry facts when needed for review/refund coordination. Avoid circular synchronous dependencies; document any internal booking eligibility query.
+Booking cancellation/expiry facts may be needed for future review coordination. Avoid circular synchronous dependencies; document any internal booking eligibility query.
 
 ## PayHere callback checklist
 
@@ -98,12 +98,12 @@ Consumes booking cancellation/expiry facts when needed for review/refund coordin
 - Provider timeout/unknown result and polling/reconciliation.
 - Hold expiry before late success.
 - Broker outage, outbox retry, Booking consumer outage.
-- Refund limits, duplicate refund, provider failure.
+- Contradictory signed provider results, including chargeback and late success after failure.
 - Decimal precision, audit immutability, authorization, PII/log sanitation.
 - PayHere sandbox end-to-end verification before release.
 
 ## Completion criteria
 
-No client can influence authoritative charge values; callbacks are replay-safe and fully verified; successful payment produces at most one completion; unknown/late/mismatch states are visible and recoverable; finance audit/reconciliation is complete.
+No client can influence authoritative charge values; callbacks are replay-safe and fully verified; successful payment produces at most one completion; unknown/late/mismatch states are visible and reviewed through an approved operator process. Provider retrieval and automatic resolution are not yet complete.
 
 Update this README, architecture/data/testing docs, OpenAPI/AsyncAPI, payment runbook, and change history whenever behavior changes.
