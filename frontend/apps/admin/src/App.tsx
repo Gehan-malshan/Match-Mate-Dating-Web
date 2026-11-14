@@ -5,6 +5,7 @@ import { AdminAccount, listManagedEvents, logout, restoreAdminSession } from './
 import { DashboardView } from './views/DashboardView'
 import { EventsView } from './views/EventsView'
 import { MatchmakingView } from './views/MatchmakingView'
+import { RegistrationsView } from './views/RegistrationsView'
 
 const memberLoginUrl = import.meta.env.VITE_MEMBER_LOGIN_URL ?? 'http://localhost:5173/login'
 
@@ -44,16 +45,23 @@ function AdminWorkspace({ account, activeView, onViewChange, onSignedOut }: {
 }) {
   const eventsQuery = useQuery({ queryKey: ['admin-events'], queryFn: listManagedEvents })
   const events = eventsQuery.data?.items ?? []
+  const [registrationEventId, setRegistrationEventId] = useState('')
+
+  function openRegistrations(eventId: string) {
+    setRegistrationEventId(eventId)
+    onViewChange('registrations')
+  }
 
   return (
     <AdminShell
       account={account}
       active={activeView}
-      onNavigate={onViewChange}
+      onNavigate={(view) => { if (view === 'registrations') setRegistrationEventId(''); onViewChange(view) }}
       onSignOut={async () => { await logout(); onSignedOut() }}
     >
       {activeView === 'dashboard' && <DashboardView events={events} loading={eventsQuery.isPending} onNavigate={onViewChange} />}
-      {activeView === 'events' && <EventsView account={account} events={events} loading={eventsQuery.isPending} error={eventsQuery.isError} />}
+      {activeView === 'events' && <EventsView account={account} events={events} loading={eventsQuery.isPending} error={eventsQuery.isError} onViewRegistrations={openRegistrations} />}
+      {activeView === 'registrations' && <RegistrationsView events={events} eventsLoading={eventsQuery.isPending} eventsError={eventsQuery.isError} selectedEventId={registrationEventId} onSelectedEventIdChange={setRegistrationEventId} />}
       {activeView === 'matchmaking' && <MatchmakingView events={events} loadingEvents={eventsQuery.isPending} />}
     </AdminShell>
   )

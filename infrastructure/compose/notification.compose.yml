@@ -31,6 +31,8 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       NOTIFICATION_ACCOUNT_CONTACT_URL: http://account-api:8081/api/v1/internal/notification-recipients
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-matchmate-local-notification-only}
+      SECURITY_PUBLIC_URL: ${SECURITY_PUBLIC_URL:-http://localhost:5173}
+      SECURITY_MAIL_TOKEN: ${SECURITY_MAIL_TOKEN:-matchmate-local-security-mail}
       NOTIFICATION_DEFAULT_LOCALE: en-LK
       NOTIFICATION_MAX_ATTEMPTS: "5"
       NOTIFICATION_POLL_INTERVAL: 1s

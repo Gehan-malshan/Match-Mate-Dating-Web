@@ -1,5 +1,9 @@
 # MatchMate System Architecture
 
+## Account security lifecycle
+
+Account owns one-time verification/recovery tokens, password and session revocation, administrator TOTP, and per-account security rate windows. Notification accepts transient security-message requests from Account over a separate internal token and delivers through SMTP; raw links are never RabbitMQ facts. GraphQL exposes the matching browser mutations. Account migration 2 revokes pre-MFA administrator sessions. Account deletion pseudonymizes email and erases Account-owned profile/credential data while retaining stable IDs for unresolved cross-service retention; see [ADR-0003](../adr/0003-account-security-lifecycle.md).
+
 Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md). Image rights and moderation remain production gates.
 
 ## Current event payment-choice slice
@@ -34,7 +38,7 @@ Important open questions include exact age policy, verification method, gender/g
 | Administrator | Event creation, matching runs/overrides/locks/publication, roles, configuration, rulesets, audit access, emergency controls |
 | Service account | Machine identity with only required integration scopes |
 
-Possession of a role never bypasses ownership, event scope, resource state, privacy policy, or audit requirements.
+Possession of a role never bypasses ownership, event scope, resource state, or privacy policy. Other services may retain domain-specific audit requirements; Event does not store a separate audit history.
 
 ## 4. Data visibility model
 
@@ -116,7 +120,7 @@ Owns identity, credentials, verification, roles, sessions, lifecycle, community 
 
 ### Event Service
 
-Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity.
+Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity. The Event service does not store a separate audit history; its outbox remains for cross-service event delivery.
 
 ### Booking Service
 
@@ -126,9 +130,9 @@ The first executable slice implements Event-derived immutable pricing, atomic ca
 
 ### Payment Service
 
-Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, refunds, and payment audit. It never trusts client amount/currency and never allocates capacity.
+Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, and payment audit. The current policy offers no refunds. It never trusts client amount/currency and never allocates capacity.
 
-The first executable slice implements initiation, callback verification/replay evidence, member status, audit, transactional outbox persistence, and publisher-confirmed RabbitMQ relay. Booking integration/consumption, scheduled reconciliation, refunds, and production delivery remain incomplete, so this slice is not yet an end-to-end payment capability.
+The executable slice implements initiation, callback verification/replay evidence, member status, Booking completion consumption, audit, transactional outbox and publisher-confirmed RabbitMQ relay. It now rejects invalid callbacks before state change, serializes booking checkout initiation, flags contradictory signed results for manual review, and exposes an administrator-only, read-only reconciliation queue. The scheduled worker opens pending-result items after 30 minutes. The approved product direction is no automatic refunds; provider retrieval/automatic resolution and production PayHere evidence remain incomplete. Review items require finance investigation, including late success and chargebacks.
 
 ### Matchmaking Service
 
@@ -311,7 +315,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 
 ## 18. Observability and planning SLOs
 
-Every service emits sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, OpenTelemetry traces, and separate business audit records.
+Services emit sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, and OpenTelemetry traces. Domain-specific business audit records remain in services that require them; Event does not retain a separate audit history.
 
 Planning targets requiring approval:
 

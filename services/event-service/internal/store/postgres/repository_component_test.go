@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestRepositoryMigrationLifecycleAuditAndOutbox(t *testing.T) {
+func TestRepositoryMigrationLifecycleAndOutbox(t *testing.T) {
 	url := os.Getenv("EVENT_TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("set EVENT_TEST_DATABASE_URL to run PostgreSQL component tests")
@@ -55,6 +55,20 @@ func TestRepositoryMigrationLifecycleAuditAndOutbox(t *testing.T) {
 	if _, err = pool.Exec(ctx, migrations.EventImageUp); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = pool.Exec(ctx, migrations.EventArchiveUp); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a database created before Event auditing was removed.
+	if _, err = pool.Exec(ctx, `CREATE TABLE event_audit (audit_id integer PRIMARY KEY); INSERT INTO event_audit VALUES (1)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = pool.Exec(ctx, migrations.RemoveEventAuditUp); err != nil {
+		t.Fatal(err)
+	}
+	var auditTable *string
+	if err = pool.QueryRow(ctx, `SELECT to_regclass('event_audit')::text`).Scan(&auditTable); err != nil || auditTable != nil {
+		t.Fatalf("event audit table was not removed: %v %v", auditTable, err)
+	}
 	repo := storepg.New(pool)
 	app := application.New(repo)
 	start := time.Now().UTC().Add(7 * 24 * time.Hour)
@@ -65,14 +79,14 @@ func TestRepositoryMigrationLifecycleAuditAndOutbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	imageBytes := []byte{0xff, 0xd8, 0xff, 0xd9}
-	withImage, err := repo.SaveImage(ctx, event.ID, imageBytes, principal.Subject, "image-correlation")
+	withImage, err := repo.SaveImage(ctx, event.ID, imageBytes)
 	if err != nil || withImage.ImageVersion != 1 {
 		t.Fatalf("draft image save: %+v %v", withImage, err)
 	}
 	if _, err = repo.PublicImage(ctx, event.ID); err == nil {
 		t.Fatal("draft image leaked publicly")
 	}
-	event, err = app.Transition(ctx, principal, event.ID, event.Version, domain.Published, "", "component-correlation")
+	event, err = app.Transition(ctx, principal, event.ID, event.Version, domain.Published, "component-correlation")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,18 +94,15 @@ func TestRepositoryMigrationLifecycleAuditAndOutbox(t *testing.T) {
 	if err != nil || !bytes.Equal(publicImage, imageBytes) {
 		t.Fatalf("published image unavailable: %v", err)
 	}
-	if _, err = repo.SaveImage(ctx, event.ID, imageBytes, principal.Subject, "late-image"); !errors.Is(err, store.ErrConflict) {
+	if _, err = repo.SaveImage(ctx, event.ID, imageBytes); !errors.Is(err, store.ErrConflict) {
 		t.Fatalf("published image was mutable: %v", err)
 	}
-	var audits, outbox int
-	if err = pool.QueryRow(ctx, `SELECT count(*) FROM event_audit WHERE event_id=$1`, event.ID).Scan(&audits); err != nil {
-		t.Fatal(err)
-	}
+	var outbox int
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE aggregate_id=$1`, event.ID).Scan(&outbox); err != nil {
 		t.Fatal(err)
 	}
-	if audits != 2 || outbox != 2 {
-		t.Fatalf("expected two audits and two outbox rows, got audit=%d outbox=%d", audits, outbox)
+	if outbox != 2 {
+		t.Fatalf("expected two outbox rows, got %d", outbox)
 	}
 	records, err := repo.ClaimOutbox(ctx, 10)
 	if err != nil {
@@ -106,5 +117,35 @@ func TestRepositoryMigrationLifecycleAuditAndOutbox(t *testing.T) {
 	var published bool
 	if err = pool.QueryRow(ctx, `SELECT published_at IS NOT NULL FROM outbox WHERE event_id=$1`, records[0].ID).Scan(&published); err != nil || !published {
 		t.Fatalf("expected published marker: %v", err)
+	}
+	archiveInput := input
+	archiveInput.Name = "Archived Draft"
+	draft, err := app.Create(ctx, principal, archiveInput, "archive-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft, err = app.SetArchived(ctx, principal, draft.ID, draft.Version, true, "archive-test")
+	if err != nil || draft.ArchivedAt == nil {
+		t.Fatalf("archive draft: %+v %v", draft, err)
+	}
+	active, err := app.ListManaged(ctx, principal, false, "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range active.Items {
+		if item.ID == draft.ID {
+			t.Fatal("deleted draft visible in active list")
+		}
+	}
+	deleted, err := app.ListManaged(ctx, principal, true, "", 100)
+	if err != nil || len(deleted.Items) != 1 || deleted.Items[0].ID != draft.ID {
+		t.Fatalf("deleted list: %+v %v", deleted, err)
+	}
+	if _, err = app.SetArchived(ctx, principal, draft.ID, draft.Version-1, false, "archive-test"); err == nil {
+		t.Fatal("stale restore accepted")
+	}
+	draft, err = app.SetArchived(ctx, principal, draft.ID, draft.Version, false, "archive-test")
+	if err != nil || draft.ArchivedAt != nil {
+		t.Fatalf("restore draft: %+v %v", draft, err)
 	}
 }

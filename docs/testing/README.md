@@ -1,5 +1,11 @@
 # MatchMate Testing and Quality Strategy
 
+Account security gates now include RFC 6238 TOTP/replay and encrypted-secret tests, JWT overlap tests, password-reset single-use and admin-Google-bypass unit tests, security-message endpoint authorization/template tests, plus a disposable-PostgreSQL suite for migration 2, concurrent rate windows, reset/session revocation, TOTP replay/session strength, and Account-owned deletion minimization. Set `ACCOUNT_TEST_DATABASE_URL` to a disposable migrated database to run the component suite. Before production, run SMTP acceptance/failure and bounce tests, cross-replica JWKS overlap tests, browser registration/recovery/MFA/deletion journeys, and cross-service deletion/privacy checks. These remaining checks are not implied by a passing unit suite.
+
+Event Delete/Restore checks must prove administrator-only authorization, draft/cancelled-only deletion, stale-version conflicts, no hard deletion, active-versus-archived list separation, restoration, and preserved booking references. Browser E2E for the confirmation interaction remains a production gate. Event audit history is no longer stored.
+
+Admin registration-feed checks cover role denial at Booking and GraphQL, bounded pagination, the global PostgreSQL ordering/index, the member identity join, and frontend build behavior. Browser E2E with real bookings remains required before production; pay-at-venue confirmation must never be labelled as collected payment.
+
 Event image tests must cover unauthorized upload, invalid/oversized/malformed image, metadata removal, draft-only writes, no public draft exposure, post-publication read, cache/version behavior, and gateway proxy bounds. The current slice includes unit, disposable-schema PostgreSQL, gateway, and frontend checks; production still requires browser E2E, image-rights/moderation policy, abuse-rate and backup-size evidence.
 
 The event payment-choice slice adds unit coverage for allowed methods and server-derived venue confirmation, GraphQL/front-end build checks, and a disposable-schema Booking PostgreSQL component test for one-seat contention and idempotency (`BOOKING_TEST_DATABASE_URL`). Before production, add browser E2E for all three options, migration upgrades from prior schemas, broker redelivery, and PayHere sandbox evidence for online events. Venue confirmation must never be interpreted as payment collection.
@@ -76,6 +82,8 @@ The first executable slice has deterministic tests for Event registration valida
 - Immutable price snapshot.
 
 ### Payment
+
+`PAYMENT_TEST_DATABASE_URL` enables a disposable-schema PostgreSQL component test for concurrent initiation, verified/invalid/duplicate callbacks, amount mismatch, contradictory provider result, outbox uniqueness, and review queue paging. Without it this test is skipped; a green default Go run alone is not production payment evidence. Live RabbitMQ failure/redelivery and PayHere sandbox checks remain required.
 
 The first executable slice has deterministic unit coverage for snapshot money/state validation, PayHere request hashing, callback signature verification, tampering rejection, and provider status mapping. The Booking consumer is implemented, but real PostgreSQL migration/repository concurrency, HTTP/auth contract, broker outage/redelivery, sandbox E2E, and recovery evidence remain required before release.
 

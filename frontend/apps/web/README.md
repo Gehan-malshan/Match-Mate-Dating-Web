@@ -1,5 +1,7 @@
 # Unified MatchMate Web Application
 
+Account security routes include `/verify-email`, `/forgot-password`, and `/reset-password`. The shared login accepts an optional administrator authenticator code. The profile workspace offers password-confirmed account deletion. Security link pages use a `no-referrer` policy to reduce token leakage. Real email delivery requires SMTP configuration; the local development sink does not deliver recovery links. See `docs/runbooks/account-security.md`.
+
 Published events now use their Event-owned image on the landing preview, event catalogue, and detail hero when `imageVersion>0`. Existing stock artwork remains the fallback. The browser fetches public bytes from the GraphQL gateway's narrow media route; no Event Service address or image bytes are embedded in GraphQL lists.
 
 The single React and TanStack application supports role-separated member and administrator routes, registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event administration, deterministic matching operations, responses, and feedback.

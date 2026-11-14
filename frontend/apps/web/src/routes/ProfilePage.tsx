@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ApiProblem, getMe, logout, Me, updatePreferences, updateProfile } from '../lib/account-api'
+import { ApiProblem, deleteMyAccount, getMe, logout, Me, updatePreferences, updateProfile } from '../lib/account-api'
 import { MemberNavigation } from '../components/MemberNavigation'
 import './ProfilePage.css'
 
@@ -71,6 +71,7 @@ export function ProfilePage() {
         </aside>
 
         <div className="veil-main">
+          <details className="veil-card veil-form"><summary>Delete my account</summary><p>Your profile will be hidden immediately and Account-owned profile, preferences, email, and credentials removed. Booking and payment records may be retained under the applicable retention policy.</p><form onSubmit={async event=>{event.preventDefault();const data=new FormData(event.currentTarget);if(String(data.get('confirm'))!=='DELETE')return;try{await deleteMyAccount(String(data.get('password')));await navigate({to:'/'})}catch(error){setMessage((error as ApiProblem).detail??'Could not delete your account.')}}}><label>Current password<input name="password" type="password" autoComplete="current-password" required /></label><label>Type DELETE to confirm<input name="confirm" required /></label><button type="submit">Delete my account</button></form></details>
           <form id="profile-introduction" className="veil-card veil-form" onSubmit={async (event) => {
             event.preventDefault()
             const data = new FormData(event.currentTarget)

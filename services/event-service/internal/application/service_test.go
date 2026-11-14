@@ -31,7 +31,7 @@ func (f *fakeRepo) Update(_ context.Context, _ string, in domain.UpdateInput, _ 
 	f.event.Version++
 	return f.event, nil
 }
-func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.Status, _ string, _ domain.Fact) (domain.Event, error) {
+func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.Status, _ domain.Fact) (domain.Event, error) {
 	if v != f.event.Version {
 		return domain.Event{}, store.ErrConflict
 	}
@@ -42,10 +42,23 @@ func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.St
 func (f *fakeRepo) ListDiscoverable(context.Context, string, int, time.Time) (domain.Page, error) {
 	return domain.Page{}, nil
 }
-func (f *fakeRepo) ListManaged(context.Context, string, bool, string, int) (domain.Page, error) {
+func (f *fakeRepo) ListManaged(context.Context, string, bool, bool, string, int) (domain.Page, error) {
 	return domain.Page{}, nil
 }
-func (f *fakeRepo) SaveImage(_ context.Context, _ string, _ []byte, _, _ string) (domain.Event, error) {
+func (f *fakeRepo) SetArchived(_ context.Context, _ string, expected int64, archive bool, _ domain.Fact) (domain.Event, error) {
+	if f.event.Version != expected {
+		return domain.Event{}, store.ErrConflict
+	}
+	if archive {
+		now := time.Now().UTC()
+		f.event.ArchivedAt = &now
+	} else {
+		f.event.ArchivedAt = nil
+	}
+	f.event.Version++
+	return f.event, nil
+}
+func (f *fakeRepo) SaveImage(_ context.Context, _ string, _ []byte) (domain.Event, error) {
 	f.event.ImageVersion++
 	return f.event, nil
 }
@@ -71,16 +84,47 @@ func TestAdminCanCreateAndPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err = s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, e.Version, domain.Published, "", "c")
+	e, err = s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, e.Version, domain.Published, "c")
 	if err != nil || e.Status != domain.Published {
 		t.Fatalf("publish failed: %v %#v", err, e)
+	}
+}
+func TestAdminDeleteRequiresSafeStateAndCanRestore(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	admin := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	member := domain.Principal{Subject: "member", Roles: []string{"member"}}
+	e, err := s.Create(context.Background(), admin, appInput(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SetArchived(context.Background(), member, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("member deleted event")
+	}
+	e, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c")
+	if err != nil || e.ArchivedAt == nil {
+		t.Fatalf("delete draft: %+v %v", e, err)
+	}
+	if _, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("double delete accepted")
+	}
+	e, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, false, "c")
+	if err != nil || e.ArchivedAt != nil {
+		t.Fatalf("restore draft: %+v %v", e, err)
+	}
+	e, err = s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("published event deleted without cancellation")
 	}
 }
 func TestStaleTransitionReturnsStableConflict(t *testing.T) {
 	r := &fakeRepo{}
 	s := New(r)
 	e, _ := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
-	_, err := s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, 99, domain.Published, "", "c")
+	_, err := s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, 99, domain.Published, "c")
 	p, ok := err.(*domain.ProblemError)
 	if !ok || p.Code != "EVENT_VERSION_CONFLICT" {
 		t.Fatalf("unexpected error: %v", err)
@@ -106,11 +150,17 @@ func TestDraftPaymentChoiceAndLegacyUpdate(t *testing.T) {
 func TestImageUploadRequiresAdminAndValidImage(t *testing.T) {
 	r := &fakeRepo{}
 	s := New(r)
-	e, err := s.Create(context.Background(), domain.Principal{Subject:"admin",Roles:[]string{"admin"}}, appInput(), "c")
-	if err != nil { t.Fatal(err) }
+	e, err := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
 	invalid := base64.StdEncoding.EncodeToString([]byte("not a JPEG"))
-	if _,err = s.UploadImage(context.Background(),domain.Principal{Subject:"member",Roles:[]string{"member"}},e.ID,invalid,"c"); err == nil { t.Fatal("member image upload accepted") }
-	if _,err = s.UploadImage(context.Background(),domain.Principal{Subject:"admin",Roles:[]string{"admin"}},e.ID,invalid,"c"); err == nil { t.Fatal("invalid image accepted") }
+	if _, err = s.UploadImage(context.Background(), domain.Principal{Subject: "member", Roles: []string{"member"}}, e.ID, invalid); err == nil {
+		t.Fatal("member image upload accepted")
+	}
+	if _, err = s.UploadImage(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, invalid); err == nil {
+		t.Fatal("invalid image accepted")
+	}
 }
 
 func TestPublishRejectsExpiredRegistrationWindow(t *testing.T) {
@@ -119,7 +169,7 @@ func TestPublishRejectsExpiredRegistrationWindow(t *testing.T) {
 	principal := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
 	event, _ := s.Create(context.Background(), principal, appInput(), "c")
 	r.event.RegistrationClosesAt = time.Now().UTC().Add(-time.Minute)
-	_, err := s.Transition(context.Background(), principal, event.ID, event.Version, domain.Published, "", "c")
+	_, err := s.Transition(context.Background(), principal, event.ID, event.Version, domain.Published, "c")
 	p, ok := err.(*domain.ProblemError)
 	if !ok || p.Code != "EVENT_PUBLICATION_WINDOW_EXPIRED" {
 		t.Fatalf("unexpected error: %v", err)

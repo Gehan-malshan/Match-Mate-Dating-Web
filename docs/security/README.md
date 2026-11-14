@@ -1,5 +1,7 @@
 # MatchMate Security, Privacy, and Safety Baseline
 
+Account security now includes production-gated administrator TOTP, Google-admin sign-in denial when MFA is enabled, hashed one-use recovery tokens, session revocation on reset, PostgreSQL-backed login/discovery rate windows, transient SMTP security links, and overlapping JWT public keys. The member delete command requires password reauthentication and erases Account-owned personal fields. Production still needs edge/WAF limits, SMTP delivery and abuse monitoring, MFA recovery/key-rotation policy, and a cross-service retention/deletion decision. See [ADR-0003](../adr/0003-account-security-lifecycle.md) and [runbook](../runbooks/account-security.md).
+
 This baseline applies to every application, service, worker, contract, database, event, log, deployment, and operator workflow. Security and privacy controls are acceptance criteria, not post-launch enhancements.
 
 ## 1. Primary assets
@@ -64,7 +66,7 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 
 Booking now derives price/currency from Event, stores the immutable snapshot, and exposes it only after Account-token verification and subject ownership checks. Capacity updates, Payment inbox insertion, confirmation, and Booking outbox facts use local transactions. Late payment never recreates released capacity.
 
-The first executable Payment slice validates Account-issued ES256 tokens for member operations, forwards the token to Booking's constrained snapshot check, compares ownership locally, verifies PayHere callbacks without member authentication, fingerprints callback receipts, and omits account/provider identifiers from member DTOs. Gateway/WAF callback rate limits and production secret-manager wiring remain deployment requirements.
+The Payment slice validates Account-issued ES256 tokens for member operations, forwards the token to Booking's constrained snapshot check, compares ownership locally, rejects invalid or ambiguous PayHere callbacks before payment state changes, fingerprints verified callback receipts, and omits account/provider identifiers from member DTOs. The read-only, cursor-paged discrepancy queue requires the administrator role; it contains no recipient contact or card data. Live configuration rejects local or non-HTTPS PayHere return/cancel/notify URLs. Gateway/WAF callback rate limits and production secret-manager wiring remain deployment requirements.
 
 - Payment Service derives amount/currency from immutable Booking snapshot.
 - Verify PayHere signature plus merchant, order, amount, currency, booking relation, and state.
@@ -111,7 +113,7 @@ Never log passwords, tokens, secrets, raw identity evidence, full callback paylo
 
 Use sanitized IDs/hashes and structured fields. Metrics labels must remain low-cardinality and contain no personal data.
 
-Business audit records include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive.
+Where a service retains business audit records, they include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive. The Event service does not retain a separate audit history.
 
 ## 10. Moderation and safety
 

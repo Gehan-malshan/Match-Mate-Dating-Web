@@ -10,6 +10,5 @@ CREATE TABLE event (
 );
 CREATE INDEX event_discovery_idx ON event(status,starts_at DESC,event_id DESC);
 CREATE INDEX event_organizer_idx ON event(organizer_id,updated_at DESC);
-CREATE TABLE event_audit(audit_id UUID PRIMARY KEY,event_id UUID NOT NULL REFERENCES event(event_id),actor_id TEXT NOT NULL,action TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',prior_state JSONB NOT NULL,new_state JSONB NOT NULL,correlation_id TEXT NOT NULL,occurred_at TIMESTAMPTZ NOT NULL);
 CREATE TABLE outbox(event_id UUID PRIMARY KEY,event_type TEXT NOT NULL,schema_version INTEGER NOT NULL,occurred_at TIMESTAMPTZ NOT NULL,aggregate_id TEXT NOT NULL,correlation_id TEXT NOT NULL,causation_id TEXT NOT NULL DEFAULT '',actor_id TEXT NOT NULL DEFAULT '',routing_key TEXT NOT NULL,payload JSONB NOT NULL,claimed_at TIMESTAMPTZ,published_at TIMESTAMPTZ,attempts INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX event_outbox_unpublished_idx ON outbox(occurred_at) WHERE published_at IS NULL;

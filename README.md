@@ -1,5 +1,7 @@
 # MatchMate
 
+Account security now has email verification and password recovery links (through Notification SMTP), administrator TOTP when configured, durable Account-owned login/discovery limits, JWT signing-key overlap, and password-confirmed account deletion with Account-owned data minimization. The default local notification sink does not deliver email links; configure SMTP to test them. Start with [Account security runbook](docs/runbooks/account-security.md). Cross-service retention, live SMTP evidence, edge limits, and MFA recovery remain production gates.
+
 Administrators can attach one optional image while an event is a draft. The Event Service stores a sanitized JPEG, and published event pages use it instead of rotating artwork. See [ADR-0002](docs/adr/0002-event-image-storage.md).
 
 Event drafts now support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until the member pays at the entrance. Existing events retain online-only behavior. Venue collection/check-in and a production deployment without Payment/Matchmaking remain separate work.

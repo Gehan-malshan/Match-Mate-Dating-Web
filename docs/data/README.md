@@ -1,6 +1,8 @@
 # MatchMate Data Architecture
 
-Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version and writes an audit row in one transaction; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
+Account migration 2 adds `password_reset_token` (hashed one-use token, 30-minute expiry), `security_rate_window` (hashed bucket and atomic minute count), and `admin_totp` (AES-GCM encrypted secret, confirmation and last-used step). Password reset changes credential, increments token version, and revokes refresh sessions in one Account transaction. Member deletion pseudonymizes Account email and removes Account-owned profile/preference/credential/token rows; Account ID, minimal audit/consent/booking references remain until the cross-service retention policy is approved. See ADR-0003.
+
+Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
 
 Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state, not a collected-payment state. No venue collection ledger exists yet. Do not infer a paid ticket from the Booking state.
 
@@ -25,7 +27,7 @@ This guide defines service data ownership, proposed schemas, constraints, consis
 | Account/Profile | Accounts, credentials, roles, sessions, verification, profile, preferences, visibility, interests, blocks | Email uniqueness, credential/session security, source profile/preferences, account/block status |
 | Event | Event, location, schedule, price, configured capacity/policy, organizer, lifecycle | Event state, configured limits, price definition, registration window |
 | Booking | Booking, hold, allocation, price/policy snapshot, attendance, inbox/outbox | No oversell, one active booking, hold expiry, confirmed participation |
-| Payment | Payment, provider callback, refund, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment/refund state |
+| Payment | Payment, provider callback, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment state |
 | Matchmaking | Ruleset, snapshots, candidates, scores, runs, suggestions, overrides, locked pairs, responses, consent, feedback | Eligibility/scoring reproducibility, unique pairing/response, immutable run history |
 | Notification | Template, delivery, attempt, suppression/channel preference | Delivery idempotency, retry history, suppression |
 | Moderation | Report, case, evidence reference, action, appeal, safety audit | Enforcement state, restricted evidence/audit, appeal history |
@@ -59,7 +61,7 @@ Constraints and privacy:
 
 ## 4. Event database
 
-The first executable slice implements an Event-owned `event` aggregate table, `event_audit`, and transactional `outbox`. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
+The Event service owns `event`, `event_image`, and transactional `outbox` tables. Migration 5 drops the former `event_audit` table and permanently removes any records it contained; new databases do not create it. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
 
 Suggested tables:
 
@@ -104,7 +106,7 @@ Constraints:
 
 ## 6. Payment database
 
-Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `inbox`, and `outbox`. Refund and reconciliation tables remain planned until finance policy is approved. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
+Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `reconciliation_item`, `inbox`, and `outbox`. The current no-automatic-refunds policy has no refund table or command. Verified callback mismatches and conflicting results create open reconciliation items in the same transaction as state/audit/outbox changes; old pending-result items close when a final result arrives. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
 
 Suggested tables:
 
@@ -112,7 +114,7 @@ Suggested tables:
 |---|---|
 | `payment` | ID, booking unique active relation, order ID unique, amount/currency, state, provider, created/updated/completed time, version |
 | `provider_callback` | provider event/payment ID or fingerprint unique, order, received time, verification result, sanitized metadata hash/reference |
-| `refund` | payment, amount/currency, reason, state, provider reference, requested/completed times |
+| `refund` | Not implemented under the current no-refunds policy; any exception workflow needs a separate decision and migration. |
 | `reconciliation_item` | payment/order, discrepancy type, status, owner, notes/audit, resolution |
 | `payment_audit` | append-only state transition and verification decision metadata |
 | `inbox` / `outbox` | idempotent integration |
@@ -124,7 +126,7 @@ Constraints:
 - Valid duplicate callbacks do not republish completion.
 - Preserve immutable callback/audit evidence according to approved retention.
 - Do not store card data or provider credentials.
-- Refund cannot exceed captured amount minus completed refunds.
+- No refund ledger or endpoint exists under the current policy; provider disputes still require preserved evidence and manual review.
 
 ## 7. Matchmaking database
 

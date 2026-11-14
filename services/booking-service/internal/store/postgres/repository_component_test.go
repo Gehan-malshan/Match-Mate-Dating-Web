@@ -44,7 +44,7 @@ func TestVenueCapacityAndIdempotency(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	for _, file := range []string{"000001_init.up.sql", "000002_cancellation.up.sql", "000003_payment_method.up.sql", "000004_event_registrations.up.sql"} {
+	for _, file := range []string{"000001_init.up.sql", "000002_cancellation.up.sql", "000003_payment_method.up.sql", "000004_event_registrations.up.sql", "000005_registration_feed.up.sql"} {
 		body, e := migrations.Files.ReadFile(file)
 		if e != nil {
 			t.Fatal(e)
@@ -68,6 +68,10 @@ func TestVenueCapacityAndIdempotency(t *testing.T) {
 	registrations, err := repo.ListForEvent(ctx, eventID, 25, 0)
 	if err != nil || len(registrations) != 1 || registrations[0].AccountID != first.AccountID {
 		t.Fatalf("event registrations: %+v %v", registrations, err)
+	}
+	allRegistrations, err := repo.ListRegistrations(ctx, 25, 0)
+	if err != nil || len(allRegistrations) != 1 || allRegistrations[0].EventID != eventID {
+		t.Fatalf("all registrations: %+v %v", allRegistrations, err)
 	}
 	_, replay, err = repo.Create(ctx, makeBooking(first.AccountID, "AT_VENUE"), "venue-key", eventID+":AT_VENUE", 1)
 	if err != nil || !replay {

@@ -47,16 +47,21 @@ services:
       DATABASE_URL: postgres://matchmate:matchmate@postgres-account:5432/matchmate_account?sslmode=disable
       JWT_ISSUER: matchmate-account
       JWT_AUDIENCE: matchmate-api
-      JWT_KEY_ID: account-compose-dev-1
+      JWT_KEY_ID: ${JWT_KEY_ID:-account-compose-dev-1}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      JWT_PREVIOUS_PUBLIC_KEYS_JSON: ${JWT_PREVIOUS_PUBLIC_KEYS_JSON:-}
       ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       COOKIE_SECURE: "false"
-      DEV_EXPOSE_VERIFICATION_TOKEN: "true"
+      DEV_EXPOSE_VERIFICATION_TOKEN: ${DEV_EXPOSE_VERIFICATION_TOKEN:-true}
       CURRENT_CONSENT_VERSION: privacy-2026-08
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       GOOGLE_OAUTH_REDIRECT_URL: ${GOOGLE_OAUTH_REDIRECT_URL:-}
       GOOGLE_OAUTH_SUCCESS_REDIRECT_URL: ${GOOGLE_OAUTH_SUCCESS_REDIRECT_URL:-http://localhost:5173/login?google=success}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-matchmate-local-notification-only}
+      SECURITY_MAIL_URL: http://notification-api:8086
+      SECURITY_MAIL_TOKEN: ${SECURITY_MAIL_TOKEN:-matchmate-local-security-mail}
+      ADMIN_MFA_ENCRYPTION_KEY: ${ADMIN_MFA_ENCRYPTION_KEY:-}
     ports: ["8081:8081"]
     depends_on:
       account-seed:

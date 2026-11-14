@@ -13,11 +13,16 @@ import (
 
 type fakeRepo struct {
 	store.Repository
-	credential   store.Credential
-	registered   domain.RegisterInput
-	passwordHash string
-	session      domain.Session
-	account      domain.Account
+	credential        store.Credential
+	registered        domain.RegisterInput
+	passwordHash      string
+	session           domain.Session
+	account           domain.Account
+	resetHash         []byte
+	resetPasswordHash string
+	resetUsed         bool
+	mfaCode           string
+	deactivated       bool
 }
 
 func (f *fakeRepo) Register(_ context.Context, in domain.RegisterInput, hash string, _ []byte, _ time.Time, _ domain.Event) (domain.Me, error) {
@@ -38,6 +43,30 @@ func (f *fakeRepo) CreateSession(_ context.Context, s domain.Session) error {
 func (f *fakeRepo) AccountByID(context.Context, string) (domain.Account, error) {
 	return f.account, nil
 }
+func (f *fakeRepo) AllowRate(context.Context, []byte, time.Time, int) (bool, error) { return true, nil }
+func (f *fakeRepo) CreatePasswordReset(_ context.Context, _ string, hash []byte, _ time.Time) error {
+	f.resetHash = hash
+	return nil
+}
+func (f *fakeRepo) ConsumePasswordReset(_ context.Context, hash []byte, passwordHash string, _ time.Time) error {
+	if f.resetUsed || string(hash) != string(f.resetHash) {
+		return store.ErrInvalidToken
+	}
+	f.resetUsed = true
+	f.resetPasswordHash = passwordHash
+	return nil
+}
+func (f *fakeRepo) VerifyAdminTOTP(_ context.Context, _ string, code string, _ time.Time, _ []byte) error {
+	f.mfaCode = code
+	if code != "123456" {
+		return store.ErrInvalidToken
+	}
+	return nil
+}
+func (f *fakeRepo) Deactivate(context.Context, string, domain.Event) error {
+	f.deactivated = true
+	return nil
+}
 
 func testService(t *testing.T, repo store.Repository) *Service {
 	t.Helper()
@@ -51,9 +80,13 @@ func testService(t *testing.T, repo store.Repository) *Service {
 }
 func TestAdminMemberIdentityInputIsBounded(t *testing.T) {
 	s := testService(t, &fakeRepo{})
-	if _, err := s.AdminMemberIdentities(context.Background(), []string{"not-a-uuid"}); err == nil { t.Fatal("expected invalid account ID") }
+	if _, err := s.AdminMemberIdentities(context.Background(), []string{"not-a-uuid"}); err == nil {
+		t.Fatal("expected invalid account ID")
+	}
 	ids := make([]string, 51)
-	if _, err := s.AdminMemberIdentities(context.Background(), ids); err == nil { t.Fatal("expected batch limit") }
+	if _, err := s.AdminMemberIdentities(context.Background(), ids); err == nil {
+		t.Fatal("expected batch limit")
+	}
 }
 func TestRegisterCreatesPrivatePendingProfileAndHash(t *testing.T) {
 	repo := &fakeRepo{}
@@ -105,5 +138,68 @@ func TestLoginWithGoogleRequiresExistingVerifiedActiveAccount(t *testing.T) {
 	repo.account.Verification = domain.VerificationPending
 	if _, err = s.LoginWithGoogle(context.Background(), "member@example.test"); err == nil {
 		t.Fatal("unverified account logged in with Google")
+	}
+}
+
+func TestRecoveryIsSingleUseAndDoesNotExposeAccountExistence(t *testing.T) {
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified}}
+	s := testService(t, repo)
+	var raw string
+	s.SetSecurityMailer(func(_ context.Context, email, purpose, token string) error {
+		if email != "member@example.test" || purpose != "reset" {
+			t.Fatal("unexpected delivery")
+		}
+		raw = token
+		return nil
+	})
+	if err := s.RequestPasswordReset(context.Background(), "member@example.test"); err != nil {
+		t.Fatal(err)
+	}
+	if raw == "" || string(repo.resetHash) == raw {
+		t.Fatal("reset token was not separated from hash")
+	}
+	if err := s.ResetPassword(context.Background(), raw, "new secure password here"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResetPassword(context.Background(), raw, "new secure password here"); err == nil {
+		t.Fatal("reset replay accepted")
+	}
+	valid, err := auth.VerifyPassword("new secure password here", repo.resetPasswordHash)
+	if err != nil || !valid {
+		t.Fatal("new password not hashed")
+	}
+	repo.account = domain.Account{}
+}
+
+func TestAdminRequiresMFAAndGoogleCannotBypass(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	account := domain.Account{ID: "a1", Email: "admin@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"admin"}, TokenVersion: 1}
+	repo := &fakeRepo{account: account, credential: store.Credential{Account: account, PasswordHash: hash, TokenVersion: 1}}
+	s := testService(t, repo)
+	s.SetAdminMFAKey(make([]byte, 32))
+	if _, err := s.Login(context.Background(), account.Email, "correct horse battery staple"); err == nil {
+		t.Fatal("admin logged in without MFA")
+	}
+	if _, err := s.Login(context.Background(), account.Email, "correct horse battery staple", "123456"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LoginWithGoogle(context.Background(), account.Email); err == nil {
+		t.Fatal("Google bypassed admin MFA")
+	}
+}
+func TestDeletionRequiresPasswordAndRejectsAdmin(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Roles: []string{"member"}}, credential: store.Credential{PasswordHash: hash}}
+	s := testService(t, repo)
+	if err := s.DeleteAccount(context.Background(), "a1", "wrong", "correlation"); err == nil || repo.deactivated {
+		t.Fatal("deletion accepted wrong password")
+	}
+	if err := s.DeleteAccount(context.Background(), "a1", "correct horse battery staple", "correlation"); err != nil || !repo.deactivated {
+		t.Fatal("verified deletion failed")
+	}
+	repo.deactivated = false
+	repo.account.Roles = []string{"admin"}
+	if err := s.DeleteAccount(context.Background(), "a1", "correct horse battery staple", "correlation"); err == nil || repo.deactivated {
+		t.Fatal("admin self-deletion accepted")
 	}
 }

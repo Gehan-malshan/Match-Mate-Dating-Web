@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import type { AdminAccount } from '../lib/api'
 
-export type AdminView = 'dashboard' | 'events' | 'matchmaking'
+export type AdminView = 'dashboard' | 'events' | 'registrations' | 'matchmaking'
 
 const navigation: Array<{ id: AdminView; icon: string; label: string }> = [
   { id: 'dashboard', icon: '⌂', label: 'Overview' },
   { id: 'events', icon: '▣', label: 'Event manager' },
+  { id: 'registrations', icon: '◎', label: 'Registrations' },
   { id: 'matchmaking', icon: '◇', label: 'Matchmaking' },
 ]
 
