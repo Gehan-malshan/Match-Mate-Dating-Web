@@ -10,6 +10,7 @@ import (
 	"net/smtp"
 	"net/textproto"
 	"strings"
+	"time"
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
 )
@@ -34,6 +35,11 @@ func (s *Sender) Send(ctx context.Context, delivery domain.Delivery, message dom
 	if err != nil {
 		return "", retryable("PROVIDER_UNAVAILABLE", err)
 	}
+	deadline := time.Now().Add(8 * time.Second)
+	if requestDeadline, ok := ctx.Deadline(); ok && requestDeadline.Before(deadline) {
+		deadline = requestDeadline
+	}
+	_ = connection.SetDeadline(deadline)
 	client, err := smtp.NewClient(connection, s.host)
 	if err != nil {
 		connection.Close()

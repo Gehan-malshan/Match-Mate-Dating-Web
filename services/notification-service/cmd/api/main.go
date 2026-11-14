@@ -14,6 +14,9 @@ import (
 	"github.com/gehan-malshan/matchmate/notification-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/config"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/httpapi"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/provider"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/provider/devsink"
+	mailprovider "github.com/gehan-malshan/matchmate/notification-service/internal/provider/smtp"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -37,9 +40,14 @@ func main() {
 	defer pool.Close()
 	repository := postgres.New(pool)
 	feed := application.NewFeedService(repository)
+	var securitySender provider.Sender = devsink.New(log)
+	if cfg.Provider == "smtp" {
+		securitySender = mailprovider.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
+	}
+	securityHandler := httpapi.SecurityMail(httpapi.New(repository, feed, verifier), securitySender, cfg.SecurityMailToken, cfg.SecurityPublicURL)
 	server := &http.Server{
 		Addr:              cfg.HTTPAddress,
-		Handler:           cors(httpapi.New(repository, feed, verifier), cfg.AllowedOrigins),
+		Handler:           cors(securityHandler, cfg.AllowedOrigins),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

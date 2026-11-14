@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -25,6 +26,8 @@ type Config struct {
 	SMTPFrom             string
 	AccountContactURL    string
 	InternalServiceToken string
+	SecurityMailToken    string
+	SecurityPublicURL    string
 	Locale               string
 	MaxAttempts          int
 	PollInterval         time.Duration
@@ -96,6 +99,8 @@ func Load() (Config, error) {
 		SMTPFrom:             strings.TrimSpace(os.Getenv("SMTP_FROM")),
 		AccountContactURL:    strings.TrimSpace(os.Getenv("NOTIFICATION_ACCOUNT_CONTACT_URL")),
 		InternalServiceToken: os.Getenv("INTERNAL_SERVICE_TOKEN"),
+		SecurityMailToken:    os.Getenv("SECURITY_MAIL_TOKEN"),
+		SecurityPublicURL:    value("SECURITY_PUBLIC_URL", "http://localhost:5173"),
 		Locale:               value("NOTIFICATION_DEFAULT_LOCALE", "en-LK"),
 		MaxAttempts:          maxAttempts,
 		PollInterval:         poll,
@@ -118,6 +123,13 @@ func Load() (Config, error) {
 	}
 	if cfg.Provider != "smtp" {
 		return cfg, errors.New("NOTIFICATION_PROVIDER must be dev-sink or smtp")
+	}
+	if cfg.SecurityMailToken == "" {
+		return cfg, errors.New("SECURITY_MAIL_TOKEN is required for smtp security messages")
+	}
+	publicURL, err := url.Parse(cfg.SecurityPublicURL)
+	if err != nil || publicURL.Host == "" || (cfg.AppEnv == "production" && publicURL.Scheme != "https") {
+		return cfg, errors.New("SECURITY_PUBLIC_URL must be an absolute HTTPS URL in production")
 	}
 	if cfg.SMTPHost == "" || cfg.SMTPUsername == "" || cfg.SMTPPassword == "" || cfg.SMTPFrom == "" {
 		return cfg, errors.New("SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM are required for smtp")
