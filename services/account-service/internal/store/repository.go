@@ -28,6 +28,11 @@ type Repository interface {
 	Ping(context.Context) error
 	Register(context.Context, domain.RegisterInput, string, []byte, time.Time, domain.Event) (domain.Me, error)
 	VerifyEmail(context.Context, []byte, time.Time, domain.Event) (domain.Account, error)
+	ReplaceVerificationToken(context.Context, string, []byte, time.Time) error
+	CreatePasswordReset(context.Context, string, []byte, time.Time) error
+	ConsumePasswordReset(context.Context, []byte, string, time.Time) error
+	AllowRate(context.Context, []byte, time.Time, int) (bool, error)
+	VerifyAdminTOTP(context.Context, string, string, time.Time, []byte) error
 	CredentialsByEmail(context.Context, string) (Credential, error)
 	AccountByEmail(context.Context, string) (domain.Account, error)
 	AccountByID(context.Context, string) (domain.Account, error)

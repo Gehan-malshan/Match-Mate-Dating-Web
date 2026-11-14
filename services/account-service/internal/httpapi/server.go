@@ -24,12 +24,13 @@ import (
 )
 
 type Server struct {
-	app     *application.Service
-	cfg     config.Config
-	log     *slog.Logger
-	mux     *http.ServeMux
-	limits  map[string]rateWindow
-	limitMu sync.Mutex
+	app            *application.Service
+	cfg            config.Config
+	log            *slog.Logger
+	mux            *http.ServeMux
+	limits         map[string]rateWindow
+	limitMu        sync.Mutex
+	lastLimitSweep time.Time
 }
 type rateWindow struct {
 	Started time.Time
@@ -55,18 +56,21 @@ func (s *Server) routes() {
 	})
 	s.mux.HandleFunc("GET /.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request) { write(w, 200, s.app.JWK()) })
 	s.mux.Handle("POST /api/v1/auth/register", s.authLimited(http.HandlerFunc(s.register)))
-	s.mux.HandleFunc("POST /api/v1/auth/verify-email", s.verify)
+	s.mux.Handle("POST /api/v1/auth/verify-email", s.authLimited(http.HandlerFunc(s.verify)))
+	s.mux.Handle("POST /api/v1/auth/resend-verification", s.authLimited(http.HandlerFunc(s.resendVerification)))
+	s.mux.Handle("POST /api/v1/auth/request-password-reset", s.authLimited(http.HandlerFunc(s.requestPasswordReset)))
+	s.mux.Handle("POST /api/v1/auth/reset-password", s.authLimited(http.HandlerFunc(s.resetPassword)))
 	s.mux.Handle("POST /api/v1/auth/login", s.authLimited(http.HandlerFunc(s.login)))
-	s.mux.HandleFunc("GET /api/v1/auth/google/start", s.googleStart)
-	s.mux.HandleFunc("GET /api/v1/auth/google/callback", s.googleCallback)
+	s.mux.Handle("GET /api/v1/auth/google/start", s.authLimited(http.HandlerFunc(s.googleStart)))
+	s.mux.Handle("GET /api/v1/auth/google/callback", s.authLimited(http.HandlerFunc(s.googleCallback)))
 	s.mux.Handle("POST /api/v1/auth/refresh", s.authLimited(http.HandlerFunc(s.refresh)))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	s.mux.Handle("GET /api/v1/users/me", s.protected(http.HandlerFunc(s.me)))
 	s.mux.Handle("PATCH /api/v1/users/me/profile", s.protected(http.HandlerFunc(s.updateProfile)))
 	s.mux.Handle("PUT /api/v1/users/me/matching-preferences", s.protected(http.HandlerFunc(s.preferences)))
 	s.mux.Handle("DELETE /api/v1/users/me", s.protected(http.HandlerFunc(s.deactivate)))
-	s.mux.Handle("GET /api/v1/community/profiles", s.protected(http.HandlerFunc(s.community)))
-	s.mux.Handle("GET /api/v1/community/profiles/{accountId}", s.protected(http.HandlerFunc(s.communityOne)))
+	s.mux.Handle("GET /api/v1/community/profiles", s.protected(s.discoveryLimited(http.HandlerFunc(s.community))))
+	s.mux.Handle("GET /api/v1/community/profiles/{accountId}", s.protected(s.discoveryLimited(http.HandlerFunc(s.communityOne))))
 	s.mux.Handle("POST /api/v1/users/me/blocks", s.protected(http.HandlerFunc(s.block)))
 	s.mux.Handle("DELETE /api/v1/users/me/blocks/{accountId}", s.protected(http.HandlerFunc(s.unblock)))
 	s.mux.Handle("POST /api/v1/admin/profiles/{accountId}/decision", s.protected(s.roles("moderator", "admin", http.HandlerFunc(s.moderate))))
@@ -231,15 +235,53 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, v)
 }
-func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Email    string `json:"email"`
+		Email string `json:"email"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if handle(w, r, s.app.ResendVerification(r.Context(), in.Email)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if handle(w, r, s.app.RequestPasswordReset(r.Context(), in.Email)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token    string `json:"token"`
 		Password string `json:"password"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	v, err := s.app.Login(r.Context(), in.Email, in.Password)
+	if handle(w, r, s.app.ResetPassword(r.Context(), in.Token, in.Password)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		TotpCode string `json:"totpCode"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	v, err := s.app.Login(r.Context(), in.Email, in.Password, in.TotpCode)
 	if handle(w, r, err) {
 		return
 	}
@@ -306,7 +348,17 @@ func (s *Server) preferences(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, v)
 }
 func (s *Server) deactivate(w http.ResponseWriter, r *http.Request) {
-	if err := s.app.Deactivate(r.Context(), principal(r).Subject, correlation(r)); handle(w, r, err) {
+	if !s.trustedOrigin(r) {
+		problem(w, r, 403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed", nil)
+		return
+	}
+	var in struct {
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := s.app.DeleteAccount(r.Context(), principal(r).Subject, in.Password, correlation(r)); handle(w, r, err) {
 		return
 	}
 	s.clearSession(w)
@@ -387,8 +439,30 @@ func (s *Server) protected(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, c)))
 	})
 }
+func (s *Server) discoveryLimited(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		allowed, err := s.app.AllowDiscovery(r.Context(), principal(r).Subject)
+		if err != nil {
+			problem(w, r, 503, "RATE_LIMIT_UNAVAILABLE", "Discovery is temporarily unavailable", nil)
+			return
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", "60")
+			problem(w, r, 429, "RATE_LIMITED", "Too many discovery requests", nil)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 func (s *Server) authLimited(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Behind the production GraphQL gateway RemoteAddr is the gateway, not
+		// the member. Per-identity PostgreSQL limits apply in Account; the
+		// production edge must apply trusted client-IP limits.
+		if s.cfg.Environment == "production" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		host := r.RemoteAddr
 		if i := strings.LastIndex(host, ":"); i > 0 {
 			host = host[:i]
@@ -396,6 +470,14 @@ func (s *Server) authLimited(next http.Handler) http.Handler {
 		key := host + "|" + r.URL.Path
 		now := time.Now()
 		s.limitMu.Lock()
+		if now.Sub(s.lastLimitSweep) >= time.Minute {
+			for bucket, value := range s.limits {
+				if now.Sub(value.Started) > 2*time.Minute {
+					delete(s.limits, bucket)
+				}
+			}
+			s.lastLimitSweep = now
+		}
 		window := s.limits[key]
 		if window.Started.IsZero() || now.Sub(window.Started) >= time.Minute {
 			window = rateWindow{Started: now}

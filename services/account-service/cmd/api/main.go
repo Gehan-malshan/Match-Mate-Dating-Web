@@ -13,6 +13,7 @@ import (
 	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/config"
 	"github.com/gehan-malshan/matchmate/account-service/internal/httpapi"
+	"github.com/gehan-malshan/matchmate/account-service/internal/securitymail"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,8 +35,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if err = tokens.SetPreviousKeys(cfg.JWTPreviousPublicKeysJSON); err != nil {
+		panic(err)
+	}
 	repo := postgres.New(pool)
 	app := application.New(repo, tokens, cfg.AccessTTL, cfg.RefreshTTL, cfg.VerificationTTL, cfg.MinimumAge, cfg.CurrentConsentVersion, cfg.DevExposeVerificationToken)
+	if cfg.AdminMFAEncryptionKey != "" {
+		key, keyErr := auth.DecodeMFAKey(cfg.AdminMFAEncryptionKey)
+		if keyErr != nil {
+			panic(keyErr)
+		}
+		app.SetAdminMFAKey(key)
+	}
+	if cfg.SecurityMailURL != "" {
+		app.SetSecurityMailer(securitymail.New(cfg.SecurityMailURL, cfg.SecurityMailToken))
+	}
 	server := &http.Server{Addr: cfg.HTTPAddress, Handler: httpapi.New(app, cfg, log), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		log.Info("account_api_started", "address", cfg.HTTPAddress)

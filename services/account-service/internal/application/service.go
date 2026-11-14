@@ -2,7 +2,9 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -19,8 +21,15 @@ type Service struct {
 	minimumAge                             int
 	consentVersion                         string
 	exposeVerification                     bool
+	securityMail                           func(context.Context, string, string, string) error
+	adminMFAKey                            []byte
 	now                                    func() time.Time
 }
+
+func (s *Service) SetSecurityMailer(send func(context.Context, string, string, string) error) {
+	s.securityMail = send
+}
+func (s *Service) SetAdminMFAKey(key []byte) { s.adminMFAKey = key }
 
 func New(repo store.Repository, tokens *auth.Manager, access, refresh, verification time.Duration, minimumAge int, consentVersion string, expose bool) *Service {
 	return &Service{store: repo, tokens: tokens, accessTTL: access, refreshTTL: refresh, verificationTTL: verification, minimumAge: minimumAge, consentVersion: consentVersion, exposeVerification: expose, now: func() time.Time { return time.Now().UTC() }}
@@ -42,6 +51,13 @@ func (s *Service) Register(ctx context.Context, in domain.RegisterInput, correla
 	in.Email, err = domain.NormalizeEmail(in.Email)
 	if err != nil {
 		return domain.Registration{}, err
+	}
+	allowed, rateErr := s.AllowRate(ctx, rateKey("registration", in.Email), 3)
+	if rateErr != nil {
+		return domain.Registration{}, rateErr
+	}
+	if !allowed {
+		return domain.Registration{}, problem(429, "RATE_LIMITED", "Too many registrations. Try again later", nil)
 	}
 	in.Nickname = strings.TrimSpace(in.Nickname)
 	if fields := domain.ValidateRegistration(in, s.minimumAge, s.now()); len(fields) > 0 {
@@ -66,9 +82,126 @@ func (s *Service) Register(ctx context.Context, in domain.RegisterInput, correla
 		return domain.Registration{}, err
 	}
 	if !s.exposeVerification {
+		if s.securityMail == nil {
+			return domain.Registration{}, problem(503, "VERIFICATION_DELIVERY_UNAVAILABLE", "Email verification is temporarily unavailable; request a new link shortly", nil)
+		}
+		if err = s.securityMail(ctx, in.Email, "verify", raw); err != nil {
+			return domain.Registration{}, problem(503, "VERIFICATION_DELIVERY_UNAVAILABLE", "Email verification is temporarily unavailable; request a new link shortly", nil)
+		}
 		raw = ""
 	}
 	return domain.Registration{Me: me, VerificationToken: raw}, nil
+}
+
+// ResendVerification never discloses account existence or verification status.
+func (s *Service) ResendVerification(ctx context.Context, email string) error {
+	allowed, limitErr := s.AllowRate(ctx, rateKey("verification", strings.ToLower(strings.TrimSpace(email))), 3)
+	if limitErr != nil {
+		return limitErr
+	}
+	if !allowed {
+		return problem(429, "RATE_LIMITED", "Try again later", nil)
+	}
+	normalized, err := domain.NormalizeEmail(email)
+	if err != nil {
+		return nil
+	}
+	a, err := s.store.AccountByEmail(ctx, normalized)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if a.Status != domain.AccountActive || a.Verification != domain.VerificationPending {
+		return nil
+	}
+	raw, hash, err := auth.NewOpaqueToken()
+	if err != nil {
+		return err
+	}
+	if err = s.store.ReplaceVerificationToken(ctx, a.ID, hash, s.now().Add(s.verificationTTL)); err != nil {
+		return err
+	}
+	if s.securityMail == nil {
+		slog.Error("verification_delivery_unavailable")
+		return nil
+	}
+	if err = s.securityMail(ctx, a.Email, "verify", raw); err != nil {
+		slog.Error("verification_delivery_failed")
+		return nil
+	}
+	return nil
+}
+
+// RequestPasswordReset always returns the same result for unknown accounts.
+func (s *Service) RequestPasswordReset(ctx context.Context, email string) error {
+	allowed, limitErr := s.AllowRate(ctx, rateKey("recovery", strings.ToLower(strings.TrimSpace(email))), 3)
+	if limitErr != nil {
+		return limitErr
+	}
+	if !allowed {
+		return problem(429, "RATE_LIMITED", "Try again later", nil)
+	}
+	normalized, err := domain.NormalizeEmail(email)
+	if err != nil {
+		return nil
+	}
+	a, err := s.store.AccountByEmail(ctx, normalized)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if a.Status != domain.AccountActive || a.Verification != domain.VerificationVerified {
+		return nil
+	}
+	raw, hash, err := auth.NewOpaqueToken()
+	if err != nil {
+		return err
+	}
+	if err = s.store.CreatePasswordReset(ctx, a.ID, hash, s.now().Add(30*time.Minute)); err != nil {
+		return err
+	}
+	if s.securityMail == nil {
+		slog.Error("recovery_delivery_unavailable")
+		return nil
+	}
+	if err = s.securityMail(ctx, a.Email, "reset", raw); err != nil {
+		slog.Error("recovery_delivery_failed")
+		return nil
+	}
+	return nil
+}
+
+func (s *Service) ResetPassword(ctx context.Context, raw, password string) error {
+	if len(raw) != 43 {
+		return problem(400, "INVALID_OR_EXPIRED_TOKEN", "Reset link is invalid or expired", nil)
+	}
+	if len(password) < 12 || len(password) > 128 {
+		return problem(422, "INVALID_PASSWORD", "Password must contain 12 to 128 characters", nil)
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	err = s.store.ConsumePasswordReset(ctx, auth.HashOpaqueToken(raw), hash, s.now())
+	if errors.Is(err, store.ErrInvalidToken) {
+		return problem(400, "INVALID_OR_EXPIRED_TOKEN", "Reset link is invalid or expired", nil)
+	}
+	return err
+}
+
+func (s *Service) AllowRate(ctx context.Context, key []byte, limit int) (bool, error) {
+	return s.store.AllowRate(ctx, key, s.now(), limit)
+}
+func rateKey(kind, subject string) []byte {
+	sum := sha256.Sum256([]byte(kind + ":" + subject))
+	return sum[:]
+}
+func (s *Service) AllowDiscovery(ctx context.Context, id string) (bool, error) {
+	return s.AllowRate(ctx, rateKey("discovery", id), 60)
 }
 
 func (s *Service) Verify(ctx context.Context, raw, correlation string) (domain.Account, error) {
@@ -82,7 +215,14 @@ func (s *Service) Verify(ctx context.Context, raw, correlation string) (domain.A
 	return a, err
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (domain.TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password string, totpCode ...string) (domain.TokenPair, error) {
+	allowed, limitErr := s.AllowRate(ctx, rateKey("login", strings.ToLower(strings.TrimSpace(email))), 8)
+	if limitErr != nil {
+		return domain.TokenPair{}, limitErr
+	}
+	if !allowed {
+		return domain.TokenPair{}, problem(429, "RATE_LIMITED", "Too many sign-in attempts. Try again later", nil)
+	}
 	normalized, normErr := domain.NormalizeEmail(email)
 	if normErr != nil {
 		return domain.TokenPair{}, problem(401, "INVALID_CREDENTIALS", "Email or password is incorrect", nil)
@@ -102,7 +242,27 @@ func (s *Service) Login(ctx context.Context, email, password string) (domain.Tok
 		return domain.TokenPair{}, problem(403, "EMAIL_NOT_VERIFIED", "Verify your email before signing in", nil)
 	}
 	c.Account.TokenVersion = c.TokenVersion
-	return s.newSession(ctx, c.Account, "", s.now())
+	if hasRole(c.Account.Roles, "admin") && len(s.adminMFAKey) > 0 {
+		code := ""
+		if len(totpCode) > 0 {
+			code = totpCode[0]
+		}
+		if err = s.store.VerifyAdminTOTP(ctx, c.Account.ID, code, s.now(), s.adminMFAKey); err != nil {
+			if errors.Is(err, store.ErrInvalidToken) {
+				return domain.TokenPair{}, problem(401, "MFA_REQUIRED", "A valid authenticator code is required", nil)
+			}
+			return domain.TokenPair{}, err
+		}
+	}
+	return s.newSession(ctx, c.Account, "", s.now(), hasRole(c.Account.Roles, "admin") && len(s.adminMFAKey) > 0)
+}
+func hasRole(roles []string, target string) bool {
+	for _, role := range roles {
+		if role == target {
+			return true
+		}
+	}
+	return false
 }
 
 // LoginWithGoogle signs in an existing verified MatchMate account after the
@@ -127,7 +287,10 @@ func (s *Service) LoginWithGoogle(ctx context.Context, email string) (domain.Tok
 	if a.Verification != domain.VerificationVerified {
 		return domain.TokenPair{}, problem(403, "EMAIL_NOT_VERIFIED", "Verify your MatchMate email before using Google sign in", nil)
 	}
-	return s.newSession(ctx, a, "", s.now())
+	if hasRole(a.Roles, "admin") && len(s.adminMFAKey) > 0 {
+		return domain.TokenPair{}, problem(403, "ADMIN_MFA_REQUIRED", "Use password and authenticator code for administrator access", nil)
+	}
+	return s.newSession(ctx, a, "", s.now(), false)
 }
 
 // NotificationRecipient returns a verified active email only to the narrowly
@@ -168,6 +331,9 @@ func (s *Service) Refresh(ctx context.Context, raw string) (domain.TokenPair, er
 	}
 	if a.Status != domain.AccountActive {
 		return domain.TokenPair{}, problem(403, "ACCOUNT_UNAVAILABLE", "Account is not active", nil)
+	}
+	if hasRole(a.Roles, "admin") && len(s.adminMFAKey) > 0 && !a.MFAVerified {
+		return domain.TokenPair{}, problem(401, "MFA_REQUIRED", "Administrator session requires authenticator verification", nil)
 	}
 	access, accessExpiry, err := s.tokens.Issue(a.ID, a.Roles, a.TokenVersion, now)
 	if err != nil {
@@ -267,6 +433,24 @@ func (s *Service) Unblock(ctx context.Context, actor, target, correlation string
 func (s *Service) Deactivate(ctx context.Context, id, correlation string) error {
 	return s.store.Deactivate(ctx, id, event("AccountDeactivated", correlation, id))
 }
+func (s *Service) DeleteAccount(ctx context.Context, id, password, correlation string) error {
+	a, err := s.store.AccountByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if hasRole(a.Roles, "admin") {
+		return problem(403, "ADMIN_DELETION_REQUIRES_REVIEW", "Administrator account deletion requires operator review", nil)
+	}
+	c, err := s.store.CredentialsByEmail(ctx, a.Email)
+	if err != nil {
+		return err
+	}
+	valid, err := auth.VerifyPassword(password, c.PasswordHash)
+	if err != nil || !valid {
+		return problem(401, "REAUTHENTICATION_REQUIRED", "Current password is required", nil)
+	}
+	return s.Deactivate(ctx, id, correlation)
+}
 func (s *Service) Moderate(ctx context.Context, actor, target, decision, reason, correlation string) error {
 	if decision != domain.ApprovalApproved && decision != domain.ApprovalHidden {
 		return problem(422, "INVALID_DECISION", "Decision must be APPROVED or HIDDEN", nil)
@@ -275,7 +459,7 @@ func (s *Service) Moderate(ctx context.Context, actor, target, decision, reason,
 }
 func (s *Service) Ready(ctx context.Context) error { return s.store.Ping(ctx) }
 
-func (s *Service) newSession(ctx context.Context, a domain.Account, family string, now time.Time) (domain.TokenPair, error) {
+func (s *Service) newSession(ctx context.Context, a domain.Account, family string, now time.Time, mfaVerified bool) (domain.TokenPair, error) {
 	raw, hash, err := auth.NewOpaqueToken()
 	if err != nil {
 		return domain.TokenPair{}, err
@@ -283,7 +467,7 @@ func (s *Service) newSession(ctx context.Context, a domain.Account, family strin
 	if family == "" {
 		family = uuid.NewString()
 	}
-	session := domain.Session{ID: uuid.NewString(), FamilyID: family, AccountID: a.ID, TokenHash: hash, ExpiresAt: now.Add(s.refreshTTL)}
+	session := domain.Session{ID: uuid.NewString(), FamilyID: family, AccountID: a.ID, TokenHash: hash, ExpiresAt: now.Add(s.refreshTTL), MFAVerified: mfaVerified}
 	if err = s.store.CreateSession(ctx, session); err != nil {
 		return domain.TokenPair{}, err
 	}

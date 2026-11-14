@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store"
 	"github.com/google/uuid"
@@ -112,6 +113,116 @@ func (r *Repository) VerifyEmail(ctx context.Context, hash []byte, now time.Time
 	return r.AccountByID(ctx, id)
 }
 
+func (r *Repository) ReplaceVerificationToken(ctx context.Context, accountID string, hash []byte, expiry time.Time) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var state string
+	if err = tx.QueryRow(ctx, `SELECT verification_state FROM account WHERE account_id=$1 AND status='ACTIVE' FOR UPDATE`, accountID).Scan(&state); err != nil {
+		return err
+	}
+	if state != domain.VerificationPending {
+		return store.ErrConflict
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM email_verification_token WHERE account_id=$1`, accountID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO email_verification_token(token_hash,account_id,expires_at,created_at) VALUES($1,$2,$3,now())`, hash, accountID, expiry); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) CreatePasswordReset(ctx context.Context, accountID string, hash []byte, expiry time.Time) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `SELECT account_id FROM account WHERE account_id=$1 AND status='ACTIVE' AND verification_state='VERIFIED' FOR UPDATE`, accountID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM password_reset_token WHERE account_id=$1`, accountID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO password_reset_token(token_hash,account_id,expires_at,created_at) VALUES($1,$2,$3,now())`, hash, accountID, expiry); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) ConsumePasswordReset(ctx context.Context, hash []byte, passwordHash string, now time.Time) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var id string
+	err = tx.QueryRow(ctx, `SELECT account_id FROM password_reset_token WHERE token_hash=$1 AND consumed_at IS NULL AND expires_at>$2 FOR UPDATE`, hash, now).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.ErrInvalidToken
+	}
+	if err != nil {
+		return err
+	}
+	var status string
+	if err = tx.QueryRow(ctx, `SELECT status FROM account WHERE account_id=$1 FOR UPDATE`, id).Scan(&status); err != nil {
+		return err
+	}
+	if status != domain.AccountActive {
+		return store.ErrInvalidToken
+	}
+	if _, err = tx.Exec(ctx, `UPDATE credential SET password_hash=$2,changed_at=$3 WHERE account_id=$1`, id, passwordHash, now); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE account SET token_version=token_version+1,updated_at=$2 WHERE account_id=$1`, id, now); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE refresh_session SET revoked_at=COALESCE(revoked_at,$2) WHERE account_id=$1`, id, now); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM password_reset_token WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) AllowRate(ctx context.Context, key []byte, now time.Time, limit int) (bool, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `INSERT INTO security_rate_window(bucket_hash,window_start,attempts,expires_at) VALUES($1,$2::timestamptz,1,$2::timestamptz+interval '1 minute') ON CONFLICT(bucket_hash) DO UPDATE SET attempts=CASE WHEN security_rate_window.expires_at<=$2::timestamptz THEN 1 ELSE security_rate_window.attempts+1 END, window_start=CASE WHEN security_rate_window.expires_at<=$2::timestamptz THEN $2::timestamptz ELSE security_rate_window.window_start END, expires_at=CASE WHEN security_rate_window.expires_at<=$2::timestamptz THEN $2::timestamptz+interval '1 minute' ELSE security_rate_window.expires_at END RETURNING attempts`, key, now).Scan(&count)
+	return count <= limit, err
+}
+func (r *Repository) VerifyAdminTOTP(ctx context.Context, id, code string, now time.Time, key []byte) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var cipherText []byte
+	var lastStep int64
+	err = tx.QueryRow(ctx, `SELECT secret_ciphertext,last_step FROM admin_totp WHERE account_id=$1 AND confirmed_at IS NOT NULL FOR UPDATE`, id).Scan(&cipherText, &lastStep)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return store.ErrInvalidToken
+	}
+	if err != nil {
+		return err
+	}
+	secret, err := auth.DecryptMFASecret(key, cipherText)
+	if err != nil {
+		return err
+	}
+	step, err := auth.VerifyTOTP(secret, code, now, lastStep)
+	if err != nil {
+		return store.ErrInvalidToken
+	}
+	if _, err = tx.Exec(ctx, `UPDATE admin_totp SET last_step=$2 WHERE account_id=$1`, id, step); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (r *Repository) CredentialsByEmail(ctx context.Context, email string) (store.Credential, error) {
 	var c store.Credential
 	var roles []string
@@ -139,7 +250,7 @@ func (r *Repository) AccountByID(ctx context.Context, id string) (domain.Account
 	return a, err
 }
 func (r *Repository) CreateSession(ctx context.Context, s domain.Session) error {
-	_, err := r.pool.Exec(ctx, `INSERT INTO refresh_session(session_id,family_id,account_id,token_hash,expires_at,created_at) VALUES($1,$2,$3,$4,$5,now())`, s.ID, s.FamilyID, s.AccountID, s.TokenHash, s.ExpiresAt)
+	_, err := r.pool.Exec(ctx, `INSERT INTO refresh_session(session_id,family_id,account_id,token_hash,expires_at,created_at,mfa_verified) VALUES($1,$2,$3,$4,$5,now(),$6)`, s.ID, s.FamilyID, s.AccountID, s.TokenHash, s.ExpiresAt, s.MFAVerified)
 	return err
 }
 func (r *Repository) RotateSession(ctx context.Context, oldHash []byte, next domain.Session, now time.Time) (domain.Account, error) {
@@ -151,7 +262,8 @@ func (r *Repository) RotateSession(ctx context.Context, oldHash []byte, next dom
 	var id, family, account string
 	var expires time.Time
 	var revoked *time.Time
-	err = tx.QueryRow(ctx, `SELECT session_id,family_id,account_id,expires_at,revoked_at FROM refresh_session WHERE token_hash=$1 FOR UPDATE`, oldHash).Scan(&id, &family, &account, &expires, &revoked)
+	var mfaVerified bool
+	err = tx.QueryRow(ctx, `SELECT session_id,family_id,account_id,expires_at,revoked_at,mfa_verified FROM refresh_session WHERE token_hash=$1 FOR UPDATE`, oldHash).Scan(&id, &family, &account, &expires, &revoked, &mfaVerified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Account{}, store.ErrInvalidToken
 	}
@@ -168,16 +280,19 @@ func (r *Repository) RotateSession(ctx context.Context, oldHash []byte, next dom
 	}
 	next.FamilyID = family
 	next.AccountID = account
+	next.MFAVerified = mfaVerified
 	if _, err = tx.Exec(ctx, `UPDATE refresh_session SET revoked_at=$2,rotated_at=$2,replaced_by=$3 WHERE session_id=$1`, id, now, next.ID); err != nil {
 		return domain.Account{}, err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO refresh_session(session_id,family_id,account_id,token_hash,expires_at,created_at) VALUES($1,$2,$3,$4,$5,$6)`, next.ID, next.FamilyID, next.AccountID, next.TokenHash, next.ExpiresAt, now); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO refresh_session(session_id,family_id,account_id,token_hash,expires_at,created_at,mfa_verified) VALUES($1,$2,$3,$4,$5,$6,$7)`, next.ID, next.FamilyID, next.AccountID, next.TokenHash, next.ExpiresAt, now, next.MFAVerified); err != nil {
 		return domain.Account{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Account{}, err
 	}
-	return r.AccountByID(ctx, account)
+	a, err := r.AccountByID(ctx, account)
+	a.MFAVerified = mfaVerified
+	return a, err
 }
 func (r *Repository) RevokeSession(ctx context.Context, hash []byte, now time.Time) error {
 	_, err := r.pool.Exec(ctx, `UPDATE refresh_session SET revoked_at=COALESCE(revoked_at,$2) WHERE token_hash=$1`, hash, now)
@@ -366,15 +481,40 @@ func (r *Repository) Deactivate(ctx context.Context, id string, event domain.Eve
 		return err
 	}
 	defer tx.Rollback(ctx)
-	tag, err := tx.Exec(ctx, `UPDATE account SET status='DEACTIVATED',token_version=token_version+1,deactivated_at=$2,updated_at=$2 WHERE account_id=$1 AND status<>'DEACTIVATED'`, id, event.OccurredAt)
+	tag, err := tx.Exec(ctx, `UPDATE account SET status='DEACTIVATED',normalized_email='deleted-'||account_id::text||'@example.invalid',token_version=token_version+1,deactivated_at=$2,updated_at=$2 WHERE account_id=$1 AND status<>'DEACTIVATED'`, id, event.OccurredAt)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return store.ErrConflict
 	}
-	_, _ = tx.Exec(ctx, `UPDATE refresh_session SET revoked_at=COALESCE(revoked_at,$2) WHERE account_id=$1`, id, event.OccurredAt)
-	_, _ = tx.Exec(ctx, `UPDATE profile SET visibility='HIDDEN',version=version+1,updated_at=$2 WHERE account_id=$1`, id, event.OccurredAt)
+	if _, err = tx.Exec(ctx, `UPDATE refresh_session SET revoked_at=COALESCE(revoked_at,$2) WHERE account_id=$1`, id, event.OccurredAt); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM email_verification_token WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM password_reset_token WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM matching_preference WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM profile_interest WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM profile WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM credential WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM admin_totp WHERE account_id=$1`, id); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO audit_log(audit_id,actor_id,target_id,action,reason,correlation_id,occurred_at) VALUES($1,$2,$2,'ACCOUNT_DELETED','member_request',$3,$4)`, uuid.NewString(), id, event.CorrelationID, event.OccurredAt); err != nil {
+		return err
+	}
 	event.AggregateID = id
 	event.Payload = map[string]any{"accountId": id}
 	if err = insertEvent(ctx, tx, event); err != nil {

@@ -23,6 +23,7 @@ type Account struct {
 	Verification string    `json:"verification"`
 	Roles        []string  `json:"roles"`
 	TokenVersion int64     `json:"-"`
+	MFAVerified  bool      `json:"-"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
@@ -94,6 +95,7 @@ type Session struct {
 	ID, FamilyID, AccountID string
 	TokenHash               []byte
 	ExpiresAt               time.Time
+	MFAVerified             bool
 }
 type TokenPair struct {
 	AccessToken      string    `json:"accessToken"`
