@@ -1,5 +1,7 @@
 # MatchMate Developer Workstation Setup
 
+Account security integration: the root ignored `.env` can enable SMTP verification/recovery links with `NOTIFICATION_PROVIDER=smtp`, provider credentials, `SECURITY_MAIL_TOKEN`, and `SECURITY_PUBLIC_URL`. Set `ADMIN_MFA_ENCRYPTION_KEY` to test administrator TOTP, then enroll/confirm through the Account container as shown in `docs/runbooks/account-security.md`. The default development sink discards security emails. The account migration job now applies versions 1 and 2 idempotently.
+
 This is the canonical setup guide for developers and coding agents working in Visual Studio Code. The repository now contains executable frontend, Account/Profile, Event, Matchmaking, Booking, Payment, Notification, and initial Moderation slices.
 
 ## 1. Supported development model

@@ -1,5 +1,9 @@
 # Notification Service
 
+## Security email delivery
+
+`POST /api/v1/internal/security-email` accepts a service-authenticated, short-lived verification or recovery token from Account and sends an approved plain-text link through the configured SMTP provider. It does not store the destination, token, or rendered message in Notification tables or RabbitMQ. `SECURITY_MAIL_TOKEN` is separate from the Account contact-resolution token; `SECURITY_PUBLIC_URL` defines the browser origin for links and must be HTTPS in production. With the default development sink, messages are discarded without logging tokens, so use real test SMTP settings to exercise browser verification/recovery. See `docs/runbooks/account-security.md`.
+
 Owns versioned notification templates, idempotent delivery records, delivery attempts, retry/dead-letter state, suppression, channel/category preferences, and provider adapters. Business services remain independent of notification delivery success.
 
 ## Implementation status

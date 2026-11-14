@@ -1,5 +1,7 @@
 # MatchMate API Conventions
 
+GraphQL mutations now include `resendVerification(email:)`, `requestPasswordReset(email:)`, `resetPassword(token:,password:)`, and `deleteMyAccount(password:)`. `login` accepts an optional `totpCode`. Account REST endpoints and Notification's private security-email endpoint are defined in their v1 OpenAPI contracts. Password reset and deletion revoke sessions; recovery requests return a generic acceptance response for unknown or ineligible accounts.
+
 Event REST now supports admin-only `PUT /api/v1/events/{eventId}/image` with a bounded base64 JPEG and public-after-publication `GET` on the same path. GraphQL offers admin-only `uploadEventImage`; public Event includes `imageVersion`. The gateway's `GET /media/events/{eventId}` is a read-only byte route, not a general service proxy. It returns 404 for drafts or absent images. Browser clients must not request raw bytes through GraphQL.
 
 Event `paymentOptions` is `ONLINE`, `AT_VENUE`, or `BOTH`; old Event create requests default to `ONLINE` and old draft updates preserve the current value. Booking create accepts optional `paymentMethod` (`ONLINE` or `AT_VENUE`). Omission remains valid only for online-only legacy events. Booking returns its immutable method. A venue booking is `CONFIRMED` immediately but payment is due at the entrance; Payment initiation is not valid for it. See the GraphQL SDL and Event/Booking OpenAPI contracts.

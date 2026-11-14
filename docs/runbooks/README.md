@@ -1,5 +1,7 @@
 # MatchMate Operational Runbooks
 
+Account security setup, administrator TOTP provisioning, and JWT rotation are covered by [account-security.md](account-security.md).
+
 Every production service and critical cross-service workflow must have a runnable procedure that an operator unfamiliar with its implementation can follow safely.
 
 Implemented initial runbooks:

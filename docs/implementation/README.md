@@ -1,5 +1,7 @@
 # MatchMate Implementation Guide
 
+The Account hardening slice adds verification/recovery delivery, administrator TOTP, durable security rate windows, JWT overlap rotation, and Account-owned deletion minimization. Migration 2 and selected concurrency/transition tests passed against a disposable PostgreSQL 17 instance. It remains **in progress** until real SMTP, browser, multi-replica, and cross-service privacy tests pass and the retention/MFA recovery policies are approved. See ADR-0003 and `docs/runbooks/account-security.md`.
+
 Event deletion (before → after): Cancellation previously left a cancelled card in the only admin event list, with no way to remove it. Now administrators can Delete a cancelled or draft event into a recoverable archive and use Show deleted → Restore. Published/open events require cancellation before Delete. Booking references remain intact; restoring visibility never reverses cancellation. Event audit history is not retained.
 
 Admin registrations navigation (before → after): Previously an administrator had to open a single event card and could only see that event's booking page. Now the sidebar has a dedicated Registrations section with a bounded newest-first feed across all events, an event filter, and per-event deep links from cards. Booking remains the source of booking state; Account alone supplies nickname/email through an admin-only lookup. The feed is not a venue collection or attendance ledger.

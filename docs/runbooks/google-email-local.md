@@ -1,5 +1,7 @@
 # Google sign-in and SMTP email setup
 
+Administrator Google sign-in is denied when production MFA is enabled; use password plus TOTP. SMTP now also sends Account verification and password-recovery links through Notification's private transient endpoint. Set a distinct `SECURITY_MAIL_TOKEN` and review `docs/runbooks/account-security.md` for migration, enrollment, and test steps.
+
 ## What is implemented
 
 - **Google sign-in** authenticates an existing, active, email-verified MatchMate account through Google's OAuth 2.0 authorization-code flow. It does not create an incomplete MatchMate profile because MatchMate must record date of birth and privacy consent during registration.

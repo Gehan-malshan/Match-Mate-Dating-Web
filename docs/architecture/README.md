@@ -1,5 +1,9 @@
 # MatchMate System Architecture
 
+## Account security lifecycle
+
+Account owns one-time verification/recovery tokens, password and session revocation, administrator TOTP, and per-account security rate windows. Notification accepts transient security-message requests from Account over a separate internal token and delivers through SMTP; raw links are never RabbitMQ facts. GraphQL exposes the matching browser mutations. Account migration 2 revokes pre-MFA administrator sessions. Account deletion pseudonymizes email and erases Account-owned profile/credential data while retaining stable IDs for unresolved cross-service retention; see [ADR-0003](../adr/0003-account-security-lifecycle.md).
+
 Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md). Image rights and moderation remain production gates.
 
 ## Current event payment-choice slice

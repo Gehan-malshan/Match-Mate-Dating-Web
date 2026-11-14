@@ -1,5 +1,7 @@
 # MatchMate GraphQL Gateway
 
+The Account security mutations `resendVerification`, `requestPasswordReset`, `resetPassword`, and `deleteMyAccount` route to Account's REST owner. `login` accepts an optional administrator TOTP code. The gateway never handles or stores the TOTP secret, verification token, or recovery token beyond a single request.
+
 Event `archivedAt`, `managedEvents(archived:)`, and admin-only `archiveEvent`/`restoreEvent` expose recoverable deletion. The gateway checks the admin role, and Event repeats authorization and lifecycle checks. Archive does not delete booking history. The Event service no longer stores an event audit trail.
 
 Event `imageVersion` is included in the GraphQL model. `uploadEventImage(eventId,imageBase64)` is admin-only and forwards to Event; media bytes are read through the narrow public `GET /media/events/{eventId}` route, not GraphQL lists. Draft bytes remain private because Event returns 404 until publication. See [ADR-0002](../../docs/adr/0002-event-image-storage.md).

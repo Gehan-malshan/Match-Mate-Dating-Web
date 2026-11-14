@@ -1,5 +1,7 @@
 # OpenAPI Contracts
 
+Account v1 now describes verification resend, password recovery/reset, optional administrator TOTP login, and password-confirmed member deletion. Notification v1 describes a private service-authenticated transient security email endpoint. These are additive v1 operations except the existing Account DELETE now requires password reauthentication; clients must update together. See ADR-0003 and the Account security runbook.
+
 Event v1 now includes the optional event image workflow: admin-only draft JPEG replacement and public-after-publication binary read, plus `imageVersion` metadata. GraphQL remains the browser command surface; the gateway owns the narrow public media GET.
 
 Implemented specifications: `account-v1.yaml`, the Event slice in `event-v1.yaml`, the first Booking slice in `booking-v1.yaml`, the deterministic prototype in `matchmaking-v1.yaml`, the first Payment slice in `payment-v1.yaml`, and the authenticated member feed in `notification-v1.yaml`.

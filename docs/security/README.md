@@ -1,5 +1,7 @@
 # MatchMate Security, Privacy, and Safety Baseline
 
+Account security now includes production-gated administrator TOTP, Google-admin sign-in denial when MFA is enabled, hashed one-use recovery tokens, session revocation on reset, PostgreSQL-backed login/discovery rate windows, transient SMTP security links, and overlapping JWT public keys. The member delete command requires password reauthentication and erases Account-owned personal fields. Production still needs edge/WAF limits, SMTP delivery and abuse monitoring, MFA recovery/key-rotation policy, and a cross-service retention/deletion decision. See [ADR-0003](../adr/0003-account-security-lifecycle.md) and [runbook](../runbooks/account-security.md).
+
 This baseline applies to every application, service, worker, contract, database, event, log, deployment, and operator workflow. Security and privacy controls are acceptance criteria, not post-launch enhancements.
 
 ## 1. Primary assets

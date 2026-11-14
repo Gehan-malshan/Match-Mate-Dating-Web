@@ -1,5 +1,7 @@
 # MatchMate Testing and Quality Strategy
 
+Account security gates now include RFC 6238 TOTP/replay and encrypted-secret tests, JWT overlap tests, password-reset single-use and admin-Google-bypass unit tests, security-message endpoint authorization/template tests, plus a disposable-PostgreSQL suite for migration 2, concurrent rate windows, reset/session revocation, TOTP replay/session strength, and Account-owned deletion minimization. Set `ACCOUNT_TEST_DATABASE_URL` to a disposable migrated database to run the component suite. Before production, run SMTP acceptance/failure and bounce tests, cross-replica JWKS overlap tests, browser registration/recovery/MFA/deletion journeys, and cross-service deletion/privacy checks. These remaining checks are not implied by a passing unit suite.
+
 Event Delete/Restore checks must prove administrator-only authorization, draft/cancelled-only deletion, stale-version conflicts, no hard deletion, active-versus-archived list separation, restoration, and preserved booking references. Browser E2E for the confirmation interaction remains a production gate. Event audit history is no longer stored.
 
 Admin registration-feed checks cover role denial at Booking and GraphQL, bounded pagination, the global PostgreSQL ordering/index, the member identity join, and frontend build behavior. Browser E2E with real bookings remains required before production; pay-at-venue confirmation must never be labelled as collected payment.

@@ -15,8 +15,14 @@ paths:
     post: {security: [], operationId: register, requestBody: {$ref: '#/components/requestBodies/Register'}, responses: {'201': {description: Private pending profile created, content: {application/json: {schema: {$ref: '#/components/schemas/Registration'}}}}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/verify-email:
     post: {security: [], operationId: verifyEmail, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token], properties: {token: {type: string}}}}}}, responses: {'200': {description: Verified}, '400': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/resend-verification:
+    post: {security: [], operationId: resendVerification, description: Generic response; sends a replacement single-use link only to an eligible pending account., requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, responses: {'204': {description: Request accepted}, '429': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/request-password-reset:
+    post: {security: [], operationId: requestPasswordReset, description: Generic response to avoid account enumeration; issues a single-use 30-minute link only for an eligible account., requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, responses: {'204': {description: Request accepted}, '429': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/reset-password:
+    post: {security: [], operationId: resetPassword, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token,password], properties: {token: {type: string}, password: {type: string, minLength: 12, maxLength: 128}}}}}}, responses: {'204': {description: Password changed and sessions revoked}, '400': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/login:
-    post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}}}
+    post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}, totpCode: {type: string, pattern: '^[0-9]{6}$'}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '429': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/google/start:
     get: {security: [], operationId: startGoogleLogin, description: Browser-only OAuth start endpoint. The GraphQL gateway exposes it as /auth/google/start., responses: {'302': {description: Redirect to Google authorization}}}
   /api/v1/auth/google/callback:
@@ -27,7 +33,7 @@ paths:
     post: {security: [], operationId: logout, responses: {'204': {description: Session revoked}}}
   /api/v1/users/me:
     get: {operationId: getMe, responses: {'200': {description: Private account aggregate, content: {application/json: {schema: {$ref: '#/components/schemas/Me'}}}}, '401': {$ref: '#/components/responses/Problem'}}}
-    delete: {operationId: deactivateMe, responses: {'204': {description: Account deactivated and sessions revoked}}}
+    delete: {operationId: deleteMyAccount, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [password], properties: {password: {type: string, format: password}}}}}}, responses: {'204': {description: Account-owned profile data and credentials erased; account pseudonymized; sessions revoked}, '401': {$ref: '#/components/responses/Problem'}}}
   /api/v1/users/me/profile:
     patch: {operationId: updateProfile, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProfilePatch'}}}}, responses: {'200': {description: Updated}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
   /api/v1/users/me/matching-preferences:

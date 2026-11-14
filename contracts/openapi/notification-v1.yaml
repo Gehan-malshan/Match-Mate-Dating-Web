@@ -6,6 +6,25 @@ info:
 servers:
   - url: /api/v1
 paths:
+  /internal/security-email:
+    post:
+      operationId: sendSecurityEmail
+      summary: Private transient verification or recovery email delivery
+      description: Account-to-Notification only. The raw one-time token is accepted in memory and never stored or published.
+      security: [{internalServiceToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, purpose, token]
+              properties: {email: {type: string, format: email}, purpose: {enum: [verify, reset]}, token: {type: string}}
+      responses:
+        "204": {description: Provider accepted message}
+        "400": {description: Invalid request}
+        "401": {description: Internal authorization failed}
+        "502": {description: Provider failed}
   /notifications:
     get:
       operationId: listMyNotifications
@@ -70,6 +89,7 @@ paths:
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+    internalServiceToken: {type: apiKey, in: header, name: X-MatchMate-Internal-Token}
   responses:
     Problem:
       description: RFC 9457-style problem details

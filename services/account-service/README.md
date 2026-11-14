@@ -1,5 +1,13 @@
 # Account and Profile Service
 
+## Security lifecycle update (ADR-0003)
+
+Migration 2 adds hashed single-use password-reset tokens, PostgreSQL-backed security rate windows, and encrypted administrator TOTP records. Account sends raw verification/recovery links only through Notification's private transient SMTP endpoint; the token is never included in an event. The browser exposes `/verify-email`, `/forgot-password`, and `/reset-password`. Password reset revokes all sessions and increments token version. Administrator password login requires TOTP when `ADMIN_MFA_ENCRYPTION_KEY` is set; production requires it. Google login cannot bypass administrator MFA. Provision the first authenticator through `cmd/admin-mfa` as described in `docs/runbooks/account-security.md`.
+
+`DELETE /api/v1/users/me` now requires the current password and immediately pseudonymizes Account email, erases Account-owned profile and credentials, and revokes sessions. Cross-service records and backups follow an unresolved retention policy; see ADR-0003. This is a behavior change from the prior bearer-only deactivation call. The browser GraphQL mutation is `deleteMyAccount(password:)`.
+
+New configuration: `SECURITY_MAIL_URL`, `SECURITY_MAIL_TOKEN`, `ADMIN_MFA_ENCRYPTION_KEY`, and optional `JWT_PREVIOUS_PUBLIC_KEYS_JSON`. See the runbook for rollout order and limitations. Real SMTP credentials and live delivery evidence remain required for production.
+
 Owns registration, authentication, roles, sessions, account lifecycle, community-safe profiles, private matchmaking preferences, profile visibility, and member blocks.
 
 Implemented owned data includes accounts, credentials, consent records, roles, sessions, profiles, preferences, visibility settings, blocks, moderation audit records, and an event outbox.
@@ -103,7 +111,7 @@ The private `GET /api/v1/internal/notification-recipients/{accountId}` endpoint 
 
 The community projection is an explicit allow-list: profile ID, nickname, five-year age band, broad location, bio, and interests. It requires active + verified + approved + community-visible state and excludes blocks in either direction. Exact DOB, email, preferences, deal-breakers, credentials, and moderation data cannot be serialized by this DTO.
 
-Profile approval/hiding requires `moderator` or `admin` and creates an audit record. Full moderation case/evidence/appeal ownership remains in the future Moderation Service. Profile media and questionnaire answers are intentionally deferred until their policy and schema decisions are approved. Production verification-email delivery also remains an integration task: development may return a token only when `DEV_EXPOSE_VERIFICATION_TOKEN=true`; production must keep it false and connect an approved private delivery path without putting email addresses in public facts.
+Profile approval/hiding requires `moderator` or `admin` and creates an audit record. Full moderation case/evidence/appeal ownership remains in the future Moderation Service. Profile media and questionnaire answers are intentionally deferred until their policy and schema decisions are approved. Verification and recovery now use Notification's private transient SMTP endpoint. Development may return a verification token only when `DEV_EXPOSE_VERIFICATION_TOKEN=true`; production must keep it false. Real SMTP delivery, bounce handling, and operational evidence remain production gates.
 
 ## Run locally on Windows / PowerShell
 
