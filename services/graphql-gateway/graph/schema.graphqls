@@ -59,7 +59,11 @@ type Query {
 type Mutation {
   register(input: RegisterInput!): RegistrationPayload!
   verifyEmail(token: String!): OperationResult!
-  login(email: String!, password: String!): AuthPayload!
+  resendVerification(email: String!): OperationResult!
+  requestPasswordReset(email: String!): OperationResult!
+  resetPassword(token: String!, password: String!): OperationResult!
+  deleteMyAccount(password: String!): OperationResult!
+  login(email: String!, password: String!, totpCode: String): AuthPayload!
   refreshSession: AuthPayload!
   logout: OperationResult!
   updateProfile(input: ProfileInput!): Profile!

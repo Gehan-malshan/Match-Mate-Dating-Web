@@ -26,10 +26,38 @@ func (r *mutationResolver) VerifyEmail(ctx context.Context, token string) (*mode
 	return &model.OperationResult{Success: err == nil}, err
 }
 
+// ResendVerification is the resolver for the resendVerification field.
+func (r *mutationResolver) ResendVerification(ctx context.Context, email string) (*model.OperationResult, error) {
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/resend-verification", http.MethodPost, map[string]string{"email": email}, nil, nil)
+	return &model.OperationResult{Success: err == nil}, err
+}
+
+// RequestPasswordReset is the resolver for the requestPasswordReset field.
+func (r *mutationResolver) RequestPasswordReset(ctx context.Context, email string) (*model.OperationResult, error) {
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/request-password-reset", http.MethodPost, map[string]string{"email": email}, nil, nil)
+	return &model.OperationResult{Success: err == nil}, err
+}
+
+// ResetPassword is the resolver for the resetPassword field.
+func (r *mutationResolver) ResetPassword(ctx context.Context, token string, password string) (*model.OperationResult, error) {
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/reset-password", http.MethodPost, map[string]string{"token": token, "password": password}, nil, nil)
+	return &model.OperationResult{Success: err == nil}, err
+}
+
+// DeleteMyAccount is the resolver for the deleteMyAccount field.
+func (r *mutationResolver) DeleteMyAccount(ctx context.Context, password string) (*model.OperationResult, error) {
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/users/me", http.MethodDelete, map[string]string{"password": password}, nil, nil)
+	return &model.OperationResult{Success: err == nil}, err
+}
+
 // Login is the resolver for the login field.
-func (r *mutationResolver) Login(ctx context.Context, email string, password string) (*model.AuthPayload, error) {
+func (r *mutationResolver) Login(ctx context.Context, email string, password string, totpCode *string) (*model.AuthPayload, error) {
 	var auth model.AuthPayload
-	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/login", http.MethodPost, map[string]string{"email": email, "password": password}, &auth, nil); err != nil {
+	code := ""
+	if totpCode != nil {
+		code = *totpCode
+	}
+	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/login", http.MethodPost, map[string]string{"email": email, "password": password, "totpCode": code}, &auth, nil); err != nil {
 		return nil, err
 	}
 	var me model.Me
