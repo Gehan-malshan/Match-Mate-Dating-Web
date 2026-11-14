@@ -13,7 +13,11 @@ export async function register(input:{email:string;password:string;nickname:stri
   return data.register
 }
 export async function verifyEmail(token:string){await graphqlClient.execute(`mutation VerifyEmail($token:String!){verifyEmail(token:$token){success}}`,{token},false)}
-export async function login(email:string,password:string){const data=await graphqlClient.execute<{login:{accessToken:string;me:Me}}>(`mutation Login($email:String!,$password:String!){login(email:$email,password:$password){accessToken me{${meFields}}}}`,{email,password},false);graphqlClient.setToken(data.login.accessToken);return data.login}
+export async function resendVerification(email:string){await graphqlClient.execute(`mutation ResendVerification($email:String!){resendVerification(email:$email){success}}`,{email},false)}
+export async function requestPasswordReset(email:string){await graphqlClient.execute(`mutation RequestPasswordReset($email:String!){requestPasswordReset(email:$email){success}}`,{email},false)}
+export async function resetPassword(token:string,password:string){await graphqlClient.execute(`mutation ResetPassword($token:String!,$password:String!){resetPassword(token:$token,password:$password){success}}`,{token,password},false)}
+export async function deleteMyAccount(password:string){await graphqlClient.execute(`mutation DeleteMyAccount($password:String!){deleteMyAccount(password:$password){success}}`,{password});graphqlClient.clearToken()}
+export async function login(email:string,password:string,totpCode=''){const data=await graphqlClient.execute<{login:{accessToken:string;me:Me}}>(`mutation Login($email:String!,$password:String!,$totpCode:String){login(email:$email,password:$password,totpCode:$totpCode){accessToken me{${meFields}}}}`,{email,password,totpCode},false);graphqlClient.setToken(data.login.accessToken);return data.login}
 export const refresh=()=>graphqlClient.refresh()
 export async function logout(){try{await graphqlClient.execute(`mutation Logout{logout{success}}`,{},false)}finally{graphqlClient.clearToken()}}
 export async function getMe(){const data=await graphqlClient.execute<{me:Me}>(`query Me{me{${meFields}}}`);return data.me}

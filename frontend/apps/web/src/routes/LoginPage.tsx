@@ -27,11 +27,11 @@ export function LoginPage() {
     })()
   }, [navigate])
   const form = useForm({
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: '', totpCode: '' },
     onSubmit: async ({ value }) => {
       setMessage('')
       try {
-        const { me } = await login(value.email, value.password)
+        const { me } = await login(value.email, value.password, value.totpCode)
         if (me.account.roles.includes('admin')) {
           await navigate({ to: '/admin' })
           return
@@ -91,6 +91,8 @@ export function LoginPage() {
               )}
             </form.Field>
 
+            <form.Field name="totpCode">{field=><label className="login-field"><span>Administrator authenticator code (if enabled)</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" value={field.state.value} onChange={event=>field.handleChange(event.target.value)} /></label>}</form.Field>
+
             <button className="login-submit" type="submit">Continue your journey <span aria-hidden="true">→</span></button>
           </form>
 
@@ -105,6 +107,7 @@ export function LoginPage() {
           </button>
           <p className="login-privacy-note">Your email, date of birth, and matching preferences stay private.</p>
           <p className="login-register">New to MatchMate? <Link to="/register">Create your private profile</Link></p>
+          <p className="login-register"><Link to="/forgot-password">Forgot password?</Link> · <Link to="/verify-email">Resend verification email</Link></p>
         </div>
 
         <footer className="login-footer">

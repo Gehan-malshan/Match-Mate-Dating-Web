@@ -3,6 +3,7 @@ import {lazy,Suspense} from 'react'
 import {getMe} from './lib/account-api'
 import {LandingPage} from './routes/LandingPage'
 import {LoginPage} from './routes/LoginPage'
+import {SecurityLinkPage} from './routes/SecurityLinkPage'
 import {ProfilePage} from './routes/ProfilePage'
 import {RegisterPage} from './routes/RegisterPage'
 import {EventsPage} from './routes/EventsPage'
@@ -18,6 +19,9 @@ const rootRoute=createRootRoute({component:Outlet})
 const indexRoute=createRoute({getParentRoute:()=>rootRoute,path:'/',component:LandingPage})
 const registerRoute=createRoute({getParentRoute:()=>rootRoute,path:'/register',component:RegisterPage})
 const loginRoute=createRoute({getParentRoute:()=>rootRoute,path:'/login',component:LoginPage})
+const verifyRoute=createRoute({getParentRoute:()=>rootRoute,path:'/verify-email',component:()=> <SecurityLinkPage mode="verify"/>})
+const forgotRoute=createRoute({getParentRoute:()=>rootRoute,path:'/forgot-password',component:()=> <SecurityLinkPage mode="forgot"/>})
+const resetRoute=createRoute({getParentRoute:()=>rootRoute,path:'/reset-password',component:()=> <SecurityLinkPage mode="reset"/>})
 const eventsRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events',component:EventsPage})
 const eventDetailRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events/$eventId',component:EventDetailPage})
 
@@ -40,6 +44,6 @@ const adminRoute=createRoute({
   component:AdminRoute,
 })
 
-const routeTree=rootRoute.addChildren([indexRoute,registerRoute,loginRoute,eventsRoute,eventDetailRoute,adminRoute,memberGroup.addChildren([profileRoute,bookingsRoute,notificationsRoute,communityRoute,communityProfileRoute])])
+const routeTree=rootRoute.addChildren([indexRoute,registerRoute,loginRoute,verifyRoute,forgotRoute,resetRoute,eventsRoute,eventDetailRoute,adminRoute,memberGroup.addChildren([profileRoute,bookingsRoute,notificationsRoute,communityRoute,communityProfileRoute])])
 export const router=createRouter({routeTree})
 declare module '@tanstack/react-router'{interface Register{router:typeof router}}
