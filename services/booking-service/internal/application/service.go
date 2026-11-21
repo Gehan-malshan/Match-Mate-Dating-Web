@@ -30,6 +30,9 @@ type Repository interface {
 	ListRegistrations(context.Context, int, int) ([]domain.Booking, error)
 	Cancel(context.Context, string, string, string, time.Time) (domain.Booking, bool, error)
 	Expire(context.Context, time.Time, int) (int, error)
+	CollectVenue(context.Context, string, string, string, string, time.Time) (domain.Booking, error)
+	CheckIn(context.Context, string, string, string, time.Time) (domain.Booking, error)
+	GetForStaff(context.Context, string) (domain.Booking, error)
 }
 type Service struct {
 	repo   Repository
@@ -141,6 +144,41 @@ func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Boo
 	}
 	b, _, err := s.repo.Cancel(ctx, actor, id, key, s.now().UTC())
 	return b, err
+}
+func (s *Service) CollectVenue(ctx context.Context, actor, bookingID, key, method string) (domain.Booking, error) {
+	if actor == "" || bookingID == "" || key == "" || (method != "CASH" && method != "CARD_AT_VENUE") {
+		return domain.Booking{}, ErrInvalid
+	}
+	if err := s.staffEligibility(ctx, bookingID); err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repo.CollectVenue(ctx, actor, bookingID, key, method, s.now().UTC())
+}
+func (s *Service) CheckIn(ctx context.Context, actor, bookingID, key string) (domain.Booking, error) {
+	if actor == "" || bookingID == "" || key == "" {
+		return domain.Booking{}, ErrInvalid
+	}
+	if err := s.staffEligibility(ctx, bookingID); err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repo.CheckIn(ctx, actor, bookingID, key, s.now().UTC())
+}
+func (s *Service) staffEligibility(ctx context.Context, bookingID string) error {
+	b, err := s.repo.GetForStaff(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b.State != domain.Confirmed {
+		return ErrConflict
+	}
+	event, eventErr := s.events.Get(ctx, b.EventID)
+	if eventErr != nil {
+		return ErrDependency
+	}
+	if event.Status == "CANCELLED" {
+		return ErrConflict
+	}
+	return s.checkSafety(ctx, b.AccountID, b.EventID)
 }
 func (s *Service) Snapshot(ctx context.Context, actor, id string) (domain.Booking, error) {
 	b, err := s.repo.Get(ctx, actor, id)

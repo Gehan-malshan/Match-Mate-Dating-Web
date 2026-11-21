@@ -51,7 +51,7 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
   /bookings/{bookingId}/cancel:
     post:
-      summary: Cancel and release an active online payment hold; confirmed venue bookings await an approved cancellation policy
+      summary: Cancel and release an unpaid online payment hold only; confirmed venue bookings cannot be cancelled
       security: [{bearerAuth: []}]
       parameters:
         - {name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}
@@ -60,6 +60,19 @@ paths:
         "200": {description: Cancelled booking, content: {application/json: {schema: {$ref: "#/components/schemas/Booking"}}}}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  /admin/bookings/{bookingId}/venue-collection:
+    post:
+      summary: Administrator records cash or external card collection of the immutable venue ticket price
+      security: [{bearerAuth: []}]
+      parameters: [{name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}, {name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [method], properties: {method: {type: string, enum: [CASH,CARD_AT_VENUE]}}}}}}
+      responses: {'200': {description: Booking with collection time}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /admin/bookings/{bookingId}/check-in:
+    post:
+      summary: Administrator checks in an eligible confirmed booking after required venue collection
+      security: [{bearerAuth: []}]
+      parameters: [{name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}, {name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      responses: {'200': {description: Booking with check-in time}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
   responses: {Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}}
@@ -84,4 +97,7 @@ components:
         createdAt: {type: string, format: date-time}
         confirmedAt: {type: string, format: date-time}
         cancelledAt: {type: string, format: date-time}
+        venueCollectedAt: {type: string, format: date-time}
+        venueCollectionMethod: {type: string, enum: [CASH,CARD_AT_VENUE]}
+        checkedInAt: {type: string, format: date-time}
     Problem: {type: object, required: [type,title,status,code,detail,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, traceId: {type: string}}}

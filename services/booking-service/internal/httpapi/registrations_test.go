@@ -33,6 +33,21 @@ type testRepository struct {
 	items []domain.Booking
 }
 
+func TestVenueStaffActionsRequireAdmin(t *testing.T) {
+	app := application.New(testRepository{}, testEvents{}, time.Minute)
+	server := New(app, testVerifier{roles: []string{"member"}}, slog.Default())
+	for _, path := range []string{"/api/v1/admin/bookings/" + testEventID + "/venue-collection", "/api/v1/admin/bookings/" + testEventID + "/check-in"} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		req.Header.Set("Authorization", "Bearer member-token")
+		req.Header.Set("Idempotency-Key", "test-key")
+		w := httptest.NewRecorder()
+		server.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("member accessed %s: %d %s", path, w.Code, w.Body.String())
+		}
+	}
+}
+
 func (r testRepository) ListForEvent(context.Context, string, int, int) ([]domain.Booking, error) {
 	return r.items, nil
 }

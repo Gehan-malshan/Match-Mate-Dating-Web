@@ -1,5 +1,7 @@
 # MatchMate Testing and Quality Strategy
 
+Booking's PostgreSQL component suite must run with `BOOKING_TEST_DATABASE_URL` and migration 6. It covers last-seat contention, venue collection before check-in, idempotent retries, confirmed venue cancellation denial, online hold expiry, duplicate Payment facts, and capacity recovery. CI needs a real PostgreSQL service; unit tests alone do not prove allocation safety. Staff authorization and GraphQL/browser behavior require separate checks.
+
 Moderation release checks include a suspended password login and refresh yielding only `appeal` role, a GraphQL login that does not fetch `/users/me`, owner-scoped action list and appeal submission through the gateway, denial of ordinary member/admin routes, and normal access after appeal reversal. PostgreSQL component coverage verifies action application, reversal, and expiry.
 
 Administrator registration contract tests verify that Booking's `entryEligible` survives the GraphQL identity join and is displayed separately from confirmed booking state. Stale signed tokens from suspended administrators must be denied by Moderation, Booking, and Matchmaking service authorization.

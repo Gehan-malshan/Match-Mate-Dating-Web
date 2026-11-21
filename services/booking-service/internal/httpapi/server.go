@@ -38,6 +38,8 @@ func New(app *application.Service, v Verifier, log *slog.Logger) http.Handler {
 	m.Handle("GET /api/v1/admin/events/{eventId}/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("GET /api/v1/admin/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("POST /api/v1/bookings/{bookingId}/cancel", s.protect(http.HandlerFunc(s.cancel)))
+	m.Handle("POST /api/v1/admin/bookings/{bookingId}/venue-collection", s.protect(http.HandlerFunc(s.collectVenue)))
+	m.Handle("POST /api/v1/admin/bookings/{bookingId}/check-in", s.protect(http.HandlerFunc(s.checkIn)))
 	m.Handle("GET /internal/v1/bookings/{bookingId}/payment-snapshot", s.protect(http.HandlerFunc(s.snapshot)))
 	return m
 }
@@ -142,6 +144,44 @@ func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
 	b, err := s.app.Cancel(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"))
+	if handle(w, err) {
+		return
+	}
+	write(w, 200, b)
+}
+func (s *Server) requireStaff(w http.ResponseWriter, r *http.Request) bool {
+	for _, role := range principal(r).Roles {
+		if role == "admin" {
+			return true
+		}
+	}
+	problem(w, 403, "ADMIN_ROLE_REQUIRED", "Administrator access is required.")
+	return false
+}
+func (s *Server) collectVenue(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaff(w, r) {
+		return
+	}
+	var in struct {
+		Method string `json:"method"`
+	}
+	d := json.NewDecoder(io.LimitReader(r.Body, 1<<16))
+	d.DisallowUnknownFields()
+	if d.Decode(&in) != nil {
+		problem(w, 400, "INVALID_REQUEST", "Request body is invalid.")
+		return
+	}
+	b, err := s.app.CollectVenue(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"), in.Method)
+	if handle(w, err) {
+		return
+	}
+	write(w, 200, b)
+}
+func (s *Server) checkIn(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaff(w, r) {
+		return
+	}
+	b, err := s.app.CheckIn(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"))
 	if handle(w, err) {
 		return
 	}

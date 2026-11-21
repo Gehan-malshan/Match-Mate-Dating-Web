@@ -21,11 +21,11 @@ type OutboxRecord struct {
 
 func New(pool *pgxpool.Pool) *Repository { return &Repository{pool: pool} }
 
-const cols = `id,account_id,event_id,state,amount::text,currency,policy_version,expires_at,version,created_at,confirmed_at,cancelled_at,payment_method`
+const cols = `id,account_id,event_id,state,amount::text,currency,policy_version,expires_at,version,created_at,confirmed_at,cancelled_at,payment_method,venue_collected_at,venue_collection_method,checked_in_at`
 
 func scan(row pgx.Row) (domain.Booking, error) {
 	var b domain.Booking
-	err := row.Scan(&b.ID, &b.AccountID, &b.EventID, &b.State, &b.Amount, &b.Currency, &b.PolicyVersion, &b.ExpiresAt, &b.Version, &b.CreatedAt, &b.ConfirmedAt, &b.CancelledAt, &b.PaymentMethod)
+	err := row.Scan(&b.ID, &b.AccountID, &b.EventID, &b.State, &b.Amount, &b.Currency, &b.PolicyVersion, &b.ExpiresAt, &b.Version, &b.CreatedAt, &b.ConfirmedAt, &b.CancelledAt, &b.PaymentMethod, &b.VenueCollectedAt, &b.VenueCollectionMethod, &b.CheckedInAt)
 	return b, err
 }
 func (r *Repository) Ready(ctx context.Context) error { return r.pool.Ping(ctx) }

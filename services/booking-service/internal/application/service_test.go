@@ -42,6 +42,17 @@ func (f *fakeRepo) Cancel(_ context.Context, _ string, _ string, _ string, at ti
 	return f.created, false, nil
 }
 func (f *fakeRepo) Expire(context.Context, time.Time, int) (int, error) { return 0, nil }
+func (f *fakeRepo) GetForStaff(context.Context, string) (domain.Booking, error) {
+	return f.created, nil
+}
+func (f *fakeRepo) CollectVenue(_ context.Context, _, _, _, _ string, at time.Time) (domain.Booking, error) {
+	f.created.VenueCollectedAt = &at
+	return f.created, nil
+}
+func (f *fakeRepo) CheckIn(_ context.Context, _, _, _ string, at time.Time) (domain.Booking, error) {
+	f.created.CheckedInAt = &at
+	return f.created, nil
+}
 func TestCreateUsesEventOwnedPrice(t *testing.T) {
 	now := time.Date(2026, 8, 29, 10, 0, 0, 0, time.UTC)
 	repo := &fakeRepo{}
@@ -145,5 +156,28 @@ func TestBookingSafetyRaceAndAppealReversal(t *testing.T) {
 	eligible, err = svc.EntryEligible(context.Background(), repo.created)
 	if err != nil || !eligible {
 		t.Fatalf("reversed exclusion still blocks entry: eligible=%v err=%v", eligible, err)
+	}
+}
+
+func TestStaffActionsRespectCurrentEligibilityAndEventCancellation(t *testing.T) {
+	repo := &fakeRepo{created: domain.Booking{ID: "booking", AccountID: "member", EventID: "event", State: domain.Confirmed, PaymentMethod: "AT_VENUE"}}
+	events := fakeEvents{domain.EventSnapshot{EventID: "event", Status: "PUBLISHED"}}
+	svc := New(repo, events, time.Minute)
+	guard := &safetyStub{}
+	svc.SetSafety(guard)
+	guard.excluded.Store(true)
+	if _, err := svc.CollectVenue(context.Background(), "admin", "booking", "collection-key", "CASH"); !errors.Is(err, ErrExcluded) || repo.created.VenueCollectedAt != nil {
+		t.Fatalf("excluded member's collection accepted: %v", err)
+	}
+	if _, err := svc.CheckIn(context.Background(), "admin", "booking", "checkin-key"); !errors.Is(err, ErrExcluded) || repo.created.CheckedInAt != nil {
+		t.Fatalf("excluded member checked in: %v", err)
+	}
+	guard.excluded.Store(false)
+	if _, err := svc.CollectVenue(context.Background(), "admin", "booking", "collection-key", "CASH"); err != nil {
+		t.Fatalf("appeal reversal still blocks collection: %v", err)
+	}
+	svc.events = fakeEvents{domain.EventSnapshot{EventID: "event", Status: "CANCELLED"}}
+	if _, err := svc.CheckIn(context.Background(), "admin", "booking", "checkin-key"); !errors.Is(err, ErrConflict) || repo.created.CheckedInAt != nil {
+		t.Fatalf("cancelled event admitted member: %v", err)
 	}
 }

@@ -42,7 +42,7 @@ For the browser path, sign in through the common `/login` page with a suspended 
 
 Booking administrative registration rows now include `entryEligible`. Treat `false` as an entry prohibition even when the historical booking state remains `CONFIRMED`. Do not cancel a paid booking or release capacity automatically until the approved policy covers exclusions. A Moderation outage makes safety-sensitive operations return unavailable or retry; investigate the service rather than bypassing it. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md).
 
-The admin Registrations table displays this point-in-time decision as **Eligible**, **Entry blocked**, or **Not confirmed**. Refresh the table immediately before a manual admission decision. This is not an automated check-in endpoint.
+The admin Registrations table displays this point-in-time decision as **Eligible**, **Entry blocked**, or **Not confirmed**. Refresh the table immediately before using the administrator check-in action. Booking rechecks current eligibility when check-in is requested; the displayed decision alone is not an admission credential.
 
 An unavailable database makes readiness fail. RabbitMQ failure must not roll back reports or actions: facts remain in the Moderation-owned outbox and publish after relay recovery. Never delete or rewrite unpublished rows. Action expiry is idempotent through row locking and state checks.
 

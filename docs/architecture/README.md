@@ -8,7 +8,7 @@ Event media is an optional, Event-owned draft attachment. The administrator uplo
 
 ## Current event payment-choice slice
 
-The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**, not processed or marked paid in MatchMate. The member UI shows the due amount and never starts PayHere for venue bookings. Existing events default to online-only. See [ADR-0001](../adr/0001-event-payment-choice.md). Production separation of Payment/Matchmaking services is still an open deployment task.
+The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**. Staff can record cash or external card collection, then check in an eligible confirmed booking. That record is not PayHere settlement. Confirmed venue reservations cannot be cancelled. See [ADR-0001](../adr/0001-event-payment-choice.md) and [ADR-0006](../adr/0006-venue-collection-and-checkin.md). Production separation of Payment/Matchmaking services is still an open deployment task.
 
 This is the canonical architecture description for MatchMate. It must remain synchronized with implementation, OpenAPI, AsyncAPI, service READMEs, ADRs, migrations, tests, and runbooks.
 
@@ -195,9 +195,11 @@ OpenAPI becomes authoritative when specifications exist.
 | POST | `/api/v1/blocks` | Account | Block member |
 | GET/POST | `/api/v1/events` | Event | Discover/create events |
 | GET/PATCH | `/api/v1/events/{eventId}` | Event | Read/update event |
-| POST | `/api/v1/bookings` | Booking | Create hold |
+| POST | `/api/v1/bookings` | Booking | Create online hold or confirmed venue reservation |
 | GET | `/api/v1/bookings/{bookingId}` | Booking | Read authorized booking |
-| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel/request cancellation |
+| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel an unpaid online hold only |
+| POST | `/api/v1/admin/bookings/{bookingId}/venue-collection` | Booking | Record administrator venue collection |
+| POST | `/api/v1/admin/bookings/{bookingId}/check-in` | Booking | Check in eligible confirmed booking |
 | POST | `/api/v1/payments/initiate` | Payment | Start PayHere from booking ID |
 | POST | `/api/v1/payments/payhere/callback` | Payment | Provider callback |
 | GET/POST | `/api/v1/events/{eventId}/matching-runs` | Matchmaking | List/generate runs |

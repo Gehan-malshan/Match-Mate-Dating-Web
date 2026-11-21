@@ -139,6 +139,26 @@ func (r *mutationResolver) CancelBooking(ctx context.Context, bookingID string, 
 	return &result, err
 }
 
+// CollectVenuePayment is the resolver for the collectVenuePayment field.
+func (r *mutationResolver) CollectVenuePayment(ctx context.Context, bookingID string, method string, idempotencyKey string) (*model.Booking, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	var result model.Booking
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/admin/bookings/"+escape(bookingID)+"/venue-collection", http.MethodPost, map[string]string{"method": method}, &result, map[string]string{"Idempotency-Key": idempotencyKey})
+	return &result, err
+}
+
+// CheckInBooking is the resolver for the checkInBooking field.
+func (r *mutationResolver) CheckInBooking(ctx context.Context, bookingID string, idempotencyKey string) (*model.Booking, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	var result model.Booking
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/admin/bookings/"+escape(bookingID)+"/check-in", http.MethodPost, nil, &result, map[string]string{"Idempotency-Key": idempotencyKey})
+	return &result, err
+}
+
 // InitiatePayment is the resolver for the initiatePayment field.
 func (r *mutationResolver) InitiatePayment(ctx context.Context, input model.CheckoutCustomerInput, idempotencyKey string) (*model.Checkout, error) {
 	var result model.Checkout

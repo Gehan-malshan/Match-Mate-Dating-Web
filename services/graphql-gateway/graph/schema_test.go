@@ -74,6 +74,21 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 
 func toJSON(value any) string { body, _ := json.Marshal(value); return string(body) }
 
+func TestVenueStaffMutationsRequireAdmin(t *testing.T) {
+	role:="member"
+	account:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","application/json");_,_=w.Write([]byte(`{"account":{"id":"actor","email":"a@example.test","status":"ACTIVE","verification":"VERIFIED","roles":["`+role+`"]}}`))}))
+	defer account.Close()
+	calls:=0
+	booking:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){calls++;if r.Header.Get("Idempotency-Key")!="key-12345678"{t.Errorf("missing idempotency key")};w.Header().Set("Content-Type","application/json");_,_=w.Write([]byte(`{"bookingId":"booking-id","eventId":"event-id","state":"CONFIRMED","paymentMethod":"AT_VENUE","amount":"2500.00","currency":"LKR","policyVersion":1,"expiresAt":"2026-11-22T12:00:00Z","version":2,"createdAt":"2026-11-22T10:00:00Z"}`))}))
+	defer booking.Close()
+	server:=handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers:&Resolver{Upstream:upstream.New(upstream.Services{Account:account.URL,Booking:booking.URL})}}))
+	query:=`{"query":"mutation { collectVenuePayment(bookingId: \"booking-id\", method: \"CASH\", idempotencyKey: \"key-12345678\") { bookingId } }"}`
+	call:=func()[]byte{w:=httptest.NewRecorder();r:=httptest.NewRequest(http.MethodPost,"/graphql",bytes.NewBufferString(query));r.Header.Set("Content-Type","application/json");server.ServeHTTP(w,r);return w.Body.Bytes()}
+	if result:=call();!bytes.Contains(result,[]byte(`"errors"`))||calls!=0{t.Fatalf("member reached staff command: %s",result)}
+	role="admin"
+	if result:=call();bytes.Contains(result,[]byte(`"errors"`))||calls!=1{t.Fatalf("admin command failed: %s calls=%d",result,calls)}
+}
+
 func TestAppealOnlyLoginAndOwnerAppealThroughGateway(t *testing.T) {
 	meCalls := 0
 	account := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

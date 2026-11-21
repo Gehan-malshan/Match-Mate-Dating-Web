@@ -4,7 +4,9 @@ Owns ticket holds, bookings, event allocation, capacity consumption, hold expiry
 
 ## Implementation status
 
-The executable member slice provides authenticated hold creation/read/list, idempotent cancellation of unpaid holds, a constrained Payment snapshot, Event-owned price/currency lookup, atomic capacity allocation, configurable expiry, Payment event inbox deduplication, confirmation/late-review transitions, transactional outbox facts, and a publisher-confirmed RabbitMQ relay. The safe initial policy is a configurable 15-minute hold, no waitlist, no automatic refund, and manual review for late payment. Confirmed bookings cannot be cancelled until refund policy is approved. Attendance, account/moderation consumers, and approved refund coordination remain later slices.
+The executable member slice provides authenticated hold creation/read/list, idempotent cancellation of unpaid online holds, a constrained Payment snapshot, Event-owned price/currency lookup, atomic capacity allocation, configurable expiry, Payment event inbox deduplication, confirmation/late-review transitions, transactional outbox facts, and a publisher-confirmed RabbitMQ relay. The safe initial policy is a configurable 15-minute hold, no waitlist, no refunds, and manual review for late payment. Confirmed venue bookings cannot be cancelled.
+
+Migration 6 adds administrator-only venue collection (`CASH` or `CARD_AT_VENUE`) and check-in. Booking records the immutable price snapshot, actor, method, and UTC time; this is a staff declaration, not PayHere settlement. Venue check-in requires collection first. Both commands require `Idempotency-Key`, use a booking row lock, and emit outbox facts. Moderation eligibility and Event cancellation are rechecked before the action. See [ADR-0006](../../docs/adr/0006-venue-collection-and-checkin.md).
 
 The local API uses port `8085` because the upstream Matchmaking prototype owns port `8083`.
 
@@ -12,11 +14,11 @@ Booking now checks current Moderation state before creating reservations and exp
 
 Every authenticated Booking route also rechecks the actor's global suspension so an older signed member or administrator token cannot continue using the service. The administrator registration UI displays the current entry decision separately from booking status.
 
-Administrators can list an event's booking records with `GET /api/v1/admin/events/{eventId}/registrations?limit=25&offset=0`. The endpoint enforces the admin role from the signed token, returns account IDs only to authorized callers, and includes `hasMore` for pagination. Migration 4 indexes the event/date ordering. The GraphQL gateway's `eventRegistrations` query joins these booking records to Account-owned nickname/email via an admin-only batch lookup. This is a booking list, not an attendance or payment-collection ledger: `CONFIRMED` + `AT_VENUE` means the seat is reserved, not paid.
+Administrators can list an event's booking records with `GET /api/v1/admin/events/{eventId}/registrations?limit=25&offset=0`. The endpoint enforces the admin role from the signed token, returns account IDs only to authorized callers, and includes `hasMore` for pagination. Migration 4 indexes the event/date ordering. The GraphQL gateway's `eventRegistrations` query joins these booking records to Account-owned nickname/email via an admin-only batch lookup. The booking rows include collection and check-in timestamps; `CONFIRMED` + `AT_VENUE` alone means the seat is reserved, not paid.
 
 The dedicated admin registrations page also uses `GET /api/v1/admin/registrations?limit=25&offset=0` to page across all events. It has the same role check and privacy boundary; migration 5 indexes global booking order. The selected-event filter continues to use the event-scoped endpoint. Neither endpoint changes member-owned `GET /bookings` behavior.
 
-Migration 3 adds the immutable `paymentMethod` booking snapshot. A member can select `AT_VENUE` only when Event permits it. That reservation atomically increments confirmed capacity and publishes `BookingConfirmed` without starting PayHere. Its confirmed status means the seat is reserved, **not that payment was collected**. `ONLINE` retains the expiring hold and verified-Payment confirmation flow. Existing bookings default to `ONLINE`. Confirmed venue cancellations, staff collection, and check-in are not implemented pending policy; do not present those as available actions. `BOOKING_TEST_DATABASE_URL` enables the disposable-schema PostgreSQL last-seat/idempotency component test.
+Migration 3 adds the immutable `paymentMethod` booking snapshot. A member can select `AT_VENUE` only when Event permits it. That reservation atomically increments confirmed capacity and publishes `BookingConfirmed` without starting PayHere. Its confirmed status means the seat is reserved, **not that payment was collected**. `ONLINE` retains the expiring hold and verified-Payment confirmation flow. Existing bookings default to `ONLINE`. `BOOKING_TEST_DATABASE_URL` enables the disposable-schema PostgreSQL capacity, idempotency, expiry, duplicate-event, collection, and attendance component test.
 
 It must prevent overselling through transactional allocation controls and idempotent commands.
 
@@ -27,31 +29,33 @@ It must prevent overselling through transactional allocation controls and idempo
 - Store immutable event price, currency, and relevant policy version.
 - Expire/release holds idempotently.
 - Confirm valid bookings after a trusted payment-completed fact.
-- Handle cancellation/refund-request coordination according to approved policy.
-- Record attendance/check-in/no-show with organizer scope and audit.
+- Permit cancellation and expiry of unpaid online holds; retain confirmed venue reservations under the no-cancellation policy.
+- Record administrator venue collection and check-in. A future policy must define event-scoped staff access and no-show handling.
 - Provide authoritative allocation/usage checks to Event and matching eligibility to Matchmaking.
 
 ## Does not own
 
 Event configuration, PayHere/provider state, account credentials/profiles, matchmaking scores, or notification delivery.
 
-## Proposed API
+## Implemented API
 
 ```text
 POST   /api/v1/bookings
 GET    /api/v1/bookings/{bookingId}
-GET    /api/v1/bookings?mine=true
+GET    /api/v1/bookings
 POST   /api/v1/bookings/{bookingId}/cancel
-POST   /api/v1/bookings/{bookingId}/check-in       organizer/admin
-GET    /internal/v1/events/{eventId}/usage         constrained internal
+POST   /api/v1/admin/bookings/{bookingId}/venue-collection admin
+POST   /api/v1/admin/bookings/{bookingId}/check-in admin
+GET    /api/v1/admin/events/{eventId}/registrations admin
+GET    /api/v1/admin/registrations admin
 GET    /internal/v1/bookings/{bookingId}/payment-snapshot constrained Payment integration
 ```
 
-Create/cancel/check-in require idempotency keys. Member booking access uses authenticated subject ownership.
+Create/cancel/venue-collection/check-in require idempotency keys. Member booking access uses authenticated subject ownership.
 
-## Proposed data
+## Data
 
-`booking`, `seat_hold`, `capacity_allocation`, `attendance`, `inbox`, and `outbox`.
+Implemented tables include `booking`, `capacity_allocation`, `idempotency_record`, `booking_staff_action`, `inbox`, and `outbox`. Venue collection and check-in are recorded on `booking`.
 
 Key invariants:
 
@@ -67,13 +71,13 @@ Key invariants:
 ```text
 PENDING_PAYMENT -> CONFIRMED
 PENDING_PAYMENT -> EXPIRED | CANCELLED
-CONFIRMED -> CANCELLED under policy
+CONFIRMED venue bookings remain reserved; collection and check-in add timestamps without changing booking state
 Late/mismatched payment -> PAYMENT_REVIEW
 ```
 
 ## Events
 
-Produces `BookingPending`, `BookingConfirmed`, `BookingCancelled`, `HoldExpired`, and attendance facts.
+Produces `BookingPending`, `BookingConfirmed`, `BookingCancelled`, `HoldExpired`, `VenuePaymentCollected`, and `BookingCheckedIn` facts.
 
 Consumes Event policy/lifecycle updates, `PaymentCompleted`/payment review facts, and account/moderation restrictions as approved. Consumer updates and inbox insertion occur atomically.
 
@@ -94,12 +98,12 @@ Consumes Event policy/lifecycle updates, `PaymentCompleted`/payment review facts
 - Payment event duplicate/reorder/late behavior.
 - Cancellation authorization, window, allocation release, refund coordination.
 - Capacity policy version race.
-- Attendance organizer scope and audit.
+- Administrator-only attendance and collection, current eligibility, and idempotent action audit.
 - Migration, outbox/inbox, metrics, and sensitive-log behavior.
 
 ## Completion criteria
 
 Concurrency tests prove no overselling; every hold reaches a controlled terminal/review state; confirmed booking is authoritative for event participation; duplicate commands/events are safe; operations can observe and recover failures.
 
-Update this README, architecture/data/testing docs, contracts, runbooks, and change history whenever behavior changes.
+Update this README, architecture/data/testing docs, contracts, and runbooks whenever behavior changes.
 

@@ -17,18 +17,21 @@ type AuthPayload struct {
 }
 
 type Booking struct {
-	BookingID     string  `json:"bookingId"`
-	EventID       string  `json:"eventId"`
-	State         string  `json:"state"`
-	PaymentMethod string  `json:"paymentMethod"`
-	Amount        string  `json:"amount"`
-	Currency      string  `json:"currency"`
-	PolicyVersion int     `json:"policyVersion"`
-	ExpiresAt     string  `json:"expiresAt"`
-	Version       int     `json:"version"`
-	CreatedAt     string  `json:"createdAt"`
-	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
-	CancelledAt   *string `json:"cancelledAt,omitempty"`
+	BookingID             string  `json:"bookingId"`
+	EventID               string  `json:"eventId"`
+	State                 string  `json:"state"`
+	PaymentMethod         string  `json:"paymentMethod"`
+	Amount                string  `json:"amount"`
+	Currency              string  `json:"currency"`
+	PolicyVersion         int     `json:"policyVersion"`
+	ExpiresAt             string  `json:"expiresAt"`
+	Version               int     `json:"version"`
+	CreatedAt             string  `json:"createdAt"`
+	ConfirmedAt           *string `json:"confirmedAt,omitempty"`
+	CancelledAt           *string `json:"cancelledAt,omitempty"`
+	VenueCollectedAt      *string `json:"venueCollectedAt,omitempty"`
+	VenueCollectionMethod *string `json:"venueCollectionMethod,omitempty"`
+	CheckedInAt           *string `json:"checkedInAt,omitempty"`
 }
 
 type BookingPage struct {
@@ -125,18 +128,21 @@ type EventPage struct {
 }
 
 type EventRegistration struct {
-	BookingID     string  `json:"bookingId"`
-	AccountID     string  `json:"accountId"`
-	Nickname      string  `json:"nickname"`
-	Email         string  `json:"email"`
-	EventID       string  `json:"eventId"`
-	State         string  `json:"state"`
-	EntryEligible bool    `json:"entryEligible"`
-	PaymentMethod string  `json:"paymentMethod"`
-	Amount        string  `json:"amount"`
-	Currency      string  `json:"currency"`
-	CreatedAt     string  `json:"createdAt"`
-	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
+	BookingID             string  `json:"bookingId"`
+	AccountID             string  `json:"accountId"`
+	Nickname              string  `json:"nickname"`
+	Email                 string  `json:"email"`
+	EventID               string  `json:"eventId"`
+	State                 string  `json:"state"`
+	EntryEligible         bool    `json:"entryEligible"`
+	PaymentMethod         string  `json:"paymentMethod"`
+	Amount                string  `json:"amount"`
+	Currency              string  `json:"currency"`
+	CreatedAt             string  `json:"createdAt"`
+	ConfirmedAt           *string `json:"confirmedAt,omitempty"`
+	VenueCollectedAt      *string `json:"venueCollectedAt,omitempty"`
+	VenueCollectionMethod *string `json:"venueCollectionMethod,omitempty"`
+	CheckedInAt           *string `json:"checkedInAt,omitempty"`
 }
 
 type EventRegistrationPage struct {

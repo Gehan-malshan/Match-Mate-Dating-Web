@@ -1,10 +1,12 @@
 # MatchMate Data Architecture
 
+Booking migration 6 adds venue collection and check-in timestamps, staff IDs, collection method, and a separate staff-command idempotency table. The immutable booking amount/currency remains the collection amount. Do not drop these columns during rollback after real collection; preserve financial and attendance history. See ADR-0006.
+
 Account migration 2 adds `password_reset_token` (hashed one-use token, 30-minute expiry), `security_rate_window` (hashed bucket and atomic minute count), and `admin_totp` (AES-GCM encrypted secret, confirmation and last-used step). Password reset changes credential, increments token version, and revokes refresh sessions in one Account transaction. Member deletion pseudonymizes Account email and removes Account-owned profile/preference/credential/token rows; Account ID, minimal audit/consent/booking references remain until the cross-service retention policy is approved. See ADR-0003.
 
 Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
 
-Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state, not a collected-payment state. No venue collection ledger exists yet. Do not infer a paid ticket from the Booking state.
+Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state; migration 6 separately records collection and check-in. Do not infer payment from the Booking state alone.
 
 This guide defines service data ownership, proposed schemas, constraints, consistency, migrations, retention, and recovery. Table names are proposed until service migrations are accepted; ownership and invariants are architecture decisions.
 
@@ -82,16 +84,17 @@ Constraints:
 
 ## 5. Booking database
 
-Booking migration 1 implements `booking`, `capacity_allocation`, `idempotency_record`, `inbox`, and `outbox`. Migration 2 adds the cancellation timestamp used by idempotent unpaid-hold cancellation. A partial unique index prevents more than one active account/event booking, and a conditional allocation update prevents held plus confirmed capacity from exceeding the immutable configured limit. Attendance tables remain planned.
+Booking migration 1 implements `booking`, `capacity_allocation`, `idempotency_record`, `inbox`, and `outbox`. Migration 2 adds the cancellation timestamp used by idempotent unpaid-hold cancellation. Migration 6 records venue collection and check-in on `booking` and creates `booking_staff_action` for staff-command idempotency. A partial unique index prevents more than one active account/event booking, and a conditional allocation update prevents held plus confirmed capacity from exceeding the immutable configured limit. Separate attendance/no-show tables remain proposed.
 
-Suggested tables:
+Implemented tables and proposed extensions:
 
 | Table | Important fields/constraints |
 |---|---|
-| `booking` | ID, account/event scalar IDs, state, idempotency key, policy version, amount/currency snapshot, created/confirmed/cancelled/expired times, version |
-| `seat_hold` | booking unique, event, allocation category, expiry, released time |
+| `booking` (implemented) | ID, account/event scalar IDs, state, policy version, amount/currency snapshot, lifecycle times, venue collection method/actor/time, check-in actor/time, version |
+| `booking_staff_action` (implemented) | actor, operation, idempotency key, booking, request fingerprint, time |
+| `seat_hold` (proposed) | booking unique, event, allocation category, expiry, released time |
 | `capacity_allocation` | event/category unique, configured policy version, held count, confirmed count, version |
-| `attendance` | booking unique, check-in/no-show state, actor/time/audit |
+| `attendance` (proposed) | booking unique, no-show policy and additional attendance history |
 | `inbox` | unique event ID per consumer/handler |
 | `outbox` | booking facts |
 
