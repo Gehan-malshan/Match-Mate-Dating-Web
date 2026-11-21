@@ -24,6 +24,12 @@ func (s verifierStub) Verify(string) (domain.Principal, error) { return s.princi
 type repoStub struct{}
 
 func (repoStub) Ready(context.Context) error { return nil }
+func (repoStub) ListOwnActions(context.Context, string, time.Time) ([]domain.OwnAction, error) {
+	return nil, nil
+}
+func (repoStub) EffectiveSafety(context.Context, string, string, time.Time) (domain.EffectiveSafety, error) {
+	return domain.EffectiveSafety{}, nil
+}
 func (repoStub) CreateReport(_ context.Context, p domain.Principal, in domain.CreateReportInput, _ string, now time.Time) (domain.Report, error) {
 	return domain.Report{ID: uuid.NewString(), CaseID: uuid.NewString(), TargetType: in.TargetType, TargetID: in.TargetID, Category: in.Category, Status: domain.ReportOpen, Severity: domain.SeverityMedium, CreatedAt: now, UpdatedAt: now}, nil
 }
@@ -68,6 +74,22 @@ func TestAuthenticationAndRoleIsolation(t *testing.T) {
 	handler(domain.Principal{Subject: uuid.NewString(), Roles: []string{"organizer"}}).ServeHTTP(response, request)
 	if response.Code != 403 {
 		t.Fatalf("organizer case status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+func TestInternalSafetyRequiresServiceToken(t *testing.T) {
+	server := New(application.New(repoStub{}, 5), verifierStub{}, config.Config{SafetyServiceToken: "private-test-token"}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	path := "/api/v1/internal/safety/" + uuid.NewString()
+	for _, tc := range []struct {
+		token  string
+		status int
+	}{{"", 401}, {"wrong", 401}, {"private-test-token", 200}} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("X-Moderation-Service-Token", tc.token)
+		response := httptest.NewRecorder()
+		server.ServeHTTP(response, req)
+		if response.Code != tc.status {
+			t.Fatalf("token supplied=%v status=%d body=%s", tc.token != "", response.Code, response.Body.String())
+		}
 	}
 }
 func TestMemberCanSubmitValidReport(t *testing.T) {

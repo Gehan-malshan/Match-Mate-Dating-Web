@@ -79,6 +79,14 @@ func TestReportActionAppealAndOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	active, err := repo.EffectiveSafety(ctx, member.Subject, "", now)
+	if err != nil || !active.RevealPrevented {
+		t.Fatalf("applied reveal prevention=%+v err=%v", active, err)
+	}
+	visibleActions, err := repo.ListOwnActions(ctx, member.Subject, now)
+	if err != nil || len(visibleActions) != 1 || visibleActions[0].ID != action.ID {
+		t.Fatalf("owner action summaries=%+v err=%v", visibleActions, err)
+	}
 	_, err = repo.CreateAction(ctx, report.CaseID, domain.Action{TargetType: domain.TargetAccount, TargetID: member.Subject, Class: domain.ActionRevealPrevention, Scope: "ALL", Reason: "Prevent reveal during investigation", EffectiveAt: now}, moderator, "correlation", now)
 	requireProblem(t, err, 409, "ACTION_ALREADY_ACTIVE")
 	_, err = repo.CreateAppeal(ctx, action.ID, "Please review this safety decision", domain.Principal{Subject: uuid.NewString(), Roles: []string{"member"}}, "correlation", now)
@@ -89,6 +97,10 @@ func TestReportActionAppealAndOutbox(t *testing.T) {
 	}
 	if _, err = repo.DecideAppeal(ctx, appeal.ID, "REVERSED", moderator, "Evidence supports reversing action", "correlation", now); err != nil {
 		t.Fatal(err)
+	}
+	active, err = repo.EffectiveSafety(ctx, member.Subject, "", now)
+	if err != nil || active.RevealPrevented {
+		t.Fatalf("reversed appeal still restricts reveal: %+v err=%v", active, err)
 	}
 	if _, err = repo.DecideAppeal(ctx, appeal.ID, "UPHELD", moderator, "Second decision must be rejected", "correlation", now); err == nil {
 		t.Fatal("appeal was decided twice")
@@ -110,6 +122,10 @@ func TestReportActionAppealAndOutbox(t *testing.T) {
 	}
 	if count, expireErr := repo.ExpireActions(ctx, now.Add(2*time.Minute), 20); expireErr != nil || count != 1 {
 		t.Fatalf("expired=%d err=%v", count, expireErr)
+	}
+	active, err = repo.EffectiveSafety(ctx, expiringMember.Subject, uuid.NewString(), now.Add(2*time.Minute))
+	if err != nil || active.MatchmakingExcluded {
+		t.Fatalf("expired action still applies: %+v err=%v", active, err)
 	}
 	if count, expireErr := repo.ExpireActions(ctx, now.Add(2*time.Minute), 20); expireErr != nil || count != 0 {
 		t.Fatalf("expiry was not idempotent: expired=%d err=%v", count, expireErr)

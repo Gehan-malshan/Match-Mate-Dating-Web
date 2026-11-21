@@ -17,6 +17,12 @@ type repoStub struct {
 }
 
 func (s *repoStub) Ready(context.Context) error { return nil }
+func (s *repoStub) ListOwnActions(context.Context, string, time.Time) ([]domain.OwnAction, error) {
+	return nil, nil
+}
+func (s *repoStub) EffectiveSafety(context.Context, string, string, time.Time) (domain.EffectiveSafety, error) {
+	return domain.EffectiveSafety{}, nil
+}
 func (s *repoStub) CreateReport(_ context.Context, _ domain.Principal, in domain.CreateReportInput, _ string, now time.Time) (domain.Report, error) {
 	s.created++
 	return domain.Report{ID: uuid.NewString(), TargetID: in.TargetID, CreatedAt: now}, nil
@@ -130,6 +136,20 @@ func TestInvalidResourceIDsDoNotReachRepository(t *testing.T) {
 	requireProblem(t, err, 404, "ACTION_NOT_APPEALABLE")
 	_, err = service.Decide(context.Background(), moderator, "bad", "UPHELD", "Documented decision reason", "correlation")
 	requireProblem(t, err, 404, "APPEAL_NOT_PENDING")
+}
+func TestSafetyActionRequiresEffectiveTargetAndScope(t *testing.T) {
+	service := New(&repoStub{}, 5)
+	moderator := domain.Principal{Subject:uuid.NewString(),Roles:[]string{"moderator"}}
+	action := domain.Action{TargetType:domain.TargetEvent, TargetID:uuid.NewString(), Class:domain.ActionAccountSuspension, Scope:"ALL", Reason:"Documented safety restriction", EffectiveAt:time.Now()}
+	_, err := service.ApplyAction(context.Background(), moderator, uuid.NewString(), action, "correlation")
+	requireProblem(t, err, 400, "ACTION_INVALID")
+	action.TargetType = domain.TargetAccount
+	action.Scope = "unrecognized"
+	_, err = service.ApplyAction(context.Background(), moderator, uuid.NewString(), action, "correlation")
+	requireProblem(t, err, 400, "ACTION_INVALID")
+	action.Class = domain.ActionEventExclusion
+	_, err = service.ApplyAction(context.Background(), moderator, uuid.NewString(), action, "correlation")
+	requireProblem(t, err, 400, "ACTION_INVALID")
 }
 
 func TestInvalidCursorIsRejected(t *testing.T) {

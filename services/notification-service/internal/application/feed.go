@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
 	"github.com/google/uuid"
 )
 
@@ -34,6 +35,21 @@ type FeedPage struct {
 type FeedService struct {
 	repository FeedRepository
 	now        func() time.Time
+	safety     interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+}
+
+func (s *FeedService) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	s.safety = client
+}
+func (s *FeedService) checkSafety(ctx context.Context, accountID, eventID string) (safety.Decision, error) {
+	if s.safety == nil {
+		return safety.Decision{}, nil
+	}
+	return s.safety.Check(ctx, accountID, eventID)
 }
 
 func NewFeedService(repository FeedRepository) *FeedService {
@@ -41,6 +57,13 @@ func NewFeedService(repository FeedRepository) *FeedService {
 }
 
 func (s *FeedService) List(ctx context.Context, accountID string, limit int, encodedCursor string) (FeedPage, error) {
+	base, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return FeedPage{}, err
+	}
+	if base.Suspended {
+		return FeedPage{Items: []domain.FeedItem{}}, nil
+	}
 	if limit < 1 || limit > 50 {
 		return FeedPage{}, ErrInvalidCursor
 	}
@@ -54,6 +77,18 @@ func (s *FeedService) List(ctx context.Context, accountID string, limit int, enc
 	}
 	items := make([]domain.FeedItem, 0, len(records))
 	for _, record := range records {
+		if s.safety != nil && record.Category == "BOOKING" {
+			if record.EventID == "" {
+				continue
+			}
+			decision, checkErr := s.checkSafety(ctx, accountID, record.EventID)
+			if checkErr != nil {
+				return FeedPage{}, checkErr
+			}
+			if decision.EventExcluded {
+				continue
+			}
+		}
 		rendered, renderErr := domain.Render(record.Template, record.Variables)
 		if renderErr != nil {
 			return FeedPage{}, fmt.Errorf("render member notification: %w", renderErr)
@@ -72,7 +107,7 @@ func (s *FeedService) List(ctx context.Context, accountID string, limit int, enc
 			CreatedAt:       record.CreatedAt,
 		})
 	}
-	unread, err := s.repository.UnreadCount(ctx, accountID)
+	unread, err := s.UnreadCount(ctx, accountID)
 	if err != nil {
 		return FeedPage{}, err
 	}
@@ -85,6 +120,42 @@ func (s *FeedService) List(ctx context.Context, accountID string, limit int, enc
 }
 
 func (s *FeedService) UnreadCount(ctx context.Context, accountID string) (int, error) {
+	decision, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return 0, err
+	}
+	if decision.Suspended {
+		return 0, nil
+	}
+	if s.safety != nil {
+		grouped, ok := s.repository.(interface {
+			UnreadGroups(context.Context, string) ([]domain.UnreadGroup, error)
+		})
+		if !ok {
+			return 0, errors.New("notification safety unread projection unavailable")
+		}
+		groups, err := grouped.UnreadGroups(ctx, accountID)
+		if err != nil {
+			return 0, err
+		}
+		total := 0
+		for _, group := range groups {
+			if group.Category == "BOOKING" {
+				if group.EventID == "" {
+					continue
+				}
+				decision, checkErr := s.checkSafety(ctx, accountID, group.EventID)
+				if checkErr != nil {
+					return 0, checkErr
+				}
+				if decision.EventExcluded {
+					continue
+				}
+			}
+			total += group.Count
+		}
+		return total, nil
+	}
 	return s.repository.UnreadCount(ctx, accountID)
 }
 

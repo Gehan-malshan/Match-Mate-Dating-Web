@@ -8,6 +8,8 @@ Owns versioned notification templates, idempotent delivery records, delivery att
 
 ## Implementation status
 
+Notification now reads effective Moderation state before provider send and member feed display. Suspension suppresses delivery and feed access; event exclusion suppresses event booking messages and hides those feed items. The worker retries on a Moderation outage. Migration 4 records the event UUID on new booking deliveries and permits a `SUPPRESSED` attempt outcome; the migration runner also now applies the previously present SMTP-template migration 3. Production requires `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN`. Security verification/recovery email uses its separate transient endpoint and is unaffected by ordinary notification suppression.
+
 The first executable vertical slice provides:
 
 - An independently buildable Go module and OCI image.

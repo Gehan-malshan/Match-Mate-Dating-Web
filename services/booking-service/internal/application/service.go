@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gehan-malshan/matchmate/booking-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/booking-service/internal/safety"
 	"github.com/google/uuid"
 	"time"
 )
@@ -15,6 +16,7 @@ var (
 	ErrCapacity   = errors.New("event capacity exhausted")
 	ErrInvalid    = errors.New("invalid request")
 	ErrDependency = errors.New("dependency unavailable")
+	ErrExcluded   = errors.New("member is excluded from this event")
 )
 
 type EventReader interface {
@@ -34,14 +36,38 @@ type Service struct {
 	events EventReader
 	hold   time.Duration
 	now    func() time.Time
+	safety interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
 }
 
 func New(repo Repository, events EventReader, hold time.Duration) *Service {
 	return &Service{repo: repo, events: events, hold: hold, now: time.Now}
 }
+func (s *Service) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	s.safety = client
+}
+func (s *Service) checkSafety(ctx context.Context, actor, eventID string) error {
+	if s.safety == nil {
+		return nil
+	}
+	decision, err := s.safety.Check(ctx, actor, eventID)
+	if err != nil {
+		return fmt.Errorf("%w: moderation safety", ErrDependency)
+	}
+	if decision.Suspended || decision.EventExcluded {
+		return ErrExcluded
+	}
+	return nil
+}
 func (s *Service) Create(ctx context.Context, actor, eventID, method, key string) (domain.Booking, error) {
 	if eventID == "" || key == "" {
 		return domain.Booking{}, fmt.Errorf("%w: eventId and Idempotency-Key are required", ErrInvalid)
+	}
+	if err := s.checkSafety(ctx, actor, eventID); err != nil {
+		return domain.Booking{}, err
 	}
 	e, err := s.events.Get(ctx, eventID)
 	if err != nil {
@@ -61,6 +87,9 @@ func (s *Service) Create(ctx context.Context, actor, eventID, method, key string
 	if method == "AT_VENUE" {
 		b.State = domain.Confirmed
 		b.ConfirmedAt = &now
+	}
+	if err := s.checkSafety(ctx, actor, e.EventID); err != nil {
+		return domain.Booking{}, err
 	}
 	b, _, err = s.repo.Create(ctx, b, key, eventID+":"+method, e.ConfiguredCapacity)
 	return b, err
@@ -86,6 +115,16 @@ func (s *Service) ListRegistrations(ctx context.Context, limit, offset int) ([]d
 	}
 	return s.repo.ListRegistrations(ctx, limit, offset)
 }
+// EntryEligible is recomputed from current moderation state. A confirmed
+// reservation is not an admission credential when the member is excluded.
+func (s *Service) EntryEligible(ctx context.Context, booking domain.Booking) (bool, error) {
+	if booking.State != domain.Confirmed { return false, nil }
+	if err := s.checkSafety(ctx, booking.AccountID, booking.EventID); err != nil {
+		if errors.Is(err, ErrExcluded) { return false, nil }
+		return false, err
+	}
+	return true, nil
+}
 func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Booking, error) {
 	if id == "" || key == "" {
 		return domain.Booking{}, fmt.Errorf("%w: bookingId and Idempotency-Key are required", ErrInvalid)
@@ -96,6 +135,9 @@ func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Boo
 func (s *Service) Snapshot(ctx context.Context, actor, id string) (domain.Booking, error) {
 	b, err := s.repo.Get(ctx, actor, id)
 	if err != nil {
+		return b, err
+	}
+	if err := s.checkSafety(ctx, actor, b.EventID); err != nil {
 		return b, err
 	}
 	if b.State != domain.Pending || b.PaymentMethod != "ONLINE" {

@@ -154,7 +154,7 @@ The implemented prototype adds `event_scope` and `participant_projection` as Mat
 
 ## 8. Notification database
 
-Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence. Templates currently use the development provider channel until an approved email/provider contact-resolution design is accepted.
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. Migration 3 installs SMTP template variants. Migration 4 adds nullable `event_id` to delivery and a suppressed-attempt outcome so current event exclusion can stop pending sends and hide event-scoped feed items. Legacy booking deliveries without an event ID are conservatively suppressed when safety checking is enabled. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence.
 
 | Table | Important fields/constraints |
 |---|---|

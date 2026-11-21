@@ -24,6 +24,8 @@ services:
       BOOKING_DATABASE_URL: postgres://matchmate:matchmate@postgres-booking:5432/matchmate_booking?sslmode=disable
       BOOKING_EVENT_API_URL: http://host.docker.internal:8082/api/v1/events/{eventId}
       ACCOUNT_JWKS_URL: http://host.docker.internal:8081/.well-known/jwks.json
+      MODERATION_API_URL: http://moderation-api:8087
+      MODERATION_SERVICE_TOKEN: ${MODERATION_SERVICE_TOKEN:-matchmate-local-safety-only}
     ports: ["8085:8085"]
     depends_on: {booking-migrate: {condition: service_completed_successfully}}
   booking-expiry:

@@ -150,7 +150,7 @@ The executable slice consumes minimum-safe Account and Booking facts containing 
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
 
-The first executable standalone slice owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe report status and moderator/admin operations, expires due actions, and publishes minimum-safe enforcement facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification consumers remain required before cross-domain enforcement is complete.
+Moderation owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe action IDs and moderator/admin operations, expires due actions, and publishes minimum-safe facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification use an authenticated, uncached safety REST read for immediate decisions; see [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). A suspension limits password sign-in to an appeal-only role. Restriction checks are repeated near critical writes. Cross-service atomic admission, paid-booking resolution, browser appeal UI, and production load/outage evidence remain open.
 
 ## 9. Communication model
 

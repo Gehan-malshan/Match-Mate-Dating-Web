@@ -17,6 +17,7 @@ type Config struct {
 	SecurityMailURL                                                   string
 	SecurityMailToken                                                 string
 	AdminMFAEncryptionKey                                             string
+	ModerationURL, ModerationToken                                    string
 	CurrentConsentVersion                                             string
 	AllowedOrigins                                                    []string
 	AccessTTL, RefreshTTL, VerificationTTL                            time.Duration
@@ -35,6 +36,7 @@ func Load() (Config, error) {
 		SecurityMailURL:       os.Getenv("SECURITY_MAIL_URL"),
 		SecurityMailToken:     os.Getenv("SECURITY_MAIL_TOKEN"),
 		AdminMFAEncryptionKey: os.Getenv("ADMIN_MFA_ENCRYPTION_KEY"),
+		ModerationURL:         os.Getenv("MODERATION_API_URL"), ModerationToken: os.Getenv("MODERATION_SERVICE_TOKEN"),
 		CurrentConsentVersion: env("CURRENT_CONSENT_VERSION", "privacy-2026-08"),
 		AllowedOrigins:        split(env("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")),
 		AccessTTL:             duration("ACCESS_TOKEN_TTL", 10*time.Minute), RefreshTTL: duration("REFRESH_TOKEN_TTL", 30*24*time.Hour), VerificationTTL: duration("VERIFICATION_TOKEN_TTL", 24*time.Hour),
@@ -52,7 +54,9 @@ func Load() (Config, error) {
 	if c.Environment == "production" && !c.CookieSecure {
 		return Config{}, errors.New("COOKIE_SECURE must be true in production")
 	}
-	if c.Environment == "production" && c.DevExposeVerificationToken { return Config{}, errors.New("DEV_EXPOSE_VERIFICATION_TOKEN must be false in production") }
+	if c.Environment == "production" && c.DevExposeVerificationToken {
+		return Config{}, errors.New("DEV_EXPOSE_VERIFICATION_TOKEN must be false in production")
+	}
 	googleValues := []string{c.GoogleClientID, c.GoogleClientSecret, c.GoogleRedirectURL}
 	configuredGoogle := 0
 	for _, value := range googleValues {
@@ -74,6 +78,9 @@ func Load() (Config, error) {
 	}
 	if c.Environment == "production" && c.AdminMFAEncryptionKey == "" {
 		return Config{}, errors.New("ADMIN_MFA_ENCRYPTION_KEY is required in production")
+	}
+	if c.Environment == "production" && (c.ModerationURL == "" || c.ModerationToken == "") {
+		return c, errors.New("MODERATION_API_URL and MODERATION_SERVICE_TOKEN are required in production")
 	}
 	return c, nil
 }

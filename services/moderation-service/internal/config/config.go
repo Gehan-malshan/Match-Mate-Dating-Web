@@ -14,6 +14,7 @@ type Config struct {
 	AllowedOrigins                                                    []string
 	ReportRateLimit                                                   int
 	ExpiryInterval                                                    time.Duration
+	SafetyServiceToken                                                string
 }
 
 func value(key, fallback string) string {
@@ -32,8 +33,12 @@ func Load() (Config, error) {
 		return Config{}, errors.New("MODERATION_EXPIRY_INTERVAL must be positive")
 	}
 	cfg := Config{Environment: value("APP_ENV", "development"), HTTPAddress: value("HTTP_ADDRESS", ":8087"), DatabaseURL: strings.TrimSpace(os.Getenv("DATABASE_URL")), RabbitMQURL: value("RABBITMQ_URL", "amqp://matchmate:matchmate@localhost:5672/"), EventExchange: value("EVENT_EXCHANGE", "matchmate.events"), JWTIssuer: value("JWT_ISSUER", "matchmate-account"), JWTAudience: value("JWT_AUDIENCE", "matchmate-api"), JWTPublicKeyPEM: strings.TrimSpace(os.Getenv("JWT_PUBLIC_KEY_PEM")), AccountJWKSURL: value("ACCOUNT_JWKS_URL", "http://localhost:8081/.well-known/jwks.json"), AllowedOrigins: split(value("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")), ReportRateLimit: rate, ExpiryInterval: interval}
+	cfg.SafetyServiceToken = value("MODERATION_SERVICE_TOKEN", "matchmate-local-safety-only")
 	if cfg.DatabaseURL == "" {
 		return cfg, errors.New("DATABASE_URL is required")
+	}
+	if cfg.Environment == "production" && (os.Getenv("MODERATION_SERVICE_TOKEN") == "" || cfg.SafetyServiceToken == "matchmate-local-safety-only") {
+		return cfg, errors.New("a non-development MODERATION_SERVICE_TOKEN is required in production")
 	}
 	return cfg, nil
 }

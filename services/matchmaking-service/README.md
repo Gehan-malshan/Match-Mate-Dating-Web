@@ -22,6 +22,8 @@ The canonical rule specification remains [`../../docs/matchmaking/README.md`](..
 
 The fixture projection is a Matchmaking-owned simulation of future Booking, Account, Event, and Moderation facts. The service never reads another service database. Production ingestion through inbox-deduplicated events remains a later integration phase.
 
+Current Moderation decisions are checked through a private service-authenticated REST read. Suspended, hidden, event-excluded, or matchmaking-excluded participants cannot enter generation, override, lock, or publication. Published member matches are rechecked on read; reveal consent is denied for either participant when reveal prevention applies. Checks repeat near commits and fail closed on Moderation outage. The fixture remains a prototype and does not become a production Booking projection through this change. Production requires `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN`.
+
 ## Ruleset
 
 `prototype-v1` uses the repository's proposed initial weights:

@@ -6,7 +6,7 @@ Owns reports, moderation cases, safety actions, evidence references, appeals, an
 
 The first executable vertical slice includes authenticated member/organizer reporting, duplicate and bounded in-process abuse controls, owner-safe report history, moderator/admin case access and assignment, audited case views, explicit investigation/dismissal transitions, versioned append-only actions, owner-bound appeals, uphold/reverse decisions, scheduled action expiry, restricted audit records, reference-only evidence metadata, a transactional outbox, publisher-confirmed RabbitMQ relay, OpenAPI/AsyncAPI contracts, health endpoints, Compose wiring, and unit/security/component-test harnesses.
 
-Downstream Account, Booking, Matchmaking, and Notification consumers remain required before the service meets its cross-domain completion criteria. Until those inbox-deduplicated consumers are deployed, published enforcement facts do not by themselves prove that active exclusions are enforced everywhere.
+Account, Booking, Matchmaking, and Notification now query current effective actions through the private service-authenticated safety endpoint at their decision points. This avoids waiting for broker projection lag. Published facts remain available for audit/integration; no separate downstream moderation inbox is required for immediate checks under [ADR-0005](../../docs/adr/0005-authoritative-moderation-safety-reads.md). Cross-database admission races, paid-booking policy, browser appeal flow, and production load/failure evidence remain open.
 
 ## Responsibilities
 
@@ -29,6 +29,8 @@ The following v1 API is implemented:
 ```text
 POST /api/v1/reports
 GET  /api/v1/reports/mine
+GET  /api/v1/moderation/actions/mine
+GET  /api/v1/internal/safety/{accountId}?eventId={eventId}  private service-token header
 GET  /api/v1/moderation/cases
 GET  /api/v1/moderation/cases/{caseId}
 POST /api/v1/moderation/cases/{caseId}/assign
@@ -93,6 +95,7 @@ Update this README, security/architecture/data/testing docs, event contracts, ru
 | `JWT_AUDIENCE` | `matchmate-api` | Required token audience |
 | `MODERATION_REPORT_RATE_LIMIT_PER_HOUR` | `5` | Per-process member report bound; gateway/distributed enforcement remains required for multi-replica production |
 | `MODERATION_EXPIRY_INTERVAL` | `30s` | Due-action expiry scan |
+| `MODERATION_SERVICE_TOKEN` | Development fixture only | Authenticates private current-safety reads; distinct high-entropy secret in production |
 
 ## Safe defaults and open questions
 

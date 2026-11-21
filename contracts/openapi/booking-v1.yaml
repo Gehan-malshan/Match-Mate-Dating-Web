@@ -5,25 +5,25 @@ paths:
   /admin/registrations:
     get:
       summary: Page booking records across all events for administrators only
-      description: Returns all booking states; a confirmed AT_VENUE reservation is not proof of payment collection.
+      description: Returns all booking states and current entryEligible safety decision; a confirmed AT_VENUE reservation is not proof of payment collection.
       security: [{bearerAuth: []}]
       parameters:
         - {name: limit, in: query, required: true, schema: {type: integer, minimum: 1, maximum: 50}}
         - {name: offset, in: query, required: true, schema: {type: integer, minimum: 0}}
       responses:
-        "200": {description: Page of bookings with account IDs, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {type: object}}, hasMore: {type: boolean}}}}}}
+        "200": {description: Page of bookings with current safety eligibility, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {$ref: '#/components/schemas/Registration'}}, hasMore: {type: boolean}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
   /admin/events/{eventId}/registrations:
     get:
       summary: List an event's bookings for administrators only
-      description: Returns all booking states, including pending and expired. A confirmed AT_VENUE reservation is not proof of payment collection.
+      description: Returns all booking states, including pending and expired, plus current entryEligible safety decision. A confirmed AT_VENUE reservation is not proof of payment collection.
       security: [{bearerAuth: []}]
       parameters:
         - {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: limit, in: query, required: true, schema: {type: integer, minimum: 1, maximum: 50}}
         - {name: offset, in: query, required: true, schema: {type: integer, minimum: 0}}
       responses:
-        "200": {description: Page of bookings with account IDs, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {type: object}}, hasMore: {type: boolean}}}}}}
+        "200": {description: Page of bookings with current safety eligibility, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {$ref: '#/components/schemas/Registration'}}, hasMore: {type: boolean}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
   /bookings:
     get:
@@ -64,6 +64,10 @@ components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
   responses: {Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}}
   schemas:
+    Registration:
+      allOf:
+        - {$ref: '#/components/schemas/Booking'}
+        - {type: object, required: [accountId,entryEligible], properties: {accountId: {type: string, format: uuid}, entryEligible: {type: boolean, description: Current moderation eligibility; false prevents entry even when booking remains confirmed}}}
     Booking:
       type: object
       required: [bookingId,eventId,state,paymentMethod,amount,currency,policyVersion,expiresAt,version,createdAt]

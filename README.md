@@ -92,7 +92,7 @@ Match-Mate-Dating-Web/
 
 The browser-facing migration now uses one GraphQL endpoint and one role-aware web application. The GraphQL gateway is a BFF over the existing service REST contracts; it does not own domain data or replace RabbitMQ.
 
-The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and initial Moderation slices. Moderation reporting/case/action/appeal APIs publish minimum-safe enforcement facts; downstream enforcement consumers and moderator UI remain incremental work.
+The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and Moderation slices. Moderation reports/actions/appeals publish minimum-safe facts. Account, Booking, Matchmaking, and Notification now read current effective actions through a private, fail-closed Moderation API at safety-sensitive decisions. See [ADR-0005](docs/adr/0005-authoritative-moderation-safety-reads.md) for the remaining race and policy limits.
 
 The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event

@@ -4,6 +4,8 @@ Account security now includes production-gated administrator TOTP, Google-admin 
 
 This baseline applies to every application, service, worker, contract, database, event, log, deployment, and operator workflow. Security and privacy controls are acceptance criteria, not post-launch enhancements.
 
+Moderation actions now have an authenticated private current-state read at Account login/discovery, Booking admission/payment snapshot and admin entry eligibility, Matchmaking generation/lock/publication/reveal, and Notification send/feed. The response exposes only effective booleans. Sensitive operations fail closed during a Moderation outage. Suspended members receive an `appeal`-role token after password verification so they can list their own active action IDs and appeal through Moderation; the role is denied at ordinary Account and Booking endpoints. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). No cross-database atomicity is claimed for an action committed after a final safety read.
+
 ## 1. Primary assets
 
 - Account PII, credentials, sessions, verification evidence, and profile media.

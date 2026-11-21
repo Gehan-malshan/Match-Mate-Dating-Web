@@ -14,6 +14,7 @@ import (
 	"github.com/gehan-malshan/matchmate/notification-service/internal/provider/devsink"
 	mailprovider "github.com/gehan-malshan/matchmate/notification-service/internal/provider/smtp"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/recipient"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -38,6 +39,9 @@ func main() {
 		resolver = recipient.NewAccount(cfg.AccountContactURL, cfg.InternalServiceToken)
 	}
 	worker := delivery.NewWorker(postgres.New(pool), sender, resolver, log, cfg.LeaseDuration, cfg.RetryBase)
+	if cfg.ModerationURL != "" {
+		worker.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
+	}
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
 	log.Info("notification_worker_started", "provider", cfg.Provider)

@@ -62,6 +62,8 @@ services:
       SECURITY_MAIL_URL: http://notification-api:8086
       SECURITY_MAIL_TOKEN: ${SECURITY_MAIL_TOKEN:-matchmate-local-security-mail}
       ADMIN_MFA_ENCRYPTION_KEY: ${ADMIN_MFA_ENCRYPTION_KEY:-}
+      MODERATION_API_URL: http://moderation-api:8087
+      MODERATION_SERVICE_TOKEN: ${MODERATION_SERVICE_TOKEN:-matchmate-local-safety-only}
     ports: ["8081:8081"]
     depends_on:
       account-seed:

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"github.com/gehan-malshan/matchmate/moderation-service/internal/application"
@@ -63,8 +64,10 @@ func (s *Server) routes() {
 		}
 		w.WriteHeader(204)
 	})
+	s.mux.HandleFunc("GET /api/v1/internal/safety/{accountId}", s.effectiveSafety)
 	s.mux.Handle("POST /api/v1/reports", s.protected(http.HandlerFunc(s.createReport)))
 	s.mux.Handle("GET /api/v1/reports/mine", s.protected(http.HandlerFunc(s.listMine)))
+	s.mux.Handle("GET /api/v1/moderation/actions/mine", s.protected(http.HandlerFunc(s.ownActions)))
 	s.mux.Handle("GET /api/v1/moderation/cases", s.protected(http.HandlerFunc(s.listCases)))
 	s.mux.Handle("GET /api/v1/moderation/cases/{caseId}", s.protected(http.HandlerFunc(s.getCase)))
 	s.mux.Handle("POST /api/v1/moderation/cases/{caseId}/assign", s.protected(http.HandlerFunc(s.assign)))
@@ -72,6 +75,38 @@ func (s *Server) routes() {
 	s.mux.Handle("POST /api/v1/moderation/cases/{caseId}/actions", s.protected(http.HandlerFunc(s.action)))
 	s.mux.Handle("POST /api/v1/moderation/actions/{actionId}/appeals", s.protected(http.HandlerFunc(s.appeal)))
 	s.mux.Handle("POST /api/v1/moderation/appeals/{appealId}/decision", s.protected(http.HandlerFunc(s.decision)))
+}
+func (s *Server) ownActions(w http.ResponseWriter, r *http.Request) {
+	actions, err := s.app.ListOwnActions(r.Context(), principal(r).Subject)
+	if handle(w, r, err) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	write(w, 200, map[string]any{"items": actions})
+}
+func (s *Server) effectiveSafety(w http.ResponseWriter, r *http.Request) {
+	got, want := []byte(r.Header.Get("X-Moderation-Service-Token")), []byte(s.cfg.SafetyServiceToken)
+	if len(want) == 0 || subtle.ConstantTimeCompare(got, want) != 1 {
+		problem(w, r, 401, "SERVICE_AUTH_REQUIRED", "Service authentication is required", nil)
+		return
+	}
+	accountID, eventID := r.PathValue("accountId"), r.URL.Query().Get("eventId")
+	if _, err := uuid.Parse(accountID); err != nil {
+		problem(w, r, 400, "INVALID_ACCOUNT_ID", "Account ID is invalid", nil)
+		return
+	}
+	if eventID != "" {
+		if _, err := uuid.Parse(eventID); err != nil {
+			problem(w, r, 400, "INVALID_EVENT_ID", "Event ID is invalid", nil)
+			return
+		}
+	}
+	decision, err := s.app.EffectiveSafety(r.Context(), accountID, eventID)
+	if handle(w, r, err) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	write(w, 200, decision)
 }
 func (s *Server) createReport(w http.ResponseWriter, r *http.Request) {
 	var in domain.CreateReportInput

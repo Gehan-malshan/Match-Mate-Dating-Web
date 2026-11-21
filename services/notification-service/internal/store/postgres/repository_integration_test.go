@@ -45,7 +45,7 @@ func TestRepositoryEventDeduplicationDeliveryAndSuppression(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	for _, name := range []string{"000001_init.up.sql", "000002_member_feed.up.sql"} {
+	for _, name := range []string{"000001_init.up.sql", "000002_member_feed.up.sql", "000003_email_templates.up.sql", "000004_safety_delivery.up.sql"} {
 		migration, readErr := migrations.Files.ReadFile(name)
 		if readErr != nil {
 			t.Fatal(readErr)

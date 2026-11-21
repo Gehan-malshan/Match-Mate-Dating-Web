@@ -8,6 +8,8 @@ The executable member slice provides authenticated hold creation/read/list, idem
 
 The local API uses port `8085` because the upstream Matchmaking prototype owns port `8083`.
 
+Booking now checks current Moderation state before creating reservations and exposing a pending online booking to Payment. A suspended or event-excluded member is denied; a Moderation outage fails closed. Administrative registration rows include `entryEligible`, computed from current restrictions and confirmed state. A confirmed historical booking remains recorded, but `entryEligible=false` means it must not be treated as permission to enter. Automated cancellation, capacity release, and refund treatment for excluded paid members require Product/Finance/Safety policy. Production requires `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN`.
+
 Administrators can list an event's booking records with `GET /api/v1/admin/events/{eventId}/registrations?limit=25&offset=0`. The endpoint enforces the admin role from the signed token, returns account IDs only to authorized callers, and includes `hasMore` for pagination. Migration 4 indexes the event/date ordering. The GraphQL gateway's `eventRegistrations` query joins these booking records to Account-owned nickname/email via an admin-only batch lookup. This is a booking list, not an attendance or payment-collection ledger: `CONFIRMED` + `AT_VENUE` means the seat is reserved, not paid.
 
 The dedicated admin registrations page also uses `GET /api/v1/admin/registrations?limit=25&offset=0` to page across all events. It has the same role check and privacy boundary; migration 5 indexes global booking order. The selected-event filter continues to use the event-scoped endpoint. Neither endpoint changes member-owned `GET /bookings` behavior.

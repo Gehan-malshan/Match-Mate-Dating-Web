@@ -13,6 +13,7 @@ import (
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/config"
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/httpapi"
+	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,7 +35,11 @@ func main() {
 		panic(err)
 	}
 	defer pool.Close()
-	server := &http.Server{Addr: cfg.HTTPAddress, Handler: httpapi.New(postgres.New(pool), verifier, cfg, logger), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	store := postgres.New(pool)
+	if cfg.ModerationURL != "" {
+		store.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
+	}
+	server := &http.Server{Addr: cfg.HTTPAddress, Handler: httpapi.New(store, verifier, cfg, logger), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		logger.Info("matchmaking_api_started", "address", cfg.HTTPAddress)
 		if serveErr := server.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {

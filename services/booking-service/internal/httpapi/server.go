@@ -49,6 +49,10 @@ func (s *Server) protect(next http.Handler) http.Handler {
 			problem(w, 401, "AUTHENTICATION_REQUIRED", "A valid access token is required.")
 			return
 		}
+		if len(p.Roles) == 1 && p.Roles[0] == "appeal" {
+			problem(w, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal.")
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
 	})
 }
@@ -120,10 +124,13 @@ func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
 	type registration struct {
 		domain.Booking
 		AccountID string `json:"accountId"`
+		EntryEligible bool `json:"entryEligible"`
 	}
 	result := make([]registration, 0, len(items))
 	for _, b := range items {
-		result = append(result, registration{Booking: b, AccountID: b.AccountID})
+		eligible, checkErr := s.app.EntryEligible(r.Context(), b)
+		if handle(w, checkErr) { return }
+		result = append(result, registration{Booking: b, AccountID: b.AccountID, EntryEligible: eligible})
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	write(w, 200, map[string]any{"items": result, "hasMore": hasMore})
@@ -173,6 +180,9 @@ func handle(w http.ResponseWriter, err error) bool {
 		status = 503
 		code = "DEPENDENCY_UNAVAILABLE"
 		detail = "A required service is unavailable."
+	}
+	if errors.Is(err, application.ErrExcluded) {
+		status, code, detail = 403, "EVENT_PARTICIPATION_EXCLUDED", "Event participation is unavailable."
 	}
 	problem(w, status, code, detail)
 	return true

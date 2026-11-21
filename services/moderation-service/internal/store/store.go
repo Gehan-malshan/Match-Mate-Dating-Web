@@ -8,6 +8,8 @@ import (
 
 type Repository interface {
 	Ready(context.Context) error
+	EffectiveSafety(context.Context, string, string, time.Time) (domain.EffectiveSafety, error)
+	ListOwnActions(context.Context, string, time.Time) ([]domain.OwnAction, error)
 	CreateReport(context.Context, domain.Principal, domain.CreateReportInput, string, time.Time) (domain.Report, error)
 	ListOwnReports(context.Context, string, int, time.Time, string) (domain.Page[domain.Report], error)
 	ListCases(context.Context, int, time.Time, string) (domain.Page[domain.Case], error)

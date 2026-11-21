@@ -436,6 +436,10 @@ func (s *Server) protected(next http.Handler) http.Handler {
 		if handle(w, r, err) {
 			return
 		}
+		if len(c.Roles) == 1 && c.Roles[0] == "appeal" {
+			problem(w, r, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal", nil)
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, c)))
 	})
 }

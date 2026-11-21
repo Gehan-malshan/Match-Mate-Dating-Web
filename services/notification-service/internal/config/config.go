@@ -10,34 +10,35 @@ import (
 )
 
 type Config struct {
-	AppEnv               string
-	HTTPAddress          string
-	DatabaseURL          string
-	RabbitMQURL          string
-	EventExchange        string
-	QueueName            string
-	DeadLetterExch       string
-	DeadLetterQueue      string
-	Provider             string
-	SMTPHost             string
-	SMTPPort             string
-	SMTPUsername         string
-	SMTPPassword         string
-	SMTPFrom             string
-	AccountContactURL    string
-	InternalServiceToken string
-	SecurityMailToken    string
-	SecurityPublicURL    string
-	Locale               string
-	MaxAttempts          int
-	PollInterval         time.Duration
-	LeaseDuration        time.Duration
-	RetryBase            time.Duration
-	JWTPublicKeyPEM      string
-	AccountJWKSURL       string
-	JWTIssuer            string
-	JWTAudience          string
-	AllowedOrigins       []string
+	AppEnv                         string
+	HTTPAddress                    string
+	DatabaseURL                    string
+	RabbitMQURL                    string
+	EventExchange                  string
+	QueueName                      string
+	DeadLetterExch                 string
+	DeadLetterQueue                string
+	Provider                       string
+	SMTPHost                       string
+	SMTPPort                       string
+	SMTPUsername                   string
+	SMTPPassword                   string
+	SMTPFrom                       string
+	AccountContactURL              string
+	InternalServiceToken           string
+	SecurityMailToken              string
+	SecurityPublicURL              string
+	Locale                         string
+	MaxAttempts                    int
+	PollInterval                   time.Duration
+	LeaseDuration                  time.Duration
+	RetryBase                      time.Duration
+	JWTPublicKeyPEM                string
+	AccountJWKSURL                 string
+	JWTIssuer                      string
+	JWTAudience                    string
+	AllowedOrigins                 []string
+	ModerationURL, ModerationToken string
 }
 
 func value(key, fallback string) string {
@@ -111,9 +112,13 @@ func Load() (Config, error) {
 		JWTIssuer:            value("JWT_ISSUER", "matchmate-account"),
 		JWTAudience:          value("JWT_AUDIENCE", "matchmate-api"),
 		AllowedOrigins:       strings.Split(value("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173"), ","),
+		ModerationURL:        os.Getenv("MODERATION_API_URL"), ModerationToken: os.Getenv("MODERATION_SERVICE_TOKEN"),
 	}
 	if cfg.DatabaseURL == "" {
 		return cfg, errors.New("NOTIFICATION_DATABASE_URL is required")
+	}
+	if cfg.AppEnv == "production" && (cfg.ModerationURL == "" || cfg.ModerationToken == "") {
+		return cfg, errors.New("MODERATION_API_URL and MODERATION_SERVICE_TOKEN are required in production")
 	}
 	if cfg.Provider == "dev-sink" {
 		if cfg.AppEnv != "development" && cfg.AppEnv != "test" {

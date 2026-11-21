@@ -45,6 +45,12 @@ func New(repo store.Repository, rateLimit int) *Service {
 	return &Service{repo: repo, now: time.Now, reportWindows: map[string][]time.Time{}, rateLimit: rateLimit}
 }
 func (s *Service) Ready(ctx context.Context) error { return s.repo.Ready(ctx) }
+func (s *Service) EffectiveSafety(ctx context.Context, accountID, eventID string) (domain.EffectiveSafety, error) {
+	return s.repo.EffectiveSafety(ctx, accountID, eventID, s.now().UTC())
+}
+func (s *Service) ListOwnActions(ctx context.Context, subject string) ([]domain.OwnAction, error) {
+	return s.repo.ListOwnActions(ctx, subject, s.now().UTC())
+}
 func hasAny(p domain.Principal, roles ...string) bool {
 	for _, role := range roles {
 		if p.HasRole(role) {
@@ -160,6 +166,19 @@ func (s *Service) ApplyAction(ctx context.Context, p domain.Principal, caseID st
 	}
 	if _, err := uuid.Parse(a.TargetID); err != nil || !domain.ValidTarget(a.TargetType) {
 		return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "Action target is invalid"}
+	}
+	if (a.Class == domain.ActionAccountSuspension || a.Class == domain.ActionEventExclusion || a.Class == domain.ActionMatchmakingExclusion || a.Class == domain.ActionRevealPrevention) && a.TargetType != domain.TargetAccount {
+		return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "This safety action requires an account target"}
+	}
+	if a.Class == domain.ActionProfileRestriction && a.TargetType != domain.TargetAccount && a.TargetType != domain.TargetProfile {
+		return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "Profile restriction requires an account or profile target"}
+	}
+	globalScope := a.Scope == "ALL" || a.Scope == "GLOBAL"
+	if (a.Class == domain.ActionAccountSuspension || a.Class == domain.ActionProfileRestriction || (a.Class == domain.ActionContentHide && a.TargetType == domain.TargetProfile)) && !globalScope {
+		return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "This safety action requires ALL scope"}
+	}
+	if a.Class == domain.ActionEventExclusion || a.Class == domain.ActionMatchmakingExclusion || a.Class == domain.ActionRevealPrevention {
+		if !globalScope { if _, err := uuid.Parse(a.Scope); err != nil { return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "Scope must be ALL or an event ID"} } }
 	}
 	if fields := domain.ValidAction(a.Class, a.Scope, a.Reason, a.EffectiveAt, a.ExpiresAt); len(fields) > 0 {
 		return a, &domain.ProblemError{Status: 400, Code: "ACTION_INVALID", Detail: "Action fields are invalid", Fields: fields}

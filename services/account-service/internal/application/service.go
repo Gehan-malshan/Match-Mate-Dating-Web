@@ -10,6 +10,7 @@ import (
 
 	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/account-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store"
 	"github.com/google/uuid"
 )
@@ -23,13 +24,27 @@ type Service struct {
 	exposeVerification                     bool
 	securityMail                           func(context.Context, string, string, string) error
 	adminMFAKey                            []byte
-	now                                    func() time.Time
+	safety                                 interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+	now func() time.Time
 }
 
 func (s *Service) SetSecurityMailer(send func(context.Context, string, string, string) error) {
 	s.securityMail = send
 }
 func (s *Service) SetAdminMFAKey(key []byte) { s.adminMFAKey = key }
+func (s *Service) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	s.safety = client
+}
+func (s *Service) safetyFor(ctx context.Context, accountID string) (safety.Decision, error) {
+	if s.safety == nil {
+		return safety.Decision{}, nil
+	}
+	return s.safety.Check(ctx, accountID, "")
+}
 
 func New(repo store.Repository, tokens *auth.Manager, access, refresh, verification time.Duration, minimumAge int, consentVersion string, expose bool) *Service {
 	return &Service{store: repo, tokens: tokens, accessTTL: access, refreshTTL: refresh, verificationTTL: verification, minimumAge: minimumAge, consentVersion: consentVersion, exposeVerification: expose, now: func() time.Time { return time.Now().UTC() }}
@@ -241,6 +256,11 @@ func (s *Service) Login(ctx context.Context, email, password string, totpCode ..
 	if c.Account.Verification != domain.VerificationVerified {
 		return domain.TokenPair{}, problem(403, "EMAIL_NOT_VERIFIED", "Verify your email before signing in", nil)
 	}
+	decision, err := s.safetyFor(ctx, c.Account.ID)
+	if err != nil {
+		return domain.TokenPair{}, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
+	appealOnly := decision.Suspended
 	c.Account.TokenVersion = c.TokenVersion
 	if hasRole(c.Account.Roles, "admin") && len(s.adminMFAKey) > 0 {
 		code := ""
@@ -254,7 +274,16 @@ func (s *Service) Login(ctx context.Context, email, password string, totpCode ..
 			return domain.TokenPair{}, err
 		}
 	}
-	return s.newSession(ctx, c.Account, "", s.now(), hasRole(c.Account.Roles, "admin") && len(s.adminMFAKey) > 0)
+	mfaVerified := hasRole(c.Account.Roles, "admin") && len(s.adminMFAKey) > 0
+	decision, err = s.safetyFor(ctx, c.Account.ID)
+	if err != nil {
+		return domain.TokenPair{}, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
+	appealOnly = decision.Suspended
+	if appealOnly {
+		c.Account.Roles = []string{"appeal"}
+	}
+	return s.newSession(ctx, c.Account, "", s.now(), mfaVerified)
 }
 func hasRole(roles []string, target string) bool {
 	for _, role := range roles {
@@ -287,6 +316,13 @@ func (s *Service) LoginWithGoogle(ctx context.Context, email string) (domain.Tok
 	if a.Verification != domain.VerificationVerified {
 		return domain.TokenPair{}, problem(403, "EMAIL_NOT_VERIFIED", "Verify your MatchMate email before using Google sign in", nil)
 	}
+	decision, err := s.safetyFor(ctx, a.ID)
+	if err != nil {
+		return domain.TokenPair{}, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
+	if decision.Suspended {
+		return domain.TokenPair{}, problem(403, "ACCOUNT_SUSPENDED", "Use password sign in for appeal access", nil)
+	}
 	if hasRole(a.Roles, "admin") && len(s.adminMFAKey) > 0 {
 		return domain.TokenPair{}, problem(403, "ADMIN_MFA_REQUIRED", "Use password and authenticator code for administrator access", nil)
 	}
@@ -304,6 +340,10 @@ func (s *Service) NotificationRecipient(ctx context.Context, id string) (domain.
 		return domain.Account{}, err
 	}
 	if a.Status != domain.AccountActive || a.Verification != domain.VerificationVerified {
+		return domain.Account{}, problem(404, "NOTIFICATION_RECIPIENT_UNAVAILABLE", "Recipient is unavailable", nil)
+	}
+	decision, err := s.safetyFor(ctx, id)
+	if err != nil || decision.Suspended {
 		return domain.Account{}, problem(404, "NOTIFICATION_RECIPIENT_UNAVAILABLE", "Recipient is unavailable", nil)
 	}
 	return a, nil
@@ -332,8 +372,15 @@ func (s *Service) Refresh(ctx context.Context, raw string) (domain.TokenPair, er
 	if a.Status != domain.AccountActive {
 		return domain.TokenPair{}, problem(403, "ACCOUNT_UNAVAILABLE", "Account is not active", nil)
 	}
+	decision, err := s.safetyFor(ctx, a.ID)
+	if err != nil {
+		return domain.TokenPair{}, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
 	if hasRole(a.Roles, "admin") && len(s.adminMFAKey) > 0 && !a.MFAVerified {
 		return domain.TokenPair{}, problem(401, "MFA_REQUIRED", "Administrator session requires authenticator verification", nil)
+	}
+	if decision.Suspended {
+		a.Roles = []string{"appeal"}
 	}
 	access, accessExpiry, err := s.tokens.Issue(a.ID, a.Roles, a.TokenVersion, now)
 	if err != nil {
@@ -355,6 +402,13 @@ func (s *Service) Authenticate(ctx context.Context, raw string) (*auth.Claims, e
 	}
 	a, err := s.store.AccountByID(ctx, c.Subject)
 	if err != nil || a.Status != domain.AccountActive || a.TokenVersion != c.TokenVersion {
+		return nil, problem(401, "INVALID_ACCESS_TOKEN", "Access token is no longer valid", nil)
+	}
+	decision, err := s.safetyFor(ctx, c.Subject)
+	if err != nil {
+		return nil, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
+	if decision.Suspended && (len(c.Roles) != 1 || c.Roles[0] != "appeal") {
 		return nil, problem(401, "INVALID_ACCESS_TOKEN", "Access token is no longer valid", nil)
 	}
 	return c, nil
@@ -415,14 +469,38 @@ func (s *Service) ListCommunity(ctx context.Context, id, cursor string, limit in
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
-	return s.store.ListCommunity(ctx, id, cursor, limit)
+	profiles, next, err := s.store.ListCommunity(ctx, id, cursor, limit)
+	if err != nil {
+		return nil, "", err
+	}
+	visible := make([]domain.CommunityProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		decision, checkErr := s.safetyFor(ctx, profile.ProfileID)
+		if checkErr != nil {
+			return nil, "", problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+		}
+		if !decision.Suspended && !decision.ProfileHidden {
+			visible = append(visible, profile)
+		}
+	}
+	return visible, next, nil
 }
 func (s *Service) GetCommunity(ctx context.Context, viewer, id string) (domain.CommunityProfile, error) {
 	v, e := s.store.GetCommunity(ctx, viewer, id)
 	if errors.Is(e, store.ErrNotFound) {
 		return v, problem(404, "PROFILE_NOT_FOUND", "Profile is unavailable", nil)
 	}
-	return v, e
+	if e != nil {
+		return v, e
+	}
+	decision, checkErr := s.safetyFor(ctx, id)
+	if checkErr != nil {
+		return v, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+	}
+	if decision.Suspended || decision.ProfileHidden {
+		return v, problem(404, "PROFILE_NOT_FOUND", "Profile is unavailable", nil)
+	}
+	return v, nil
 }
 func (s *Service) Block(ctx context.Context, actor, target, correlation string) error {
 	return s.store.Block(ctx, actor, target, event("MemberBlocked", correlation, actor))

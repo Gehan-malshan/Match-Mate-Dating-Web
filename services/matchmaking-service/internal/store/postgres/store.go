@@ -10,14 +10,64 @@ import (
 
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/engine"
+	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/safety"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Store struct{ db *pgxpool.Pool }
+type Store struct {
+	db     *pgxpool.Pool
+	safety interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+}
 
-func New(db *pgxpool.Pool) *Store                { return &Store{db: db} }
+func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
+func (s *Store) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	s.safety = client
+}
+func (s *Store) checkSafety(ctx context.Context, accountID, eventID string, reveal bool) error {
+	if s.safety == nil {
+		return nil
+	}
+	decision, err := s.safety.Check(ctx, accountID, eventID)
+	if err != nil {
+		return problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable")
+	}
+	if decision.Suspended || decision.ProfileHidden || decision.MatchmakingExcluded || (reveal && decision.RevealPrevented) {
+		return problem(403, "MATCH_SAFETY_RESTRICTED", "Match participation is restricted")
+	}
+	return nil
+}
+func (s *Store) checkRunSelection(ctx context.Context, q queryer, runID, eventID string) error {
+	rows, err := q.Query(ctx, `SELECT participant_a::text,participant_b::text FROM pairing_selection WHERE run_id=$1`, runID)
+	if err != nil {
+		return err
+	}
+	ids := map[string]bool{}
+	for rows.Next() {
+		var a, b string
+		if err = rows.Scan(&a, &b); err != nil {
+			rows.Close()
+			return err
+		}
+		ids[a], ids[b] = true, true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for id := range ids {
+		if err = s.checkSafety(ctx, id, eventID, false); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func (s *Store) Ready(ctx context.Context) error { return s.db.Ping(ctx) }
 
 func (s *Store) Generate(ctx context.Context, p domain.Principal, eventID, key, correlation string) (domain.Run, error) {
@@ -82,6 +132,11 @@ func (s *Store) Generate(ctx context.Context, p domain.Principal, eventID, key, 
 	if len(people) < 2 {
 		return domain.Run{}, problem(422, "INSUFFICIENT_PARTICIPANTS", "At least two fixture participants are required")
 	}
+	for _, person := range people {
+		if err = s.checkSafety(ctx, person.AccountID, eventID, false); err != nil {
+			return domain.Run{}, err
+		}
+	}
 	generated, err := engine.Generate(people, rules)
 	if err != nil {
 		return domain.Run{}, problem(422, "MATCHING_INPUT_INVALID", err.Error())
@@ -139,6 +194,11 @@ func (s *Store) Generate(ctx context.Context, p domain.Principal, eventID, key, 
 	}
 	if err = s.audit(ctx, tx, p.Subject, runID, "MATCHING_RUN_GENERATED", "", map[string]any{}, map[string]any{"status": "GENERATED"}, correlation); err != nil {
 		return domain.Run{}, err
+	}
+	for _, person := range people {
+		if err = s.checkSafety(ctx, person.AccountID, eventID, false); err != nil {
+			return domain.Run{}, err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Run{}, err
@@ -202,6 +262,11 @@ func (s *Store) transition(ctx context.Context, p domain.Principal, runID string
 	if status != from || version != expected {
 		return domain.Run{}, problem(409, "MATCHING_RUN_STATE_CONFLICT", "Run state or expectedVersion is stale")
 	}
+	if to == "PUBLISHED" {
+		if err = s.checkRunSelection(ctx, tx, runID, eventID); err != nil {
+			return domain.Run{}, err
+		}
+	}
 	tag, err := tx.Exec(ctx, `UPDATE matching_run SET status=$3,aggregate_version=aggregate_version+1,updated_at=now(),published_at=CASE WHEN $3='PUBLISHED' THEN now() ELSE published_at END WHERE run_id=$1 AND aggregate_version=$2 AND status=$4`, runID, expected, to, from)
 	if err != nil {
 		return domain.Run{}, err
@@ -214,6 +279,11 @@ func (s *Store) transition(ctx context.Context, p domain.Principal, runID string
 	}
 	if err = s.audit(ctx, tx, p.Subject, runID, "MATCHING_RUN_"+to, "", map[string]any{"status": from}, map[string]any{"status": to}, correlation); err != nil {
 		return domain.Run{}, err
+	}
+	if to == "PUBLISHED" {
+		if err = s.checkRunSelection(ctx, tx, runID, eventID); err != nil {
+			return domain.Run{}, err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Run{}, err
@@ -240,6 +310,12 @@ func (s *Store) Override(ctx context.Context, p domain.Principal, runID, removeI
 	}
 	if status != "UNDER_REVIEW" || version != expected {
 		return domain.Run{}, problem(409, "MATCHING_RUN_STATE_CONFLICT", "Run must be under review and expectedVersion current")
+	}
+	if err = s.checkSafety(ctx, a, eventID, false); err != nil {
+		return domain.Run{}, err
+	}
+	if err = s.checkSafety(ctx, b, eventID, false); err != nil {
+		return domain.Run{}, err
 	}
 	var existing string
 	if err = tx.QueryRow(ctx, `SELECT override_id::text FROM pairing_override WHERE run_id=$1 AND idempotency_key=$2`, runID, key).Scan(&existing); err == nil {
@@ -310,6 +386,9 @@ func (s *Store) Lock(ctx context.Context, p domain.Principal, runID string, expe
 	if status != "UNDER_REVIEW" || version != expected {
 		return domain.Run{}, problem(409, "MATCHING_RUN_STATE_CONFLICT", "Run must be under review and expectedVersion current")
 	}
+	if err = s.checkRunSelection(ctx, tx, runID, eventID); err != nil {
+		return domain.Run{}, err
+	}
 	var rawRules []byte
 	if err = tx.QueryRow(ctx, `SELECT configuration FROM ruleset WHERE version=$1`, rulesVersion).Scan(&rawRules); err != nil {
 		return domain.Run{}, err
@@ -375,6 +454,9 @@ func (s *Store) Lock(ctx context.Context, p domain.Principal, runID string, expe
 	if err = s.audit(ctx, tx, p.Subject, runID, "PAIRINGS_LOCKED", "", map[string]any{"status": "UNDER_REVIEW"}, map[string]any{"status": "LOCKED", "pairingCount": len(pairingIDs)}, correlation); err != nil {
 		return domain.Run{}, err
 	}
+	if err = s.checkRunSelection(ctx, tx, runID, eventID); err != nil {
+		return domain.Run{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Run{}, err
 	}
@@ -394,7 +476,7 @@ type MemberMatch struct {
 }
 
 func (s *Store) Mine(ctx context.Context, p domain.Principal) ([]MemberMatch, error) {
-	rows, err := s.db.Query(ctx, `SELECT lp.pairing_id::text,lp.event_id::text,CASE WHEN lp.participant_a=$1 THEN sb.participant_code ELSE sa.participant_code END,lp.score,lp.safe_reasons,COALESCE(mine.response,''),(SELECT count(*)=2 FROM match_response mr WHERE mr.pairing_id=lp.pairing_id AND mr.response='INTERESTED'),COALESCE(rc.decision,''),(SELECT count(*)=2 FROM reveal_consent x WHERE x.pairing_id=lp.pairing_id AND x.decision='GRANTED') FROM locked_pairing lp JOIN matching_run r ON r.run_id=lp.run_id AND r.status='PUBLISHED' JOIN participant_snapshot sa ON sa.run_id=r.run_id AND sa.account_id=lp.participant_a JOIN participant_snapshot sb ON sb.run_id=r.run_id AND sb.account_id=lp.participant_b LEFT JOIN match_response mine ON mine.pairing_id=lp.pairing_id AND mine.account_id=$1 LEFT JOIN reveal_consent rc ON rc.pairing_id=lp.pairing_id AND rc.account_id=$1 WHERE lp.participant_a=$1 OR lp.participant_b=$1 ORDER BY lp.locked_at DESC`, p.Subject)
+	rows, err := s.db.Query(ctx, `SELECT lp.pairing_id::text,lp.event_id::text,CASE WHEN lp.participant_a=$1 THEN sb.participant_code ELSE sa.participant_code END,lp.score,lp.safe_reasons,COALESCE(mine.response,''),(SELECT count(*)=2 FROM match_response mr WHERE mr.pairing_id=lp.pairing_id AND mr.response='INTERESTED'),COALESCE(rc.decision,''),(SELECT count(*)=2 FROM reveal_consent x WHERE x.pairing_id=lp.pairing_id AND x.decision='GRANTED'),CASE WHEN lp.participant_a=$1 THEN lp.participant_b::text ELSE lp.participant_a::text END FROM locked_pairing lp JOIN matching_run r ON r.run_id=lp.run_id AND r.status='PUBLISHED' JOIN participant_snapshot sa ON sa.run_id=r.run_id AND sa.account_id=lp.participant_a JOIN participant_snapshot sb ON sb.run_id=r.run_id AND sb.account_id=lp.participant_b LEFT JOIN match_response mine ON mine.pairing_id=lp.pairing_id AND mine.account_id=$1 LEFT JOIN reveal_consent rc ON rc.pairing_id=lp.pairing_id AND rc.account_id=$1 WHERE lp.participant_a=$1 OR lp.participant_b=$1 ORDER BY lp.locked_at DESC`, p.Subject)
 	if err != nil {
 		return nil, err
 	}
@@ -402,9 +484,30 @@ func (s *Store) Mine(ctx context.Context, p domain.Principal) ([]MemberMatch, er
 	out := []MemberMatch{}
 	for rows.Next() {
 		var item MemberMatch
+		var partnerID string
 		var reasons []byte
-		if err = rows.Scan(&item.MatchID, &item.EventID, &item.PartnerCode, &item.Score, &reasons, &item.MyResponse, &item.MutualInterest, &item.MyRevealConsent, &item.BothRevealConsented); err != nil {
+		if err = rows.Scan(&item.MatchID, &item.EventID, &item.PartnerCode, &item.Score, &reasons, &item.MyResponse, &item.MutualInterest, &item.MyRevealConsent, &item.BothRevealConsented, &partnerID); err != nil {
 			return nil, err
+		}
+		if err = s.checkSafety(ctx, p.Subject, item.EventID, false); err != nil {
+			return nil, err
+		}
+		if err = s.checkSafety(ctx, partnerID, item.EventID, false); err != nil {
+			var restricted *domain.ProblemError
+			if errors.As(err, &restricted) && restricted.Status == 403 {
+				continue
+			}
+			return nil, err
+		}
+		if s.safety != nil {
+			myDecision, e1 := s.safety.Check(ctx, p.Subject, item.EventID)
+			partnerDecision, e2 := s.safety.Check(ctx, partnerID, item.EventID)
+			if e1 != nil || e2 != nil {
+				return nil, problem(503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable")
+			}
+			if myDecision.RevealPrevented || partnerDecision.RevealPrevented {
+				item.BothRevealConsented = false
+			}
 		}
 		_ = json.Unmarshal(reasons, &item.SafeReasons)
 		out = append(out, item)
@@ -451,6 +554,18 @@ func (s *Store) Consent(ctx context.Context, p domain.Principal, matchID, decisi
 		return problem(422, "REVEAL_CONSENT_INVALID", "Decision must be GRANTED or REVOKED")
 	}
 	return s.memberCommand(ctx, p, matchID, key, func(ctx context.Context, tx pgx.Tx, eventID string) error {
+		if decision == "GRANTED" {
+			var partnerID string
+			if err := tx.QueryRow(ctx, `SELECT CASE WHEN participant_a=$2 THEN participant_b::text ELSE participant_a::text END FROM locked_pairing WHERE pairing_id=$1`, matchID, p.Subject).Scan(&partnerID); err != nil {
+				return err
+			}
+			if err := s.checkSafety(ctx, p.Subject, eventID, true); err != nil {
+				return err
+			}
+			if err := s.checkSafety(ctx, partnerID, eventID, true); err != nil {
+				return err
+			}
+		}
 		var mutual bool
 		if err := tx.QueryRow(ctx, `SELECT count(*)=2 FROM match_response WHERE pairing_id=$1 AND response='INTERESTED'`, matchID).Scan(&mutual); err != nil {
 			return err
@@ -549,7 +664,23 @@ func (s *Store) memberCommand(ctx context.Context, p domain.Principal, matchID, 
 	if !published {
 		return problem(409, "MATCH_NOT_PUBLISHED", "Match is not published")
 	}
+	if err = s.checkSafety(ctx, p.Subject, eventID, false); err != nil {
+		return err
+	}
+	var partnerID string
+	if err = tx.QueryRow(ctx, `SELECT CASE WHEN participant_a=$2 THEN participant_b::text ELSE participant_a::text END FROM locked_pairing WHERE pairing_id=$1`, matchID, p.Subject).Scan(&partnerID); err != nil {
+		return err
+	}
+	if err = s.checkSafety(ctx, partnerID, eventID, false); err != nil {
+		return err
+	}
 	if err = command(ctx, tx, eventID); err != nil {
+		return err
+	}
+	if err = s.checkSafety(ctx, p.Subject, eventID, false); err != nil {
+		return err
+	}
+	if err = s.checkSafety(ctx, partnerID, eventID, false); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

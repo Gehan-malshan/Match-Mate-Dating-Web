@@ -11,12 +11,17 @@ type Config struct {
 	JWTIssuer, JWTAudience                string
 	JWTPublicKeyPEM, AccountJWKSURL       string
 	AllowedOrigins                        []string
+	ModerationURL, ModerationToken        string
 }
 
 func Load() (Config, error) {
 	c := Config{Environment: value("APP_ENV", "development"), HTTPAddress: value("HTTP_ADDRESS", ":8083"), DatabaseURL: os.Getenv("DATABASE_URL"), JWTIssuer: value("JWT_ISSUER", "matchmate-account"), JWTAudience: value("JWT_AUDIENCE", "matchmate-api"), JWTPublicKeyPEM: os.Getenv("JWT_PUBLIC_KEY_PEM"), AccountJWKSURL: value("ACCOUNT_JWKS_URL", "http://localhost:8081/.well-known/jwks.json"), AllowedOrigins: split(value("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173"))}
+	c.ModerationURL, c.ModerationToken = os.Getenv("MODERATION_API_URL"), os.Getenv("MODERATION_SERVICE_TOKEN")
 	if c.DatabaseURL == "" {
 		return c, errors.New("DATABASE_URL is required")
+	}
+	if c.Environment == "production" && (c.ModerationURL == "" || c.ModerationToken == "") {
+		return c, errors.New("MODERATION_API_URL and MODERATION_SERVICE_TOKEN are required in production")
 	}
 	return c, nil
 }

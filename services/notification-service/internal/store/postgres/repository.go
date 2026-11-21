@@ -76,7 +76,7 @@ func (r *Repository) ApplyEvent(ctx context.Context, event domain.EventEnvelope,
 	if err != nil {
 		return false, err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO notification_delivery(id,business_key,recipient_account_id,source_event_id,source_event_type,source_aggregate_id,template_id,category,channel,variables,state,scheduled_at,next_attempt_at,max_attempts,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$12,$12) ON CONFLICT(business_key) DO NOTHING`, uuid.NewString(), plan.BusinessKey, plan.RecipientAccountID, event.EventID, event.EventType, plan.SourceAggregateID, templateID, plan.Category, plan.Channel, variables, state, now, maxAttempts)
+	_, err = tx.Exec(ctx, `INSERT INTO notification_delivery(id,business_key,recipient_account_id,source_event_id,source_event_type,source_aggregate_id,template_id,category,channel,variables,state,scheduled_at,next_attempt_at,max_attempts,created_at,updated_at,event_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$12,$12,$14) ON CONFLICT(business_key) DO NOTHING`, uuid.NewString(), plan.BusinessKey, plan.RecipientAccountID, event.EventID, event.EventType, plan.SourceAggregateID, templateID, plan.Category, plan.Channel, variables, state, now, maxAttempts, nullableUUID(plan.EventID))
 	if err != nil {
 		return false, err
 	}
@@ -96,6 +96,7 @@ func (r *Repository) ListFeed(ctx context.Context, accountID string, limit int, 
 	query := `
 SELECT f.id,d.source_event_type,d.category,t.id,t.template_key,t.version,t.locale,t.channel,t.category,
        t.subject_template,t.body_template,t.allowed_variables,d.variables,f.read_at,f.created_at
+       ,COALESCE(d.event_id::text,'')
 FROM notification_feed_item f
 JOIN notification_delivery d ON d.id=f.delivery_id
 JOIN notification_template t ON t.id=d.template_id
@@ -120,7 +121,7 @@ WHERE f.recipient_account_id=$1`
 			&record.Template.ID, &record.Template.Key, &record.Template.Version, &record.Template.Locale,
 			&record.Template.Channel, &record.Template.Category, &record.Template.SubjectTemplate,
 			&record.Template.BodyTemplate, &record.Template.AllowedVariables, &variables,
-			&record.ReadAt, &record.CreatedAt,
+			&record.ReadAt, &record.CreatedAt, &record.EventID,
 		); err != nil {
 			return nil, false, err
 		}
@@ -143,6 +144,22 @@ func (r *Repository) UnreadCount(ctx context.Context, accountID string) (int, er
 	var count int
 	err := r.pool.QueryRow(ctx, `SELECT count(*) FROM notification_feed_item WHERE recipient_account_id=$1 AND read_at IS NULL`, accountID).Scan(&count)
 	return count, err
+}
+func (r *Repository) UnreadGroups(ctx context.Context, accountID string) ([]domain.UnreadGroup, error) {
+	rows, err := r.pool.Query(ctx, `SELECT COALESCE(d.event_id::text,''),d.category,count(*)::int FROM notification_feed_item f JOIN notification_delivery d ON d.id=f.delivery_id WHERE f.recipient_account_id=$1 AND f.read_at IS NULL GROUP BY d.event_id,d.category`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	groups := []domain.UnreadGroup{}
+	for rows.Next() {
+		var g domain.UnreadGroup
+		if err = rows.Scan(&g.EventID, &g.Category, &g.Count); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
 }
 
 func (r *Repository) MarkRead(ctx context.Context, accountID, notificationID string, now time.Time) (bool, error) {
@@ -167,7 +184,7 @@ func (r *Repository) ClaimDue(ctx context.Context, now time.Time, lease time.Dur
 	err = tx.QueryRow(ctx, `
 SELECT d.id,d.business_key,d.recipient_account_id,d.source_event_id,d.source_event_type,d.source_aggregate_id,
        d.state,d.attempt_count,d.max_attempts,d.created_at,d.updated_at,d.variables,
-       t.id,t.template_key,t.version,t.locale,t.channel,t.category,t.subject_template,t.body_template,t.allowed_variables
+       t.id,t.template_key,t.version,t.locale,t.channel,t.category,t.subject_template,t.body_template,t.allowed_variables,COALESCE(d.event_id::text,'')
 FROM notification_delivery d
 JOIN notification_template t ON t.id=d.template_id
 WHERE ((d.state IN ('PENDING','RETRY_SCHEDULED') AND d.next_attempt_at<=$1)
@@ -178,7 +195,7 @@ LIMIT 1`, now).Scan(
 		&delivery.ID, &delivery.BusinessKey, &delivery.RecipientAccountID, &delivery.SourceEventID, &delivery.SourceEventType, &delivery.SourceAggregateID,
 		&delivery.State, &delivery.AttemptCount, &delivery.MaxAttempts, &delivery.CreatedAt, &delivery.UpdatedAt, &variables,
 		&delivery.Template.ID, &delivery.Template.Key, &delivery.Template.Version, &delivery.Template.Locale, &delivery.Template.Channel, &delivery.Template.Category,
-		&delivery.Template.SubjectTemplate, &delivery.Template.BodyTemplate, &delivery.Template.AllowedVariables,
+		&delivery.Template.SubjectTemplate, &delivery.Template.BodyTemplate, &delivery.Template.AllowedVariables, &delivery.EventID,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Delivery{}, false, nil
@@ -204,6 +221,7 @@ LIMIT 1`, now).Scan(
 type AttemptResult struct {
 	Delivered         bool
 	PermanentFailure  bool
+	Suppressed        bool
 	ProviderReference string
 	ErrorCode         string
 	StartedAt         time.Time
@@ -233,6 +251,9 @@ func (r *Repository) CompleteAttempt(ctx context.Context, delivery domain.Delive
 	if result.Delivered {
 		nextState = domain.DeliveryDelivered
 		outcome = "DELIVERED"
+	} else if result.Suppressed {
+		nextState = domain.DeliverySuppressed
+		outcome = "SUPPRESSED"
 	} else if result.PermanentFailure {
 		nextState = domain.DeliveryPermanentlyFailed
 		outcome = "PERMANENT_FAILURE"
@@ -255,4 +276,10 @@ func (r *Repository) CompleteAttempt(ctx context.Context, delivery domain.Delive
 		return "", err
 	}
 	return nextState, tx.Commit(ctx)
+}
+func nullableUUID(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
