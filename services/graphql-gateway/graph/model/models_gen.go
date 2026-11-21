@@ -11,8 +11,9 @@ type Account struct {
 }
 
 type AuthPayload struct {
-	AccessToken string `json:"accessToken"`
-	Me          *Me    `json:"me,omitempty"`
+	AccessToken string   `json:"accessToken"`
+	Roles       []string `json:"roles"`
+	Me          *Me      `json:"me,omitempty"`
 }
 
 type Booking struct {
@@ -179,6 +180,24 @@ type Me struct {
 	Account     *Account             `json:"account"`
 	Profile     *Profile             `json:"profile"`
 	Preferences *MatchingPreferences `json:"preferences,omitempty"`
+}
+
+type ModerationAction struct {
+	ActionID    string  `json:"actionId"`
+	ActionClass string  `json:"actionClass"`
+	Scope       string  `json:"scope"`
+	EffectiveAt string  `json:"effectiveAt"`
+	ExpiresAt   *string `json:"expiresAt,omitempty"`
+}
+
+type ModerationActionPage struct {
+	Items []*ModerationAction `json:"items"`
+}
+
+type ModerationAppeal struct {
+	AppealID string `json:"appealId"`
+	ActionID string `json:"actionId"`
+	State    string `json:"state"`
 }
 
 type Mutation struct {

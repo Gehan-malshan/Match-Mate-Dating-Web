@@ -286,7 +286,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {
@@ -304,7 +304,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {

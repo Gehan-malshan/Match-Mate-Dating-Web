@@ -4,7 +4,10 @@ type Account { id: ID!, email: String!, status: String!, verification: String!, 
 type Profile { accountID: ID!, nickname: String!, dateOfBirth: String!, broadLocation: String!, bio: String!, visibility: String!, approval: String!, interests: [String!]!, version: Int! }
 type MatchingPreferences { minAge: Int!, maxAge: Int!, intentions: [String!]!, interestedIn: [String!]!, languages: [String!]!, dealBreakers: [String!]! }
 type Me { account: Account!, profile: Profile!, preferences: MatchingPreferences }
-type AuthPayload { accessToken: String!, me: Me }
+type AuthPayload { accessToken: String!, roles: [String!]!, me: Me }
+type ModerationAction { actionId: ID!, actionClass: String!, scope: String!, effectiveAt: String!, expiresAt: String }
+type ModerationActionPage { items: [ModerationAction!]! }
+type ModerationAppeal { appealId: ID!, actionId: ID!, state: String! }
 type RegistrationPayload { me: Me!, verificationToken: String }
 
 type CommunityProfile { profileId: ID!, nickname: String!, ageBand: String!, broadLocation: String!, bio: String!, interests: [String!]! }
@@ -41,6 +44,7 @@ input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, particip
 
 type Query {
   me: Me!
+  myModerationActions: ModerationActionPage!
   communityProfiles(limit: Int = 8, cursor: String): CommunityPage!
   communityProfile(profileId: ID!): CommunityProfile!
   events(limit: Int = 12, cursor: String): EventPage!
@@ -64,6 +68,7 @@ type Mutation {
   resetPassword(token: String!, password: String!): OperationResult!
   deleteMyAccount(password: String!): OperationResult!
   login(email: String!, password: String!, totpCode: String): AuthPayload!
+  appealModerationAction(actionId: ID!, reason: String!): ModerationAppeal!
   refreshSession: AuthPayload!
   logout: OperationResult!
   updateProfile(input: ProfileInput!): Profile!

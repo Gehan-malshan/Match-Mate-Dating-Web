@@ -1,5 +1,7 @@
 # Moderation and Safety Service
 
+The browser gateway forwards only `myModerationActions` and `appealModerationAction` for member self-service. Both REST handlers validate the Account-issued bearer token, and appeal creation binds the action to the authenticated subject. The restricted `appeal` role has no case-management access.
+
 Owns reports, moderation cases, safety actions, evidence references, appeals, and restricted audit records as an independently deployable Go service on local port `8087` with its own PostgreSQL database on port `5439`.
 
 ## Implementation status

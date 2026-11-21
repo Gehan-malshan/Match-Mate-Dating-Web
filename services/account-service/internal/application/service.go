@@ -386,7 +386,7 @@ func (s *Service) Refresh(ctx context.Context, raw string) (domain.TokenPair, er
 	if err != nil {
 		return domain.TokenPair{}, err
 	}
-	return domain.TokenPair{AccessToken: access, RefreshToken: nextRaw, AccessExpiresAt: accessExpiry, RefreshExpiresAt: next.ExpiresAt}, nil
+	return domain.TokenPair{AccessToken: access, Roles: a.Roles, RefreshToken: nextRaw, AccessExpiresAt: accessExpiry, RefreshExpiresAt: next.ExpiresAt}, nil
 }
 
 func (s *Service) Logout(ctx context.Context, raw string) error {
@@ -550,7 +550,7 @@ func (s *Service) newSession(ctx context.Context, a domain.Account, family strin
 		return domain.TokenPair{}, err
 	}
 	access, exp, err := s.tokens.Issue(a.ID, a.Roles, a.TokenVersion, now)
-	return domain.TokenPair{AccessToken: access, RefreshToken: raw, AccessExpiresAt: exp, RefreshExpiresAt: session.ExpiresAt}, err
+	return domain.TokenPair{AccessToken: access, Roles: a.Roles, RefreshToken: raw, AccessExpiresAt: exp, RefreshExpiresAt: session.ExpiresAt}, err
 }
 func event(kind, correlation, actor string) domain.Event {
 	if correlation == "" {

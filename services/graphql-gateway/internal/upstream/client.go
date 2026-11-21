@@ -17,7 +17,7 @@ import (
 )
 
 type Services struct {
-	Account, Event, Matchmaking, Booking, Payment, Notification string
+	Account, Event, Matchmaking, Booking, Payment, Notification, Moderation string
 }
 
 type Client struct {

@@ -12,6 +12,8 @@ import {CommunityPage} from './routes/CommunityPage'
 import {CommunityProfilePage} from './routes/CommunityProfilePage'
 import {BookingsPage} from './routes/BookingsPage'
 import {NotificationsPage} from './routes/NotificationsPage'
+import {AppealPage} from './routes/AppealPage'
+import {myModerationActions} from './lib/account-api'
 const AdminPage=lazy(()=>import('./routes/AdminPage').then((module)=>({default:module.AdminPage})))
 const AdminRoute=()=> <Suspense fallback={<main className="admin-loading"><p>Opening the protected workspace…</p></main>}><AdminPage/></Suspense>
 
@@ -22,6 +24,7 @@ const loginRoute=createRoute({getParentRoute:()=>rootRoute,path:'/login',compone
 const verifyRoute=createRoute({getParentRoute:()=>rootRoute,path:'/verify-email',component:()=> <SecurityLinkPage mode="verify"/>})
 const forgotRoute=createRoute({getParentRoute:()=>rootRoute,path:'/forgot-password',component:()=> <SecurityLinkPage mode="forgot"/>})
 const resetRoute=createRoute({getParentRoute:()=>rootRoute,path:'/reset-password',component:()=> <SecurityLinkPage mode="reset"/>})
+const appealRoute=createRoute({getParentRoute:()=>rootRoute,path:'/appeal',beforeLoad:async()=>{try{await myModerationActions()}catch{throw redirect({to:'/login'})}},component:AppealPage})
 const eventsRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events',component:EventsPage})
 const eventDetailRoute=createRoute({getParentRoute:()=>rootRoute,path:'/events/$eventId',component:EventDetailPage})
 
@@ -44,6 +47,6 @@ const adminRoute=createRoute({
   component:AdminRoute,
 })
 
-const routeTree=rootRoute.addChildren([indexRoute,registerRoute,loginRoute,verifyRoute,forgotRoute,resetRoute,eventsRoute,eventDetailRoute,adminRoute,memberGroup.addChildren([profileRoute,bookingsRoute,notificationsRoute,communityRoute,communityProfileRoute])])
+const routeTree=rootRoute.addChildren([indexRoute,registerRoute,loginRoute,verifyRoute,forgotRoute,resetRoute,appealRoute,eventsRoute,eventDetailRoute,adminRoute,memberGroup.addChildren([profileRoute,bookingsRoute,notificationsRoute,communityRoute,communityProfileRoute])])
 export const router=createRouter({routeTree})
 declare module '@tanstack/react-router'{interface Register{router:typeof router}}

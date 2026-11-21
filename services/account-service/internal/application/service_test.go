@@ -41,6 +41,10 @@ func (f *fakeRepo) CreateSession(_ context.Context, s domain.Session) error {
 	f.session = s
 	return nil
 }
+func (f *fakeRepo) RotateSession(_ context.Context, _ []byte, s domain.Session, _ time.Time) (domain.Account, error) {
+	f.session = s
+	return f.account, nil
+}
 func (f *fakeRepo) AccountByID(context.Context, string) (domain.Account, error) {
 	return f.account, nil
 }
@@ -153,10 +157,21 @@ func TestSuspensionBlocksLoginAndAppealReversalRestoresIt(t *testing.T) {
 	if err != nil || len(claims.Roles) != 1 || claims.Roles[0] != "appeal" {
 		t.Fatalf("suspended member obtained non-appeal privileges: %+v %v", claims, err)
 	}
+	if len(pair.Roles) != 1 || pair.Roles[0] != "appeal" {
+		t.Fatalf("login response exposed wrong roles: %+v", pair.Roles)
+	}
+	refreshed, err := svc.Refresh(context.Background(), pair.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "appeal" {
+		t.Fatalf("refresh did not preserve appeal restriction: %+v %v", refreshed.Roles, err)
+	}
 	if _, err := svc.LoginWithGoogle(context.Background(), a.Email); err == nil {
 		t.Fatal("Google bypassed suspension")
 	}
 	guard.decision.Suspended = false
+	refreshed, err = svc.Refresh(context.Background(), refreshed.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "member" {
+		t.Fatalf("refresh did not restore member role after reversal: %+v %v", refreshed.Roles, err)
+	}
 	pair, err = svc.Login(context.Background(), a.Email, "correct horse battery staple")
 	if err != nil {
 		t.Fatalf("reversed action still blocks login: %v", err)

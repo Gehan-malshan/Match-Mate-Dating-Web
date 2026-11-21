@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/gehan-malshan/matchmate/graphql-gateway/internal/transport"
 	"github.com/gehan-malshan/matchmate/graphql-gateway/internal/upstream"
 )
 
@@ -72,6 +73,82 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 }
 
 func toJSON(value any) string { body, _ := json.Marshal(value); return string(body) }
+
+func TestAppealOnlyLoginAndOwnerAppealThroughGateway(t *testing.T) {
+	meCalls := 0
+	account := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/auth/login", "/auth/refresh":
+			_, _ = w.Write([]byte(`{"accessToken":"appeal-token","roles":["appeal"]}`))
+		case "/users/me":
+			meCalls++
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			t.Errorf("unexpected account path: %s", r.URL.Path)
+		}
+	}))
+	defer account.Close()
+	moderationCalls := 0
+	moderation := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		moderationCalls++
+		if r.Header.Get("Authorization") != "Bearer appeal-token" {
+			t.Errorf("appeal authorization was not forwarded")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/moderation/actions/mine":
+			_, _ = w.Write([]byte(`{"items":[{"actionId":"action-id","actionClass":"ACCOUNT_SUSPENSION","scope":"ALL","effectiveAt":"2026-11-21T00:00:00Z"}]}`))
+		case "/moderation/actions/action-id/appeals":
+			if r.Method != http.MethodPost {
+				t.Errorf("appeal method: %s", r.Method)
+			}
+			_, _ = w.Write([]byte(`{"appealId":"appeal-id","actionId":"action-id","state":"OPEN"}`))
+		default:
+			t.Errorf("unexpected moderation path: %s", r.URL.Path)
+		}
+	}))
+	defer moderation.Close()
+	client := upstream.New(upstream.Services{Account: account.URL, Moderation: moderation.URL})
+	server := handler.NewDefaultServer(NewExecutableSchema(Config{Resolvers: &Resolver{Upstream: client}}))
+	call := func(query, token string) []byte {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/graphql", bytes.NewBufferString(query))
+		request.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			request.Header.Set("Authorization", "Bearer "+token)
+		}
+		server.ServeHTTP(recorder, request.WithContext(transport.WithHTTP(request.Context(), request, recorder)))
+		return recorder.Body.Bytes()
+	}
+	for _, query := range []string{
+		`{"query":"mutation { login(email: \"a@example.test\", password: \"test\") { accessToken roles me { account { id } } } }"}`,
+		`{"query":"mutation { refreshSession { accessToken roles me { account { id } } } }"}`,
+	} {
+		result := call(query, "")
+		if bytes.Contains(result, []byte(`"errors"`)) || !bytes.Contains(result, []byte(`"roles":["appeal"]`)) || !bytes.Contains(result, []byte(`"me":null`)) {
+			t.Fatalf("restricted authentication failed: %s", result)
+		}
+	}
+	if meCalls != 0 {
+		t.Fatalf("restricted login fetched normal profile %d times", meCalls)
+	}
+	list := call(`{"query":"query { myModerationActions { items { actionId actionClass } } }"}`, "appeal-token")
+	if bytes.Contains(list, []byte(`"errors"`)) || !bytes.Contains(list, []byte(`"actionId":"action-id"`)) {
+		t.Fatalf("owner action list failed: %s", list)
+	}
+	appeal := call(`{"query":"mutation { appealModerationAction(actionId: \"action-id\", reason: \"Please review this action\") { appealId state } }"}`, "appeal-token")
+	if bytes.Contains(appeal, []byte(`"errors"`)) || !bytes.Contains(appeal, []byte(`"appealId":"appeal-id"`)) {
+		t.Fatalf("owner appeal failed: %s", appeal)
+	}
+	if moderationCalls != 2 {
+		t.Fatalf("expected only owner calls, got %d", moderationCalls)
+	}
+	me := call(`{"query":"query { me { account { id } } }"}`, "appeal-token")
+	if !bytes.Contains(me, []byte(`"errors"`)) || meCalls != 1 {
+		t.Fatalf("ordinary member route was not denied: %s", me)
+	}
+}
 
 func TestPublicEventsQueryUsesEventService(t *testing.T) {
 	events := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

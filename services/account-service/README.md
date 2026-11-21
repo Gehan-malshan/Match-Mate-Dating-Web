@@ -2,6 +2,8 @@
 
 ## Moderation enforcement
 
+Login and refresh responses include the issued `roles` list so the browser gateway can identify a restricted appeal session without requesting `/users/me`. This is an additive v1 field and mirrors the signed token roles.
+
 When `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN` are configured, Account reads current effective Moderation actions before password/Google sign-in, refresh, token authentication, public profile discovery, and notification-recipient resolution. A suspended member receives only an `appeal` role token after password sign-in; ordinary Account endpoints reject it, while Moderation's owner-scoped action list and appeal endpoint accept it. Google cannot issue an appeal token. Profile restriction hides community results immediately. Sensitive reads fail closed when Moderation is unavailable. Production requires both settings; see [ADR-0005](../../docs/adr/0005-authoritative-moderation-safety-reads.md).
 
 ## Security lifecycle update (ADR-0003)

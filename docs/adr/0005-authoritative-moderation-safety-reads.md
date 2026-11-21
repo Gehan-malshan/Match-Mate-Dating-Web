@@ -1,6 +1,6 @@
 # ADR-0005: Authoritative moderation reads at safety decisions
 
-Status: Accepted (2026-11-14)
+Status: Accepted (2026-11-21)
 
 ## Context and baseline
 
@@ -19,7 +19,7 @@ Account denies normal sessions for suspended members and hides restricted public
 - Moderation availability becomes a safety dependency for these paths. Do not cache a safe decision or fail open on timeouts.
 - The check occurs near the owning-service write, but a moderator may commit an action in the small interval after a check and before a different service commits or sends. Cross-database atomic exclusion is not provided. Rechecks and subsequent reads close exposure for later requests. Strict zero-window enforcement would require an admission lease/lock protocol or compensating consumers and is a release decision.
 - Existing paid or confirmed bookings remain historically intact. `entryEligible=false` prevents interpreting a confirmed booking as permission to enter. No automatic cancellation, refund, or capacity release is implied. **OPEN QUESTION (Product/Finance/Safety):** decide treatment of excluded paid bookings and venue payments.
-- **OPEN QUESTION (Safety/Product):** provide the appeal-only workflow through the GraphQL browser interface and decide which moderation API routes can be externally exposed. Direct REST access is available in local development.
+- The GraphQL browser interface exposes only owner-scoped active action summaries and appeal submission. The restricted browser route `/appeal` does not load Account's ordinary profile. Moderation alone validates the authenticated owner and stores the appeal. Moderator case management remains outside the browser gateway.
 - Production must configure a distinct, high-entropy `MODERATION_SERVICE_TOKEN` and private `MODERATION_API_URL`, remove direct public access to the internal safety route, and test Moderation outage behavior and load.
 
 ## Verification and rollback

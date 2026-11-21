@@ -1,5 +1,7 @@
 # MatchMate GraphQL Gateway
 
+Appeal-only Account sessions return `roles: ["appeal"]` and no `me` from `login`/`refreshSession`. Owner-scoped `myModerationActions` and `appealModerationAction` forward bearer authorization to Moderation, which repeats subject and action ownership checks. Configure `MODERATION_API_URL` for this private service route.
+
 The Account security mutations `resendVerification`, `requestPasswordReset`, `resetPassword`, and `deleteMyAccount` route to Account's REST owner. `login` accepts an optional administrator TOTP code. The gateway never handles or stores the TOTP secret, verification token, or recovery token beyond a single request.
 
 Event `archivedAt`, `managedEvents(archived:)`, and admin-only `archiveEvent`/`restoreEvent` expose recoverable deletion. The gateway checks the admin role, and Event repeats authorization and lifecycle checks. Archive does not delete booking history. The Event service no longer stores an event audit trail.

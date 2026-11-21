@@ -58,7 +58,7 @@ components:
   requestBodies: {Register: {required: true, content: {application/json: {schema: {type: object, required: [email,password,nickname,dateOfBirth,consentVersion], properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 128}, nickname: {type: string}, dateOfBirth: {type: string, format: date}, consentVersion: {type: string}}}}}}}
   responses:
     Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
-    Token: {description: Access token issued; refresh token is an HttpOnly cookie., content: {application/json: {schema: {type: object, properties: {accessToken: {type: string}, accessExpiresAt: {type: string, format: date-time}}}}}}
+    Token: {description: Access token issued; refresh token is an HttpOnly cookie. Suspended users receive only the appeal role., content: {application/json: {schema: {type: object, required: [accessToken,accessExpiresAt,roles], properties: {accessToken: {type: string}, accessExpiresAt: {type: string, format: date-time}, roles: {type: array, items: {type: string}}}}}}}
   schemas:
     Registration: {type: object, properties: {me: {$ref: '#/components/schemas/Me'}, verificationToken: {type: string, description: Development only}}}
     Me: {type: object, properties: {account: {$ref: '#/components/schemas/Account'}, profile: {$ref: '#/components/schemas/Profile'}, preferences: {$ref: '#/components/schemas/Preferences'}}}
