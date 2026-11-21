@@ -5,12 +5,23 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/matchmaking-service/internal/safety"
 )
 
 type safetyStub struct {
 	decision safety.Decision
 	err      error
+}
+
+func TestSuspendedAdministratorCannotReadMatchingRuns(t *testing.T) {
+	store := &Store{}
+	store.SetSafety(&safetyStub{decision: safety.Decision{Suspended: true}})
+	actor := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	// The safety decision must reject the actor before any event DB read.
+	if err := store.authorizeEvent(context.Background(), nil, actor, "event"); err == nil {
+		t.Fatal("stale administrator token retained matching access")
+	}
 }
 
 func (s *safetyStub) Check(context.Context, string, string) (safety.Decision, error) {

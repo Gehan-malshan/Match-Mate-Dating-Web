@@ -160,6 +160,13 @@ func (s *FeedService) UnreadCount(ctx context.Context, accountID string) (int, e
 }
 
 func (s *FeedService) MarkRead(ctx context.Context, accountID, notificationID string) error {
+	decision, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return err
+	}
+	if decision.Suspended {
+		return ErrNotificationMissing
+	}
 	if _, err := uuid.Parse(notificationID); err != nil {
 		return ErrNotificationMissing
 	}
@@ -174,6 +181,13 @@ func (s *FeedService) MarkRead(ctx context.Context, accountID, notificationID st
 }
 
 func (s *FeedService) MarkAllRead(ctx context.Context, accountID string) (int64, error) {
+	decision, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return 0, err
+	}
+	if decision.Suspended {
+		return 0, nil
+	}
 	return s.repository.MarkAllRead(ctx, accountID, s.now().UTC())
 }
 

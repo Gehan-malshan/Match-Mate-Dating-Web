@@ -224,6 +224,19 @@ func (s *Server) protected(next http.Handler) http.Handler {
 			problem(w, r, 401, "INVALID_ACCESS_TOKEN", "Access token is invalid or expired", nil)
 			return
 		}
+		decision, err := s.app.EffectiveSafety(r.Context(), p.Subject, "")
+		if err != nil {
+			problem(w, r, 503, "SAFETY_UNAVAILABLE", "Safety checks are temporarily unavailable", nil)
+			return
+		}
+		if decision.Suspended && !(len(p.Roles) == 1 && p.Roles[0] == "appeal") {
+			problem(w, r, 403, "ACCOUNT_SUSPENDED", "This session is restricted", nil)
+			return
+		}
+		if len(p.Roles) == 1 && p.Roles[0] == "appeal" && r.URL.Path != "/api/v1/moderation/actions/mine" && !strings.HasSuffix(r.URL.Path, "/appeals") {
+			problem(w, r, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal", nil)
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
 	})
 }

@@ -138,6 +138,7 @@ type ComplexityRoot struct {
 		CreatedAt     func(childComplexity int) int
 		Currency      func(childComplexity int) int
 		Email         func(childComplexity int) int
+		EntryEligible func(childComplexity int) int
 		EventID       func(childComplexity int) int
 		Nickname      func(childComplexity int) int
 		PaymentMethod func(childComplexity int) int
@@ -835,6 +836,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.EventRegistration.Email(childComplexity), true
+	case "EventRegistration.entryEligible":
+		if e.ComplexityRoot.EventRegistration.EntryEligible == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EventRegistration.EntryEligible(childComplexity), true
 	case "EventRegistration.eventId":
 		if e.ComplexityRoot.EventRegistration.EventID == nil {
 			break
@@ -2148,6 +2155,8 @@ func (ec *executionContext) childFields_EventRegistration(ctx context.Context, f
 		return ec.fieldContext_EventRegistration_eventId(ctx, field)
 	case "state":
 		return ec.fieldContext_EventRegistration_state(ctx, field)
+	case "entryEligible":
+		return ec.fieldContext_EventRegistration_entryEligible(ctx, field)
 	case "paymentMethod":
 		return ec.fieldContext_EventRegistration_paymentMethod(ctx, field)
 	case "amount":
@@ -5026,6 +5035,29 @@ func (ec *executionContext) _EventRegistration_state(ctx context.Context, field 
 }
 func (ec *executionContext) fieldContext_EventRegistration_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EventRegistration_entryEligible(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EventRegistration_entryEligible(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EntryEligible, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_EventRegistration_entryEligible(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
 func (ec *executionContext) _EventRegistration_paymentMethod(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
@@ -11331,6 +11363,11 @@ func (ec *executionContext) _EventRegistration(ctx context.Context, sel ast.Sele
 			}
 		case "state":
 			out.Values[i] = ec._EventRegistration_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "entryEligible":
+			out.Values[i] = ec._EventRegistration_entryEligible(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}

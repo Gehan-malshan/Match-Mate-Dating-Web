@@ -774,6 +774,9 @@ func (s *Store) authorizeEvent(ctx context.Context, q interface {
 	if !p.HasRole("admin") {
 		return problem(403, "MATCHMAKING_ADMIN_REQUIRED", "Only an administrator can manage matchmaking runs")
 	}
+	if err := s.checkSafety(ctx, p.Subject, eventID, false); err != nil {
+		return err
+	}
 	var exists bool
 	if err := q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM event_scope WHERE event_id=$1)`, eventID).Scan(&exists); err != nil {
 		return err

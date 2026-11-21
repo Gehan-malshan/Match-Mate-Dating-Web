@@ -131,6 +131,7 @@ type EventRegistration struct {
 	Email         string  `json:"email"`
 	EventID       string  `json:"eventId"`
 	State         string  `json:"state"`
+	EntryEligible bool    `json:"entryEligible"`
 	PaymentMethod string  `json:"paymentMethod"`
 	Amount        string  `json:"amount"`
 	Currency      string  `json:"currency"`

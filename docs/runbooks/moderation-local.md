@@ -38,7 +38,11 @@ After an action is applied, query the private current-state endpoint from the lo
 
 Apply `ACCOUNT_SUSPENSION` or `PROFILE_RESTRICTION` to an Account UUID with scope `ALL`; use an event UUID or `ALL` for `EVENT_EXCLUSION`, `MATCHMAKING_EXCLUSION`, and `REVEAL_PREVENTION`. A suspended member can password-sign-in to obtain an `appeal`-only token. With that token, `GET /api/v1/moderation/actions/mine` returns the member's active action IDs; `POST /api/v1/moderation/actions/{actionId}/appeals` submits a reason. A moderator can uphold or reverse it. Re-query the current-state endpoint and retry Booking/Matchmaking/Notification actions after reversal; a reversed action stops applying without deleting audit history. The member must refresh or sign in again to regain ordinary roles.
 
+For the browser path, sign in through the common `/login` page with a suspended member's password. The backend-issued `appeal` role directs the browser to `/appeal`, where the owner can select an active action and enter a reason of 10–1000 characters. GraphQL forwards only the owner action list and appeal request to Moderation. A stale signed administrator token is also denied by Moderation, Booking, and Matchmaking when the current suspension is active.
+
 Booking administrative registration rows now include `entryEligible`. Treat `false` as an entry prohibition even when the historical booking state remains `CONFIRMED`. Do not cancel a paid booking or release capacity automatically until the approved policy covers exclusions. A Moderation outage makes safety-sensitive operations return unavailable or retry; investigate the service rather than bypassing it. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md).
+
+The admin Registrations table displays this point-in-time decision as **Eligible**, **Entry blocked**, or **Not confirmed**. Refresh the table immediately before a manual admission decision. This is not an automated check-in endpoint.
 
 An unavailable database makes readiness fail. RabbitMQ failure must not roll back reports or actions: facts remain in the Moderation-owned outbox and publish after relay recovery. Never delete or rewrite unpublished rows. Action expiry is idempotent through row locking and state checks.
 

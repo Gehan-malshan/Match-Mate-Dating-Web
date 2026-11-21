@@ -18,7 +18,7 @@ type EventPage { items: [Event!]!, nextCursor: String, limit: Int! }
 
 type Booking { bookingId: ID!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String }
 type BookingPage { items: [Booking!]! }
-type EventRegistration { bookingId: ID!, accountId: ID!, nickname: String!, email: String!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, createdAt: String!, confirmedAt: String }
+type EventRegistration { bookingId: ID!, accountId: ID!, nickname: String!, email: String!, eventId: ID!, state: String!, entryEligible: Boolean!, paymentMethod: String!, amount: String!, currency: String!, createdAt: String!, confirmedAt: String }
 type EventRegistrationPage { items: [EventRegistration!]!, hasMore: Boolean! }
 type Payment { paymentId: ID!, bookingId: ID!, orderId: String!, amount: String!, currency: String!, provider: String!, state: String!, version: Int!, createdAt: String!, updatedAt: String!, completedAt: String }
 type Checkout { payment: Payment!, actionUrl: String!, fields: JSON! }

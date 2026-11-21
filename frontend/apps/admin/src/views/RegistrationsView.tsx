@@ -26,7 +26,7 @@ export function RegistrationsView({ events, eventsLoading, eventsError, selected
       <div><p className="eyebrow">Protected booking records</p><h1>Event <em>registrations.</em></h1><p>Review members who reserved seats, online payment holds, and bookings needing review across your events.</p></div>
     </header>
     <section className="panel registrations-panel" aria-label="Event registrations">
-      <div className="panel-heading"><div><p className="eyebrow">Registration ledger</p><h2>{selectedEventId ? eventNames.get(selectedEventId) ?? 'Selected event' : 'All events'}</h2><p>Confirmed means a seat is reserved. For pay-at-venue bookings, payment has not been collected in the app.</p></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">Registration ledger</p><h2>{selectedEventId ? eventNames.get(selectedEventId) ?? 'Selected event' : 'All events'}</h2><p>Entry eligibility reflects current safety restrictions. Refresh immediately before check-in. Confirmed means a seat is reserved; venue payment has not been collected in the app.</p></div></div>
       <div className="registration-controls">
         <label htmlFor="registration-event-filter">Event
           <select id="registration-event-filter" value={selectedEventId} onChange={(change) => { onSelectedEventIdChange(change.target.value); setOffset(0) }}>
@@ -42,12 +42,13 @@ export function RegistrationsView({ events, eventsLoading, eventsError, selected
       {registrations.isError && <p className="empty-state is-error" role="alert">Could not load registrations. Check your administrator session and the Booking and Account services.</p>}
       {!registrations.isPending && !registrations.isError && items.length === 0 && <p className="empty-state">{offset ? 'No more registrations on this page.' : 'No bookings have been created for this selection yet.'}</p>}
       {items.length > 0 && <div className="registrations-scroll"><table>
-        <thead><tr><th>Member</th><th>Event</th><th>Booked</th><th>Status</th><th>Payment</th><th>Amount</th><th>Booking reference</th></tr></thead>
+        <thead><tr><th>Member</th><th>Event</th><th>Booked</th><th>Status</th><th>Entry</th><th>Payment</th><th>Amount</th><th>Booking reference</th></tr></thead>
         <tbody>{items.map((item) => <tr key={item.bookingId}>
           <td><strong>{item.nickname || 'Member unavailable'}</strong><small>{item.email || item.accountId}</small></td>
           <td><strong>{eventNames.get(item.eventId) ?? 'Event unavailable'}</strong><small>{item.eventId}</small></td>
           <td>{new Date(item.createdAt).toLocaleString()}</td>
           <td><span className={`status-badge status-${item.state.toLowerCase()}`}>{item.state.replaceAll('_', ' ')}</span>{item.confirmedAt && <small>Confirmed {new Date(item.confirmedAt).toLocaleString()}</small>}</td>
+          <td><strong>{item.entryEligible ? 'Eligible' : item.state === 'CONFIRMED' ? 'Entry blocked' : 'Not confirmed'}</strong></td>
           <td>{item.paymentMethod === 'AT_VENUE' ? 'Pay at venue' : 'Online'}{item.paymentMethod === 'AT_VENUE' && item.state === 'CONFIRMED' && <small>Not collected in app</small>}</td>
           <td>{item.currency} {item.amount}</td>
           <td><code>{item.bookingId}</code></td>

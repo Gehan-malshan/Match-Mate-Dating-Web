@@ -24,6 +24,8 @@ The fixture projection is a Matchmaking-owned simulation of future Booking, Acco
 
 Current Moderation decisions are checked through a private service-authenticated REST read. Suspended, hidden, event-excluded, or matchmaking-excluded participants cannot enter generation, override, lock, or publication. Published member matches are rechecked on read; reveal consent is denied for either participant when reveal prevention applies. Checks repeat near commits and fail closed on Moderation outage. The fixture remains a prototype and does not become a production Booking projection through this change. Production requires `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN`.
 
+Administrator event authorization also checks the actor's current event-scoped safety state; a stale signed administrator token does not preserve matching-run access after suspension.
+
 ## Ruleset
 
 `prototype-v1` uses the repository's proposed initial weights:

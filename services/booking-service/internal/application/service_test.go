@@ -89,17 +89,32 @@ func TestCancelRequiresIdempotencyKey(t *testing.T) {
 }
 
 type safetyStub struct {
-	excluded atomic.Bool
-	entered  chan struct{}
-	release  chan struct{}
+	excluded  atomic.Bool
+	suspended atomic.Bool
+	calls     atomic.Int32
+	entered   chan struct{}
+	release   chan struct{}
 }
 
 func (s *safetyStub) Check(_ context.Context, _, _ string) (safety.Decision, error) {
-	if s.entered != nil {
+	if s.entered != nil && s.calls.Add(1) == 2 {
 		s.entered <- struct{}{}
 		<-s.release
 	}
-	return safety.Decision{EventExcluded: s.excluded.Load()}, nil
+	return safety.Decision{EventExcluded: s.excluded.Load(), Suspended: s.suspended.Load()}, nil
+}
+func TestSuspendedActorCannotUseBookingRoutes(t *testing.T) {
+	svc := New(&fakeRepo{}, fakeEvents{}, time.Minute)
+	guard := &safetyStub{}
+	svc.SetSafety(guard)
+	guard.suspended.Store(true)
+	if err := svc.CheckActor(context.Background(), "member"); !errors.Is(err, ErrExcluded) {
+		t.Fatalf("suspended JWT holder was admitted: %v", err)
+	}
+	guard.suspended.Store(false)
+	if err := svc.CheckActor(context.Background(), "member"); err != nil {
+		t.Fatalf("reversed suspension still blocked actor: %v", err)
+	}
 }
 func TestBookingSafetyRaceAndAppealReversal(t *testing.T) {
 	now := time.Now().UTC()
@@ -113,18 +128,22 @@ func TestBookingSafetyRaceAndAppealReversal(t *testing.T) {
 		done <- err
 	}()
 	<-guard.entered
-	guard.excluded.Store(true) // A moderation decision becomes effective before the booking is admitted.
+	guard.excluded.Store(true) // Moderation acts after the first check, before the final admission check.
 	close(guard.release)
 	if err := <-done; !errors.Is(err, ErrExcluded) || repo.created.ID != "" {
 		t.Fatalf("excluded booking was created: %v %+v", err, repo.created)
 	}
-	eligible, err := svc.EntryEligible(context.Background(), domain.Booking{AccountID:"member",EventID:"event",State:domain.Confirmed})
-	if err != nil || eligible { t.Fatalf("excluded confirmed booking still admitted: eligible=%v err=%v", eligible, err) }
+	eligible, err := svc.EntryEligible(context.Background(), domain.Booking{AccountID: "member", EventID: "event", State: domain.Confirmed})
+	if err != nil || eligible {
+		t.Fatalf("excluded confirmed booking still admitted: eligible=%v err=%v", eligible, err)
+	}
 	guard.entered = nil
 	guard.excluded.Store(false) // An approved appeal reverses the current decision.
 	if _, err := svc.Create(context.Background(), "member", "event", "AT_VENUE", "second-key"); err != nil {
 		t.Fatalf("reversed action still blocks booking: %v", err)
 	}
 	eligible, err = svc.EntryEligible(context.Background(), repo.created)
-	if err != nil || !eligible { t.Fatalf("reversed exclusion still blocks entry: eligible=%v err=%v", eligible, err) }
+	if err != nil || !eligible {
+		t.Fatalf("reversed exclusion still blocks entry: eligible=%v err=%v", eligible, err)
+	}
 }

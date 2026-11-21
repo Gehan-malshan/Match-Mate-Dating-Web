@@ -53,6 +53,9 @@ func (s *Server) protect(next http.Handler) http.Handler {
 			problem(w, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal.")
 			return
 		}
+		if handle(w, s.app.CheckActor(r.Context(), p.Subject)) {
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
 	})
 }
@@ -123,13 +126,15 @@ func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
 	}
 	type registration struct {
 		domain.Booking
-		AccountID string `json:"accountId"`
-		EntryEligible bool `json:"entryEligible"`
+		AccountID     string `json:"accountId"`
+		EntryEligible bool   `json:"entryEligible"`
 	}
 	result := make([]registration, 0, len(items))
 	for _, b := range items {
 		eligible, checkErr := s.app.EntryEligible(r.Context(), b)
-		if handle(w, checkErr) { return }
+		if handle(w, checkErr) {
+			return
+		}
 		result = append(result, registration{Booking: b, AccountID: b.AccountID, EntryEligible: eligible})
 	}
 	w.Header().Set("Cache-Control", "no-store")

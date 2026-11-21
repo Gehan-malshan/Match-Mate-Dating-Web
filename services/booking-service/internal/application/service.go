@@ -62,6 +62,11 @@ func (s *Service) checkSafety(ctx context.Context, actor, eventID string) error 
 	}
 	return nil
 }
+
+// CheckActor rejects suspended JWT holders before any Booking route runs.
+func (s *Service) CheckActor(ctx context.Context, actor string) error {
+	return s.checkSafety(ctx, actor, "")
+}
 func (s *Service) Create(ctx context.Context, actor, eventID, method, key string) (domain.Booking, error) {
 	if eventID == "" || key == "" {
 		return domain.Booking{}, fmt.Errorf("%w: eventId and Idempotency-Key are required", ErrInvalid)
@@ -115,12 +120,17 @@ func (s *Service) ListRegistrations(ctx context.Context, limit, offset int) ([]d
 	}
 	return s.repo.ListRegistrations(ctx, limit, offset)
 }
+
 // EntryEligible is recomputed from current moderation state. A confirmed
 // reservation is not an admission credential when the member is excluded.
 func (s *Service) EntryEligible(ctx context.Context, booking domain.Booking) (bool, error) {
-	if booking.State != domain.Confirmed { return false, nil }
+	if booking.State != domain.Confirmed {
+		return false, nil
+	}
 	if err := s.checkSafety(ctx, booking.AccountID, booking.EventID); err != nil {
-		if errors.Is(err, ErrExcluded) { return false, nil }
+		if errors.Is(err, ErrExcluded) {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil

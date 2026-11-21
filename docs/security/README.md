@@ -119,7 +119,7 @@ Where a service retains business audit records, they include actor, target, acti
 
 ## 10. Moderation and safety
 
-The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
+The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Appeal-only tokens can list the owner's active action summaries and submit an appeal through two GraphQL operations; normal Account profile and administrator operations remain closed. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
 
 The current per-process report limiter is defense-in-depth for local/single-replica use. Production requires gateway plus distributed rate enforcement. Downstream services must consume enforcement facts idempotently before cross-domain exclusion is complete.
 

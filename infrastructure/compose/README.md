@@ -1,5 +1,7 @@
 # Docker Compose
 
+The GraphQL gateway now calls the Moderation API for owner-scoped action listing and appeal submission. It waits for `moderation-api` to start and uses the private `MODERATION_API_URL`; suspended members use the browser `/appeal` route.
+
 Account security migration 2 and the private Account-to-Notification security email endpoint are part of the root stack. Set `NOTIFICATION_PROVIDER=smtp` and SMTP credentials in ignored root `.env` for real verification/recovery email. `SECURITY_MAIL_TOKEN` must be distinct from `INTERNAL_SERVICE_TOKEN`; set `ADMIN_MFA_ENCRYPTION_KEY` to exercise administrator TOTP. The default development sink does not deliver reset links. See `docs/runbooks/account-security.md`.
 
 The Account/Profile development topology starts PostgreSQL and RabbitMQ, applies the versioned Account migration, and seeds shared fake logins automatically:

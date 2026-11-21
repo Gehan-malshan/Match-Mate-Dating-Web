@@ -37,7 +37,7 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 			t.Errorf("unexpected booking path: %s", r.URL.String())
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"bookingId":"booking-id","accountId":"member-id","eventId":"event-id","state":"CONFIRMED","paymentMethod":"AT_VENUE","amount":"2500.00","currency":"LKR","createdAt":"2026-09-01T12:00:00Z"}],"hasMore":false}`))
+		_, _ = w.Write([]byte(`{"items":[{"bookingId":"booking-id","accountId":"member-id","eventId":"event-id","state":"CONFIRMED","entryEligible":false,"paymentMethod":"AT_VENUE","amount":"2500.00","currency":"LKR","createdAt":"2026-09-01T12:00:00Z"}],"hasMore":false}`))
 	}))
 	defer booking.Close()
 	client := upstream.New(upstream.Services{Account: account.URL, Booking: booking.URL})
@@ -54,12 +54,12 @@ func TestEventRegistrationsJoinAndRoleGuard(t *testing.T) {
 		return payload
 	}
 	queries := []string{
-		`{"query":"query { eventRegistrations(eventId: \"event-id\") { items { nickname email state paymentMethod } hasMore } }"}`,
-		`{"query":"query { adminRegistrations { items { nickname email state paymentMethod eventId } hasMore } }"}`,
+		`{"query":"query { eventRegistrations(eventId: \"event-id\") { items { nickname email state entryEligible paymentMethod } hasMore } }"}`,
+		`{"query":"query { adminRegistrations { items { nickname email state entryEligible paymentMethod eventId } hasMore } }"}`,
 	}
 	for _, query := range queries {
 		adminResult := call(query)
-		if adminResult["errors"] != nil || !bytes.Contains([]byte(toJSON(adminResult)), []byte(`"nickname":"Asha"`)) {
+		if adminResult["errors"] != nil || !bytes.Contains([]byte(toJSON(adminResult)), []byte(`"nickname":"Asha"`)) || !bytes.Contains([]byte(toJSON(adminResult)), []byte(`"entryEligible":false`)) {
 			t.Fatalf("admin result: %v", adminResult)
 		}
 	}

@@ -1,5 +1,7 @@
 # Administrator UI Source
 
+Registration rows now show current `entryEligible` from Booking through GraphQL. A confirmed booking with a safety exclusion appears as **Entry blocked**; staff must refresh before admitting a member. Historical booking and payment records remain visible to authorized administrators.
+
 Event manager has **Delete** for draft/cancelled events (published or open events must first be cancelled). Delete requests confirmation, then archives the record; it is removed from the normal list without erasing bookings. **Show deleted** displays archived cards and **Restore** returns one to the managed list. Restoring a cancelled event does not reopen registration. Event audit history is not stored.
 
 The draft event editor now has an optional event-photo picker and preview. It accepts JPEG/PNG/WebP, compresses to a bounded JPEG, saves the draft, then uploads the image. If upload fails, the draft remains saved and can be reopened to retry. Images cannot be replaced after publication. Choose only artwork the project has rights and consent to publish.
