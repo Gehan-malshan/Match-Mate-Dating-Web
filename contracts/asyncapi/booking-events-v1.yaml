@@ -9,6 +9,8 @@ channels:
       cancelled: {$ref: '#/components/messages/BookingCancelled'}
       expired: {$ref: '#/components/messages/HoldExpired'}
       review: {$ref: '#/components/messages/BookingPaymentReviewRequired'}
+      venueCollected: {$ref: '#/components/messages/VenuePaymentCollected'}
+      checkedIn: {$ref: '#/components/messages/BookingCheckedIn'}
 operations: {publishBookingFacts: {action: send, channel: {$ref: '#/channels/bookingFacts'}}}
 components:
   messages:
@@ -17,13 +19,15 @@ components:
     BookingCancelled: {name: BookingCancelled, payload: {$ref: '#/components/schemas/BookingFact'}}
     HoldExpired: {name: HoldExpired, payload: {$ref: '#/components/schemas/BookingFact'}}
     BookingPaymentReviewRequired: {name: BookingPaymentReviewRequired, payload: {$ref: '#/components/schemas/BookingFact'}}
+    VenuePaymentCollected: {name: VenuePaymentCollected, payload: {$ref: '#/components/schemas/BookingFact'}}
+    BookingCheckedIn: {name: BookingCheckedIn, payload: {$ref: '#/components/schemas/BookingFact'}}
   schemas:
     BookingFact:
       type: object
       required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,actorId,payload]
       properties:
         eventId: {type: string, format: uuid}
-        eventType: {type: string, enum: [BookingPending,BookingConfirmed,BookingCancelled,HoldExpired,BookingPaymentReviewRequired]}
+        eventType: {type: string, enum: [BookingPending,BookingConfirmed,BookingCancelled,HoldExpired,BookingPaymentReviewRequired,VenuePaymentCollected,BookingCheckedIn]}
         schemaVersion: {type: integer, const: 1}
         occurredAt: {type: string, format: date-time}
         aggregateId: {type: string, format: uuid}

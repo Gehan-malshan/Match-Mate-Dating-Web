@@ -24,6 +24,7 @@ func Load() Config {
 			Payment:      value("PAYMENT_API_URL", "http://payment-api:8084/api/v1"),
 			Booking:      value("BOOKING_API_URL", "http://booking-api:8085/api/v1"),
 			Notification: value("NOTIFICATION_API_URL", "http://notification-api:8086/api/v1"),
+			Moderation:   value("MODERATION_API_URL", "http://moderation-api:8087/api/v1"),
 		},
 	}
 }

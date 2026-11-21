@@ -19,6 +19,72 @@ type Repository struct{ pool *pgxpool.Pool }
 
 func New(pool *pgxpool.Pool) *Repository              { return &Repository{pool: pool} }
 func (r *Repository) Ready(ctx context.Context) error { return r.pool.Ping(ctx) }
+func (r *Repository) EffectiveSafety(ctx context.Context, accountID, eventID string, now time.Time) (domain.EffectiveSafety, error) {
+	rows, err := r.pool.Query(ctx, `SELECT target_type,action_class,scope FROM moderation_action
+		WHERE target_type IN ('ACCOUNT','PROFILE') AND target_id=$1 AND state='ACTIVE'
+		AND effective_at<=$2 AND (expires_at IS NULL OR expires_at>$2)
+		AND (scope IN ('ALL','GLOBAL') OR scope=$3)`, accountID, now, eventID)
+	if err != nil {
+		return domain.EffectiveSafety{}, err
+	}
+	defer rows.Close()
+	var out domain.EffectiveSafety
+	for rows.Next() {
+		var targetType, class, scope string
+		if err = rows.Scan(&targetType, &class, &scope); err != nil {
+			return out, err
+		}
+		switch class {
+		case "ACCOUNT_SUSPENSION":
+			if targetType == "ACCOUNT" {
+				out.Suspended = true
+			}
+		case "PROFILE_RESTRICTION", "CONTENT_HIDE":
+			out.ProfileHidden = true
+		case "EVENT_EXCLUSION":
+			if targetType == "ACCOUNT" && eventID != "" && (scope == eventID || scope == "ALL" || scope == "GLOBAL") {
+				out.EventExcluded = true
+			}
+		case "MATCHMAKING_EXCLUSION":
+			if targetType == "ACCOUNT" {
+				out.MatchmakingExcluded = true
+			}
+		case "REVEAL_PREVENTION":
+			if targetType == "ACCOUNT" {
+				out.RevealPrevented = true
+			}
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return out, err
+	}
+	if out.Suspended {
+		out.ProfileHidden, out.EventExcluded, out.MatchmakingExcluded, out.RevealPrevented = true, true, true, true
+	}
+	if out.EventExcluded {
+		out.MatchmakingExcluded, out.RevealPrevented = true, true
+	}
+	if out.MatchmakingExcluded {
+		out.RevealPrevented = true
+	}
+	return out, nil
+}
+func (r *Repository) ListOwnActions(ctx context.Context, accountID string, now time.Time) ([]domain.OwnAction, error) {
+	rows, err := r.pool.Query(ctx, `SELECT action_id::text,action_class,scope,effective_at,expires_at FROM moderation_action WHERE target_type IN ('ACCOUNT','PROFILE') AND target_id=$1 AND state='ACTIVE' AND effective_at<=$2 AND (expires_at IS NULL OR expires_at>$2) ORDER BY created_at DESC LIMIT 50`, accountID, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	actions := []domain.OwnAction{}
+	for rows.Next() {
+		var action domain.OwnAction
+		if err = rows.Scan(&action.ID, &action.Class, &action.Scope, &action.EffectiveAt, &action.ExpiresAt); err != nil {
+			return nil, err
+		}
+		actions = append(actions, action)
+	}
+	return actions, rows.Err()
+}
 func problem(status int, code, detail string) *domain.ProblemError {
 	return &domain.ProblemError{Status: status, Code: code, Detail: detail}
 }

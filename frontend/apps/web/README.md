@@ -1,5 +1,7 @@
 # Unified MatchMate Web Application
 
+Password sign-in with an Account-issued `appeal` role opens `/appeal`, where the member can list their active action summaries and submit a private review request. This route never loads the ordinary profile. The GraphQL gateway and Moderation enforce ownership; regular member/admin routes remain unavailable. After reversal, sign in again to restore the normal route.
+
 Account security routes include `/verify-email`, `/forgot-password`, and `/reset-password`. The shared login accepts an optional administrator authenticator code. The profile workspace offers password-confirmed account deletion. Security link pages use a `no-referrer` policy to reduce token leakage. Real email delivery requires SMTP configuration; the local development sink does not deliver recovery links. See `docs/runbooks/account-security.md`.
 
 Published events now use their Event-owned image on the landing preview, event catalogue, and detail hero when `imageVersion>0`. Existing stock artwork remains the fallback. The browser fetches public bytes from the GraphQL gateway's narrow media route; no Event Service address or image bytes are embedded in GraphQL lists.

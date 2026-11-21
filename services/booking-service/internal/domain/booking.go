@@ -20,19 +20,22 @@ const (
 )
 
 type Booking struct {
-	ID            string     `json:"bookingId"`
-	AccountID     string     `json:"-"`
-	EventID       string     `json:"eventId"`
-	State         State      `json:"state"`
-	PaymentMethod string     `json:"paymentMethod"`
-	Amount        string     `json:"amount"`
-	Currency      string     `json:"currency"`
-	PolicyVersion int64      `json:"policyVersion"`
-	ExpiresAt     time.Time  `json:"expiresAt"`
-	Version       int64      `json:"version"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	ConfirmedAt   *time.Time `json:"confirmedAt,omitempty"`
-	CancelledAt   *time.Time `json:"cancelledAt,omitempty"`
+	ID               string     `json:"bookingId"`
+	AccountID        string     `json:"-"`
+	EventID          string     `json:"eventId"`
+	State            State      `json:"state"`
+	PaymentMethod    string     `json:"paymentMethod"`
+	Amount           string     `json:"amount"`
+	Currency         string     `json:"currency"`
+	PolicyVersion    int64      `json:"policyVersion"`
+	ExpiresAt        time.Time  `json:"expiresAt"`
+	Version          int64      `json:"version"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	ConfirmedAt      *time.Time `json:"confirmedAt,omitempty"`
+	CancelledAt      *time.Time `json:"cancelledAt,omitempty"`
+	VenueCollectedAt *time.Time `json:"venueCollectedAt,omitempty"`
+	VenueCollectionMethod *string `json:"venueCollectionMethod,omitempty"`
+	CheckedInAt      *time.Time `json:"checkedInAt,omitempty"`
 }
 type EventSnapshot struct {
 	EventID               string    `json:"eventId"`

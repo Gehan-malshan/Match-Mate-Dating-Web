@@ -24,15 +24,19 @@ func (r *queryResolver) registrationPage(ctx context.Context, path string, limit
 	}
 	var bookings struct {
 		Items []struct {
-			BookingID     string  `json:"bookingId"`
-			AccountID     string  `json:"accountId"`
-			EventID       string  `json:"eventId"`
-			State         string  `json:"state"`
-			PaymentMethod string  `json:"paymentMethod"`
-			Amount        string  `json:"amount"`
-			Currency      string  `json:"currency"`
-			CreatedAt     string  `json:"createdAt"`
-			ConfirmedAt   *string `json:"confirmedAt"`
+			BookingID        string  `json:"bookingId"`
+			AccountID        string  `json:"accountId"`
+			EventID          string  `json:"eventId"`
+			State            string  `json:"state"`
+			EntryEligible    bool    `json:"entryEligible"`
+			PaymentMethod    string  `json:"paymentMethod"`
+			Amount           string  `json:"amount"`
+			Currency         string  `json:"currency"`
+			CreatedAt        string  `json:"createdAt"`
+			ConfirmedAt      *string `json:"confirmedAt"`
+			VenueCollectedAt *string `json:"venueCollectedAt"`
+			VenueCollectionMethod *string `json:"venueCollectionMethod"`
+			CheckedInAt      *string `json:"checkedInAt"`
 		} `json:"items"`
 		HasMore bool `json:"hasMore"`
 	}
@@ -44,7 +48,7 @@ func (r *queryResolver) registrationPage(ctx context.Context, path string, limit
 	ids := make([]string, 0, len(bookings.Items))
 	seen := map[string]bool{}
 	for _, b := range bookings.Items {
-		items = append(items, &model.EventRegistration{BookingID: b.BookingID, AccountID: b.AccountID, EventID: b.EventID, State: b.State, PaymentMethod: b.PaymentMethod, Amount: b.Amount, Currency: b.Currency, CreatedAt: b.CreatedAt, ConfirmedAt: b.ConfirmedAt})
+		items = append(items, &model.EventRegistration{BookingID: b.BookingID, AccountID: b.AccountID, EventID: b.EventID, State: b.State, EntryEligible: b.EntryEligible, PaymentMethod: b.PaymentMethod, Amount: b.Amount, Currency: b.Currency, CreatedAt: b.CreatedAt, ConfirmedAt: b.ConfirmedAt, VenueCollectedAt: b.VenueCollectedAt, VenueCollectionMethod: b.VenueCollectionMethod, CheckedInAt: b.CheckedInAt})
 		if !seen[b.AccountID] {
 			ids = append(ids, b.AccountID)
 			seen[b.AccountID] = true

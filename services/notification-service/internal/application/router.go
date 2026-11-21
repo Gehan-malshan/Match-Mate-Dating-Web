@@ -76,6 +76,7 @@ func (r *Router) Route(event domain.EventEnvelope) (domain.Plan, error) {
 		plan.Action = domain.ActionDeliver
 		plan.RecipientAccountID = payload.AccountID
 		plan.SourceAggregateID = payload.BookingID
+		plan.EventID = payload.EventID
 		plan.Category = "BOOKING"
 		plan.TemplateKey = map[string]string{
 			"BookingPending":               "booking-pending",

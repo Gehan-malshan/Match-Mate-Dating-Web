@@ -8,6 +8,7 @@ import (
 
 	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/account-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store"
 )
 
@@ -39,6 +40,10 @@ func (f *fakeRepo) AccountByEmail(context.Context, string) (domain.Account, erro
 func (f *fakeRepo) CreateSession(_ context.Context, s domain.Session) error {
 	f.session = s
 	return nil
+}
+func (f *fakeRepo) RotateSession(_ context.Context, _ []byte, s domain.Session, _ time.Time) (domain.Account, error) {
+	f.session = s
+	return f.account, nil
 }
 func (f *fakeRepo) AccountByID(context.Context, string) (domain.Account, error) {
 	return f.account, nil
@@ -125,6 +130,55 @@ func TestLoginRequiresVerificationThenCreatesRotatingSession(t *testing.T) {
 	}
 	if string(repo.session.TokenHash) == pair.RefreshToken {
 		t.Fatal("refresh token stored in plaintext")
+	}
+}
+
+type safetyStub struct {
+	decision safety.Decision
+	err      error
+}
+
+func (s *safetyStub) Check(context.Context, string, string) (safety.Decision, error) {
+	return s.decision, s.err
+}
+func TestSuspensionBlocksLoginAndAppealReversalRestoresIt(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	a := domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"member"}, TokenVersion: 1}
+	repo := &fakeRepo{account: a, credential: store.Credential{Account: a, PasswordHash: hash, TokenVersion: 1}}
+	svc := testService(t, repo)
+	guard := &safetyStub{decision: safety.Decision{Suspended: true}}
+	svc.now = func() time.Time { return time.Now().UTC() }
+	svc.SetSafety(guard)
+	pair, err := svc.Login(context.Background(), a.Email, "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("suspended member could not obtain appeal session: %v", err)
+	}
+	claims, err := svc.tokens.Parse(pair.AccessToken)
+	if err != nil || len(claims.Roles) != 1 || claims.Roles[0] != "appeal" {
+		t.Fatalf("suspended member obtained non-appeal privileges: %+v %v", claims, err)
+	}
+	if len(pair.Roles) != 1 || pair.Roles[0] != "appeal" {
+		t.Fatalf("login response exposed wrong roles: %+v", pair.Roles)
+	}
+	refreshed, err := svc.Refresh(context.Background(), pair.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "appeal" {
+		t.Fatalf("refresh did not preserve appeal restriction: %+v %v", refreshed.Roles, err)
+	}
+	if _, err := svc.LoginWithGoogle(context.Background(), a.Email); err == nil {
+		t.Fatal("Google bypassed suspension")
+	}
+	guard.decision.Suspended = false
+	refreshed, err = svc.Refresh(context.Background(), refreshed.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "member" {
+		t.Fatalf("refresh did not restore member role after reversal: %+v %v", refreshed.Roles, err)
+	}
+	pair, err = svc.Login(context.Background(), a.Email, "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("reversed action still blocks login: %v", err)
+	}
+	claims, err = svc.tokens.Parse(pair.AccessToken)
+	if err != nil || len(claims.Roles) != 1 || claims.Roles[0] != "member" {
+		t.Fatalf("reversal did not restore member role: %+v %v", claims, err)
 	}
 }
 

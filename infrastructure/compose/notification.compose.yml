@@ -33,6 +33,8 @@ services:
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-matchmate-local-notification-only}
       SECURITY_PUBLIC_URL: ${SECURITY_PUBLIC_URL:-http://localhost:5173}
       SECURITY_MAIL_TOKEN: ${SECURITY_MAIL_TOKEN:-matchmate-local-security-mail}
+      MODERATION_API_URL: http://moderation-api:8087
+      MODERATION_SERVICE_TOKEN: ${MODERATION_SERVICE_TOKEN:-matchmate-local-safety-only}
       NOTIFICATION_DEFAULT_LOCALE: en-LK
       NOTIFICATION_MAX_ATTEMPTS: "5"
       NOTIFICATION_POLL_INTERVAL: 1s

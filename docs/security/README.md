@@ -4,6 +4,8 @@ Account security now includes production-gated administrator TOTP, Google-admin 
 
 This baseline applies to every application, service, worker, contract, database, event, log, deployment, and operator workflow. Security and privacy controls are acceptance criteria, not post-launch enhancements.
 
+Moderation actions now have an authenticated private current-state read at Account login/discovery, Booking admission/payment snapshot and admin entry eligibility, Matchmaking generation/lock/publication/reveal, and Notification send/feed. The response exposes only effective booleans. Sensitive operations fail closed during a Moderation outage. Suspended members receive an `appeal`-role token after password verification so they can list their own active action IDs and appeal through Moderation; the role is denied at ordinary Account and Booking endpoints. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). No cross-database atomicity is claimed for an action committed after a final safety read.
+
 ## 1. Primary assets
 
 - Account PII, credentials, sessions, verification evidence, and profile media.
@@ -117,7 +119,7 @@ Where a service retains business audit records, they include actor, target, acti
 
 ## 10. Moderation and safety
 
-The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
+The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Appeal-only tokens can list the owner's active action summaries and submit an appeal through two GraphQL operations; normal Account profile and administrator operations remain closed. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
 
 The current per-process report limiter is defense-in-depth for local/single-replica use. Production requires gateway plus distributed rate enforcement. Downstream services must consume enforcement facts idempotently before cross-domain exclusion is complete.
 

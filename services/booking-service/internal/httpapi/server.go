@@ -38,6 +38,8 @@ func New(app *application.Service, v Verifier, log *slog.Logger) http.Handler {
 	m.Handle("GET /api/v1/admin/events/{eventId}/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("GET /api/v1/admin/registrations", s.protect(http.HandlerFunc(s.adminRegistrations)))
 	m.Handle("POST /api/v1/bookings/{bookingId}/cancel", s.protect(http.HandlerFunc(s.cancel)))
+	m.Handle("POST /api/v1/admin/bookings/{bookingId}/venue-collection", s.protect(http.HandlerFunc(s.collectVenue)))
+	m.Handle("POST /api/v1/admin/bookings/{bookingId}/check-in", s.protect(http.HandlerFunc(s.checkIn)))
 	m.Handle("GET /internal/v1/bookings/{bookingId}/payment-snapshot", s.protect(http.HandlerFunc(s.snapshot)))
 	return m
 }
@@ -47,6 +49,13 @@ func (s *Server) protect(next http.Handler) http.Handler {
 		p, err := s.auth.Verify(raw)
 		if err != nil {
 			problem(w, 401, "AUTHENTICATION_REQUIRED", "A valid access token is required.")
+			return
+		}
+		if len(p.Roles) == 1 && p.Roles[0] == "appeal" {
+			problem(w, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal.")
+			return
+		}
+		if handle(w, s.app.CheckActor(r.Context(), p.Subject)) {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
@@ -119,17 +128,60 @@ func (s *Server) adminRegistrations(w http.ResponseWriter, r *http.Request) {
 	}
 	type registration struct {
 		domain.Booking
-		AccountID string `json:"accountId"`
+		AccountID     string `json:"accountId"`
+		EntryEligible bool   `json:"entryEligible"`
 	}
 	result := make([]registration, 0, len(items))
 	for _, b := range items {
-		result = append(result, registration{Booking: b, AccountID: b.AccountID})
+		eligible, checkErr := s.app.EntryEligible(r.Context(), b)
+		if handle(w, checkErr) {
+			return
+		}
+		result = append(result, registration{Booking: b, AccountID: b.AccountID, EntryEligible: eligible})
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	write(w, 200, map[string]any{"items": result, "hasMore": hasMore})
 }
 func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
 	b, err := s.app.Cancel(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"))
+	if handle(w, err) {
+		return
+	}
+	write(w, 200, b)
+}
+func (s *Server) requireStaff(w http.ResponseWriter, r *http.Request) bool {
+	for _, role := range principal(r).Roles {
+		if role == "admin" {
+			return true
+		}
+	}
+	problem(w, 403, "ADMIN_ROLE_REQUIRED", "Administrator access is required.")
+	return false
+}
+func (s *Server) collectVenue(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaff(w, r) {
+		return
+	}
+	var in struct {
+		Method string `json:"method"`
+	}
+	d := json.NewDecoder(io.LimitReader(r.Body, 1<<16))
+	d.DisallowUnknownFields()
+	if d.Decode(&in) != nil {
+		problem(w, 400, "INVALID_REQUEST", "Request body is invalid.")
+		return
+	}
+	b, err := s.app.CollectVenue(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"), in.Method)
+	if handle(w, err) {
+		return
+	}
+	write(w, 200, b)
+}
+func (s *Server) checkIn(w http.ResponseWriter, r *http.Request) {
+	if !s.requireStaff(w, r) {
+		return
+	}
+	b, err := s.app.CheckIn(r.Context(), principal(r).Subject, r.PathValue("bookingId"), r.Header.Get("Idempotency-Key"))
 	if handle(w, err) {
 		return
 	}
@@ -173,6 +225,9 @@ func handle(w http.ResponseWriter, err error) bool {
 		status = 503
 		code = "DEPENDENCY_UNAVAILABLE"
 		detail = "A required service is unavailable."
+	}
+	if errors.Is(err, application.ErrExcluded) {
+		status, code, detail = 403, "EVENT_PARTICIPATION_EXCLUDED", "Event participation is unavailable."
 	}
 	problem(w, status, code, detail)
 	return true

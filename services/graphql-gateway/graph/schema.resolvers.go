@@ -60,6 +60,9 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/login", http.MethodPost, map[string]string{"email": email, "password": password, "totpCode": code}, &auth, nil); err != nil {
 		return nil, err
 	}
+	if onlyAppeal(auth.Roles) {
+		return &auth, nil
+	}
 	var me model.Me
 	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/users/me", http.MethodGet, nil, &me, map[string]string{"Authorization": "Bearer " + auth.AccessToken}); err != nil {
 		return nil, err
@@ -68,11 +71,21 @@ func (r *mutationResolver) Login(ctx context.Context, email string, password str
 	return &auth, nil
 }
 
+// AppealModerationAction is the resolver for the appealModerationAction field.
+func (r *mutationResolver) AppealModerationAction(ctx context.Context, actionID string, reason string) (*model.ModerationAppeal, error) {
+	var result model.ModerationAppeal
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Moderation, "/moderation/actions/"+escape(actionID)+"/appeals", http.MethodPost, map[string]string{"reason": reason}, &result, nil)
+	return &result, err
+}
+
 // RefreshSession is the resolver for the refreshSession field.
 func (r *mutationResolver) RefreshSession(ctx context.Context) (*model.AuthPayload, error) {
 	var auth model.AuthPayload
 	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/auth/refresh", http.MethodPost, nil, &auth, nil); err != nil {
 		return nil, err
+	}
+	if onlyAppeal(auth.Roles) {
+		return &auth, nil
 	}
 	var me model.Me
 	if err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/users/me", http.MethodGet, nil, &me, map[string]string{"Authorization": "Bearer " + auth.AccessToken}); err != nil {
@@ -123,6 +136,26 @@ func (r *mutationResolver) CreateBooking(ctx context.Context, eventID string, pa
 func (r *mutationResolver) CancelBooking(ctx context.Context, bookingID string, idempotencyKey string) (*model.Booking, error) {
 	var result model.Booking
 	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/bookings/"+escape(bookingID)+"/cancel", http.MethodPost, nil, &result, map[string]string{"Idempotency-Key": idempotencyKey})
+	return &result, err
+}
+
+// CollectVenuePayment is the resolver for the collectVenuePayment field.
+func (r *mutationResolver) CollectVenuePayment(ctx context.Context, bookingID string, method string, idempotencyKey string) (*model.Booking, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	var result model.Booking
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/admin/bookings/"+escape(bookingID)+"/venue-collection", http.MethodPost, map[string]string{"method": method}, &result, map[string]string{"Idempotency-Key": idempotencyKey})
+	return &result, err
+}
+
+// CheckInBooking is the resolver for the checkInBooking field.
+func (r *mutationResolver) CheckInBooking(ctx context.Context, bookingID string, idempotencyKey string) (*model.Booking, error) {
+	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	var result model.Booking
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Booking, "/admin/bookings/"+escape(bookingID)+"/check-in", http.MethodPost, nil, &result, map[string]string{"Idempotency-Key": idempotencyKey})
 	return &result, err
 }
 
@@ -238,6 +271,13 @@ func (r *mutationResolver) OverridePairing(ctx context.Context, runID string, ex
 func (r *queryResolver) Me(ctx context.Context) (*model.Me, error) {
 	var result model.Me
 	err := r.Upstream.Do(ctx, r.Upstream.Services.Account, "/users/me", http.MethodGet, nil, &result, nil)
+	return &result, err
+}
+
+// MyModerationActions is the resolver for the myModerationActions field.
+func (r *queryResolver) MyModerationActions(ctx context.Context) (*model.ModerationActionPage, error) {
+	var result model.ModerationActionPage
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Moderation, "/moderation/actions/mine", http.MethodGet, nil, &result, nil)
 	return &result, err
 }
 

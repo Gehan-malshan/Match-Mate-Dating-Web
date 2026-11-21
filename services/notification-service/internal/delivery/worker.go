@@ -8,6 +8,7 @@ import (
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/provider"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
 )
 
@@ -19,6 +20,15 @@ type Worker struct {
 	lease      time.Duration
 	retryBase  time.Duration
 	now        func() time.Time
+	safety     interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+}
+
+func (w *Worker) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	w.safety = client
 }
 
 // RecipientResolver resolves a verified delivery destination only at send time.
@@ -43,9 +53,19 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 		return found, err
 	}
 
-	message, renderErr := domain.Render(delivery.Template, delivery.Variables)
 	result := postgres.AttemptResult{StartedAt: started, CompletedAt: w.now().UTC()}
-	if renderErr != nil {
+	if w.safety != nil {
+		decision, checkErr := w.safety.Check(ctx, delivery.RecipientAccountID, delivery.EventID)
+		if checkErr != nil {
+			result.ErrorCode = "SAFETY_UNAVAILABLE"
+		} else if decision.Suspended || (delivery.Template.Category == "BOOKING" && (delivery.EventID == "" || decision.EventExcluded)) {
+			result.Suppressed, result.ErrorCode = true, "SAFETY_RESTRICTED"
+		}
+	}
+	message, renderErr := domain.Render(delivery.Template, delivery.Variables)
+	if result.ErrorCode != "" {
+		// A failed safety lookup retries; a restriction suppresses delivery.
+	} else if renderErr != nil {
 		result.PermanentFailure = true
 		result.ErrorCode = "TEMPLATE_RENDER_INVALID"
 	} else {
@@ -73,7 +93,7 @@ func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
 			}
 		}
 	}
-	if !result.Delivered && !result.PermanentFailure {
+	if !result.Delivered && !result.PermanentFailure && !result.Suppressed {
 		result.RetryAt = result.CompletedAt.Add(domain.RetryDelay(w.retryBase, delivery.AttemptCount))
 	}
 	state, err := w.repository.CompleteAttempt(ctx, delivery, result)

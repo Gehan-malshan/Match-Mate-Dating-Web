@@ -1,5 +1,11 @@
 # MatchMate API Conventions
 
+Booking administrator mutations `collectVenuePayment` and `checkInBooking` forward to Booking-owned REST commands with `Idempotency-Key`. Venue collection accepts only `CASH` or `CARD_AT_VENUE`; amount and currency come from the booking price snapshot. Venue check-in requires recorded collection and current moderation eligibility. Confirmed venue reservations cannot be cancelled. See Booking OpenAPI and ADR-0006.
+
+Suspended members who sign in with a password receive an Account token response with `roles: ["appeal"]`. GraphQL `login` and `refreshSession` return that role and omit `me`; the browser directs these sessions to `/appeal`. `myModerationActions` and `appealModerationAction` forward owner-scoped requests to Moderation. The gateway never substitutes a normal Account profile for an appeal session. Moderation verifies the bearer token and action ownership. A reversed action takes effect on the next login or refresh.
+
+Administrator registration queries include `entryEligible`, calculated by Booking from current confirmed state and event-scoped safety restrictions. It is a point-in-time decision; operators refresh before admission. A confirmed booking with `entryEligible: false` is not an entry credential.
+
 GraphQL mutations now include `resendVerification(email:)`, `requestPasswordReset(email:)`, `resetPassword(token:,password:)`, and `deleteMyAccount(password:)`. `login` accepts an optional `totpCode`. Account REST endpoints and Notification's private security-email endpoint are defined in their v1 OpenAPI contracts. Password reset and deletion revoke sessions; recovery requests return a generic acceptance response for unknown or ineligible accounts.
 
 Event REST now supports admin-only `PUT /api/v1/events/{eventId}/image` with a bounded base64 JPEG and public-after-publication `GET` on the same path. GraphQL offers admin-only `uploadEventImage`; public Event includes `imageVersion`. The gateway's `GET /media/events/{eventId}` is a read-only byte route, not a general service proxy. It returns 404 for drafts or absent images. Browser clients must not request raw bytes through GraphQL.

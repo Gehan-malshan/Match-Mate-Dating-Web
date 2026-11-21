@@ -1,5 +1,11 @@
 # Booking and Payment Local Runbook
 
+## Venue collection and check-in
+
+From the repository root, apply Booking migration 6 with `docker compose up --build -d booking-migrate booking-api graphql-api` (or start the full stack). Sign in as an administrator in the single web app, open **Registrations**, and refresh the table before admission. For an eligible confirmed `AT_VENUE` booking, record **cash** or **card at venue** only after money is actually received. Booking uses its stored amount/currency and records the administrator and UTC time. Then select **Check in**. An online confirmed booking can be checked in without a venue collection record. Confirmed venue bookings cannot be cancelled; pending online holds can still expire or be cancelled. Collection is a staff declaration and must be reconciled with cash or the external card terminal separately.
+
+To run the capacity and recovery component test against a disposable migrated PostgreSQL database, set `BOOKING_TEST_DATABASE_URL` and run `go -C services/booking-service test -count=1 ./internal/store/postgres`. The test creates and removes its own schema. It exercises last-seat contention, expiry, duplicate Payment events, collection retries, check-in retries, and no venue cancellation. Keep the database available during the run. Do not drop migration 6 columns after recording real collections.
+
 ## Safe initial policy
 
 Booking holds last 15 minutes by default and are configurable from 1 minute to 1 hour. There is no waitlist or automatic refund. A verified payment arriving after expiry enters `PAYMENT_REVIEW` and does not reclaim capacity.

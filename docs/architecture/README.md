@@ -8,7 +8,7 @@ Event media is an optional, Event-owned draft attachment. The administrator uplo
 
 ## Current event payment-choice slice
 
-The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**, not processed or marked paid in MatchMate. The member UI shows the due amount and never starts PayHere for venue bookings. Existing events default to online-only. See [ADR-0001](../adr/0001-event-payment-choice.md). Production separation of Payment/Matchmaking services is still an open deployment task.
+The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**. Staff can record cash or external card collection, then check in an eligible confirmed booking. That record is not PayHere settlement. Confirmed venue reservations cannot be cancelled. See [ADR-0001](../adr/0001-event-payment-choice.md) and [ADR-0006](../adr/0006-venue-collection-and-checkin.md). Production separation of Payment/Matchmaking services is still an open deployment task.
 
 This is the canonical architecture description for MatchMate. It must remain synchronized with implementation, OpenAPI, AsyncAPI, service READMEs, ADRs, migrations, tests, and runbooks.
 
@@ -150,7 +150,7 @@ The executable slice consumes minimum-safe Account and Booking facts containing 
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
 
-The first executable standalone slice owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe report status and moderator/admin operations, expires due actions, and publishes minimum-safe enforcement facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification consumers remain required before cross-domain enforcement is complete.
+Moderation owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe action IDs and moderator/admin operations, expires due actions, and publishes minimum-safe facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification use an authenticated, uncached safety REST read for immediate decisions; see [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). A suspension limits password sign-in to an appeal-only role. The GraphQL gateway forwards owner action listing and appeal submission; the browser renders a restricted `/appeal` route. Restriction checks are repeated near critical writes. Cross-service atomic admission, paid-booking resolution, moderator browser UI, and production load/outage evidence remain open.
 
 ## 9. Communication model
 
@@ -195,9 +195,11 @@ OpenAPI becomes authoritative when specifications exist.
 | POST | `/api/v1/blocks` | Account | Block member |
 | GET/POST | `/api/v1/events` | Event | Discover/create events |
 | GET/PATCH | `/api/v1/events/{eventId}` | Event | Read/update event |
-| POST | `/api/v1/bookings` | Booking | Create hold |
+| POST | `/api/v1/bookings` | Booking | Create online hold or confirmed venue reservation |
 | GET | `/api/v1/bookings/{bookingId}` | Booking | Read authorized booking |
-| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel/request cancellation |
+| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel an unpaid online hold only |
+| POST | `/api/v1/admin/bookings/{bookingId}/venue-collection` | Booking | Record administrator venue collection |
+| POST | `/api/v1/admin/bookings/{bookingId}/check-in` | Booking | Check in eligible confirmed booking |
 | POST | `/api/v1/payments/initiate` | Payment | Start PayHere from booking ID |
 | POST | `/api/v1/payments/payhere/callback` | Payment | Provider callback |
 | GET/POST | `/api/v1/events/{eventId}/matching-runs` | Matchmaking | List/generate runs |

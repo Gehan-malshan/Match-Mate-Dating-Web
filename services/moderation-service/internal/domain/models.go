@@ -122,6 +122,23 @@ type Action struct {
 	State       string      `json:"state"`
 	CreatedAt   time.Time   `json:"createdAt"`
 }
+
+// EffectiveSafety is the current, authoritative decision for an account.
+// It contains no report, evidence, or moderator details.
+type EffectiveSafety struct {
+	Suspended           bool `json:"suspended"`
+	ProfileHidden       bool `json:"profileHidden"`
+	EventExcluded       bool `json:"eventExcluded"`
+	MatchmakingExcluded bool `json:"matchmakingExcluded"`
+	RevealPrevented     bool `json:"revealPrevented"`
+}
+type OwnAction struct {
+	ID          string      `json:"actionId"`
+	Class       ActionClass `json:"actionClass"`
+	Scope       string      `json:"scope"`
+	EffectiveAt time.Time   `json:"effectiveAt"`
+	ExpiresAt   *time.Time  `json:"expiresAt,omitempty"`
+}
 type Appeal struct {
 	ID             string     `json:"appealId"`
 	ActionID       string     `json:"actionId"`

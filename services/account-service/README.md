@@ -1,5 +1,11 @@
 # Account and Profile Service
 
+## Moderation enforcement
+
+Login and refresh responses include the issued `roles` list so the browser gateway can identify a restricted appeal session without requesting `/users/me`. This is an additive v1 field and mirrors the signed token roles.
+
+When `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN` are configured, Account reads current effective Moderation actions before password/Google sign-in, refresh, token authentication, public profile discovery, and notification-recipient resolution. A suspended member receives only an `appeal` role token after password sign-in; ordinary Account endpoints reject it, while Moderation's owner-scoped action list and appeal endpoint accept it. Google cannot issue an appeal token. Profile restriction hides community results immediately. Sensitive reads fail closed when Moderation is unavailable. Production requires both settings; see [ADR-0005](../../docs/adr/0005-authoritative-moderation-safety-reads.md).
+
 ## Security lifecycle update (ADR-0003)
 
 Migration 2 adds hashed single-use password-reset tokens, PostgreSQL-backed security rate windows, and encrypted administrator TOTP records. Account sends raw verification/recovery links only through Notification's private transient SMTP endpoint; the token is never included in an event. The browser exposes `/verify-email`, `/forgot-password`, and `/reset-password`. Password reset revokes all sessions and increments token version. Administrator password login requires TOTP when `ADMIN_MFA_ENCRYPTION_KEY` is set; production requires it. Google login cannot bypass administrator MFA. Provision the first authenticator through `cmd/admin-mfa` as described in `docs/runbooks/account-security.md`.

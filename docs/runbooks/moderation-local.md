@@ -34,6 +34,16 @@ Remove-Item Env:MODERATION_TEST_DATABASE_URL
 
 For a manual workflow, obtain real Account-issued member and moderator tokens. Submit a report, assign its case, move it to `INVESTIGATING`, then either apply an action or move it to `DISMISSED`. Use the exact URLs from `contracts/openapi/moderation-v1.yaml`; do not paste Markdown link syntax into PowerShell.
 
+After an action is applied, query the private current-state endpoint from the local workstation with the development-only `MODERATION_SERVICE_TOKEN` value in the ignored root `.env` (or the Compose default). For example, set `$safetyToken` in the current PowerShell session and call `Invoke-RestMethod -Uri "http://localhost:8087/api/v1/internal/safety/ACCOUNT_UUID?eventId=EVENT_UUID" -Headers @{"X-Moderation-Service-Token"=$safetyToken}`. The response contains booleans only. Never paste a real production token in a command transcript. The private route must not be exposed publicly in production.
+
+Apply `ACCOUNT_SUSPENSION` or `PROFILE_RESTRICTION` to an Account UUID with scope `ALL`; use an event UUID or `ALL` for `EVENT_EXCLUSION`, `MATCHMAKING_EXCLUSION`, and `REVEAL_PREVENTION`. A suspended member can password-sign-in to obtain an `appeal`-only token. With that token, `GET /api/v1/moderation/actions/mine` returns the member's active action IDs; `POST /api/v1/moderation/actions/{actionId}/appeals` submits a reason. A moderator can uphold or reverse it. Re-query the current-state endpoint and retry Booking/Matchmaking/Notification actions after reversal; a reversed action stops applying without deleting audit history. The member must refresh or sign in again to regain ordinary roles.
+
+For the browser path, sign in through the common `/login` page with a suspended member's password. The backend-issued `appeal` role directs the browser to `/appeal`, where the owner can select an active action and enter a reason of 10–1000 characters. GraphQL forwards only the owner action list and appeal request to Moderation. A stale signed administrator token is also denied by Moderation, Booking, and Matchmaking when the current suspension is active.
+
+Booking administrative registration rows now include `entryEligible`. Treat `false` as an entry prohibition even when the historical booking state remains `CONFIRMED`. Do not cancel a paid booking or release capacity automatically until the approved policy covers exclusions. A Moderation outage makes safety-sensitive operations return unavailable or retry; investigate the service rather than bypassing it. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md).
+
+The admin Registrations table displays this point-in-time decision as **Eligible**, **Entry blocked**, or **Not confirmed**. Refresh the table immediately before using the administrator check-in action. Booking rechecks current eligibility when check-in is requested; the displayed decision alone is not an admission credential.
+
 An unavailable database makes readiness fail. RabbitMQ failure must not roll back reports or actions: facts remain in the Moderation-owned outbox and publish after relay recovery. Never delete or rewrite unpublished rows. Action expiry is idempotent through row locking and state checks.
 
 Rollback stops long-running Moderation processes and preserves PostgreSQL evidence, audit, and outbox state:

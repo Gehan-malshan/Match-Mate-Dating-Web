@@ -286,7 +286,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {
@@ -304,7 +304,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {
@@ -434,6 +434,10 @@ func (s *Server) protected(next http.Handler) http.Handler {
 		}
 		c, err := s.app.Authenticate(r.Context(), raw)
 		if handle(w, r, err) {
+			return
+		}
+		if len(c.Roles) == 1 && c.Roles[0] == "appeal" {
+			problem(w, r, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal", nil)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, c)))

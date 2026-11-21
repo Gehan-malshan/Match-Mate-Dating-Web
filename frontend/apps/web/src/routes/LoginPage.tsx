@@ -31,7 +31,12 @@ export function LoginPage() {
     onSubmit: async ({ value }) => {
       setMessage('')
       try {
-        const { me } = await login(value.email, value.password, value.totpCode)
+        const { me, roles } = await login(value.email, value.password, value.totpCode)
+        if (roles.length === 1 && roles[0] === 'appeal') {
+          await navigate({ to: '/appeal' })
+          return
+        }
+        if (!me) throw new Error('Account details are unavailable')
         if (me.account.roles.includes('admin')) {
           await navigate({ to: '/admin' })
           return

@@ -17,6 +17,7 @@ import (
 	"github.com/gehan-malshan/matchmate/notification-service/internal/provider"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/provider/devsink"
 	mailprovider "github.com/gehan-malshan/matchmate/notification-service/internal/provider/smtp"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -40,6 +41,9 @@ func main() {
 	defer pool.Close()
 	repository := postgres.New(pool)
 	feed := application.NewFeedService(repository)
+	if cfg.ModerationURL != "" {
+		feed.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
+	}
 	var securitySender provider.Sender = devsink.New(log)
 	if cfg.Provider == "smtp" {
 		securitySender = mailprovider.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)

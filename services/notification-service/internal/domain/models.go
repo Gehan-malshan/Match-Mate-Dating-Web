@@ -49,6 +49,7 @@ type Plan struct {
 	Channel            string
 	Category           string
 	RecipientAccountID string
+	EventID            string
 	BusinessKey        string
 	SourceAggregateID  string
 	SuppressionReason  string
@@ -71,6 +72,7 @@ type Delivery struct {
 	ID                 string
 	BusinessKey        string
 	RecipientAccountID string
+	EventID            string
 	SourceEventID      string
 	SourceEventType    string
 	SourceAggregateID  string
@@ -90,12 +92,18 @@ type FeedCursor struct {
 
 type FeedRecord struct {
 	ID              string
+	EventID         string
 	SourceEventType string
 	Category        string
 	Template        Template
 	Variables       map[string]string
 	ReadAt          *time.Time
 	CreatedAt       time.Time
+}
+type UnreadGroup struct {
+	EventID  string
+	Category string
+	Count    int
 }
 
 type FeedItem struct {

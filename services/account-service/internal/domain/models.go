@@ -99,6 +99,7 @@ type Session struct {
 }
 type TokenPair struct {
 	AccessToken      string    `json:"accessToken"`
+	Roles            []string  `json:"roles"`
 	RefreshToken     string    `json:"-"`
 	AccessExpiresAt  time.Time `json:"accessExpiresAt"`
 	RefreshExpiresAt time.Time `json:"-"`

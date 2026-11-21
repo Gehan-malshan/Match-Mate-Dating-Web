@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
 )
 
@@ -96,5 +97,50 @@ func TestWorkerTreatsInvalidTemplateAsPermanent(t *testing.T) {
 	}
 	if !repository.result.PermanentFailure || repository.result.ErrorCode != "TEMPLATE_RENDER_INVALID" {
 		t.Fatalf("unexpected attempt result: %+v", repository.result)
+	}
+}
+
+type safetyStub struct {
+	decision safety.Decision
+	err      error
+}
+
+func (s *safetyStub) Check(context.Context, string, string) (safety.Decision, error) {
+	return s.decision, s.err
+}
+
+type countingSender struct{ sends int }
+
+func (s *countingSender) Send(context.Context, domain.Delivery, domain.RenderedMessage, string) (string, error) {
+	s.sends++
+	return "sent", nil
+}
+func TestWorkerSuppressesRestrictedDeliveryAndRetriesSafetyOutage(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		decision   safety.Decision
+		checkErr   error
+		suppressed bool
+		code       string
+	}{
+		{"suspended", safety.Decision{Suspended: true}, nil, true, "SAFETY_RESTRICTED"},
+		{"event excluded", safety.Decision{EventExcluded: true}, nil, true, "SAFETY_RESTRICTED"},
+		{"lookup unavailable", safety.Decision{}, errors.New("offline"), false, "SAFETY_UNAVAILABLE"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			delivery := testDelivery()
+			delivery.EventID = "event"
+			delivery.Template.Category = "BOOKING"
+			repo := &repositoryStub{delivery: delivery, found: true, state: domain.DeliverySuppressed}
+			sender := &countingSender{}
+			worker := NewWorker(repo, sender, nil, slog.New(slog.NewTextHandler(io.Discard, nil)), time.Minute, time.Minute)
+			worker.SetSafety(&safetyStub{decision: tc.decision, err: tc.checkErr})
+			if _, err := worker.RunOnce(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if sender.sends != 0 || repo.result.Suppressed != tc.suppressed || repo.result.ErrorCode != tc.code {
+				t.Fatalf("sender=%d result=%+v", sender.sends, repo.result)
+			}
+		})
 	}
 }

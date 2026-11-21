@@ -48,21 +48,25 @@ type ComplexityRoot struct {
 	AuthPayload struct {
 		AccessToken func(childComplexity int) int
 		Me          func(childComplexity int) int
+		Roles       func(childComplexity int) int
 	}
 
 	Booking struct {
-		Amount        func(childComplexity int) int
-		BookingID     func(childComplexity int) int
-		CancelledAt   func(childComplexity int) int
-		ConfirmedAt   func(childComplexity int) int
-		CreatedAt     func(childComplexity int) int
-		Currency      func(childComplexity int) int
-		EventID       func(childComplexity int) int
-		ExpiresAt     func(childComplexity int) int
-		PaymentMethod func(childComplexity int) int
-		PolicyVersion func(childComplexity int) int
-		State         func(childComplexity int) int
-		Version       func(childComplexity int) int
+		Amount                func(childComplexity int) int
+		BookingID             func(childComplexity int) int
+		CancelledAt           func(childComplexity int) int
+		CheckedInAt           func(childComplexity int) int
+		ConfirmedAt           func(childComplexity int) int
+		CreatedAt             func(childComplexity int) int
+		Currency              func(childComplexity int) int
+		EventID               func(childComplexity int) int
+		ExpiresAt             func(childComplexity int) int
+		PaymentMethod         func(childComplexity int) int
+		PolicyVersion         func(childComplexity int) int
+		State                 func(childComplexity int) int
+		VenueCollectedAt      func(childComplexity int) int
+		VenueCollectionMethod func(childComplexity int) int
+		Version               func(childComplexity int) int
 	}
 
 	BookingPage struct {
@@ -130,17 +134,21 @@ type ComplexityRoot struct {
 	}
 
 	EventRegistration struct {
-		AccountID     func(childComplexity int) int
-		Amount        func(childComplexity int) int
-		BookingID     func(childComplexity int) int
-		ConfirmedAt   func(childComplexity int) int
-		CreatedAt     func(childComplexity int) int
-		Currency      func(childComplexity int) int
-		Email         func(childComplexity int) int
-		EventID       func(childComplexity int) int
-		Nickname      func(childComplexity int) int
-		PaymentMethod func(childComplexity int) int
-		State         func(childComplexity int) int
+		AccountID             func(childComplexity int) int
+		Amount                func(childComplexity int) int
+		BookingID             func(childComplexity int) int
+		CheckedInAt           func(childComplexity int) int
+		ConfirmedAt           func(childComplexity int) int
+		CreatedAt             func(childComplexity int) int
+		Currency              func(childComplexity int) int
+		Email                 func(childComplexity int) int
+		EntryEligible         func(childComplexity int) int
+		EventID               func(childComplexity int) int
+		Nickname              func(childComplexity int) int
+		PaymentMethod         func(childComplexity int) int
+		State                 func(childComplexity int) int
+		VenueCollectedAt      func(childComplexity int) int
+		VenueCollectionMethod func(childComplexity int) int
 	}
 
 	EventRegistrationPage struct {
@@ -187,10 +195,31 @@ type ComplexityRoot struct {
 		Profile     func(childComplexity int) int
 	}
 
+	ModerationAction struct {
+		ActionClass func(childComplexity int) int
+		ActionID    func(childComplexity int) int
+		EffectiveAt func(childComplexity int) int
+		ExpiresAt   func(childComplexity int) int
+		Scope       func(childComplexity int) int
+	}
+
+	ModerationActionPage struct {
+		Items func(childComplexity int) int
+	}
+
+	ModerationAppeal struct {
+		ActionID func(childComplexity int) int
+		AppealID func(childComplexity int) int
+		State    func(childComplexity int) int
+	}
+
 	Mutation struct {
+		AppealModerationAction   func(childComplexity int, actionID string, reason string) int
 		ArchiveEvent             func(childComplexity int, eventID string, expectedVersion int) int
 		BlockMember              func(childComplexity int, accountID string) int
 		CancelBooking            func(childComplexity int, bookingID string, idempotencyKey string) int
+		CheckInBooking           func(childComplexity int, bookingID string, idempotencyKey string) int
+		CollectVenuePayment      func(childComplexity int, bookingID string, method string, idempotencyKey string) int
 		CreateBooking            func(childComplexity int, eventID string, paymentMethod *string, idempotencyKey string) int
 		CreateEvent              func(childComplexity int, input model.EventInput) int
 		DeleteMyAccount          func(childComplexity int, password string) int
@@ -288,6 +317,7 @@ type ComplexityRoot struct {
 		MatchingRun             func(childComplexity int, runID string) int
 		MatchingRuns            func(childComplexity int, eventID string) int
 		Me                      func(childComplexity int) int
+		MyModerationActions     func(childComplexity int) int
 		Notifications           func(childComplexity int, limit *int, cursor *string) int
 		Payment                 func(childComplexity int, bookingID string) int
 		UnreadNotificationCount func(childComplexity int) int
@@ -325,6 +355,7 @@ type MutationResolver interface {
 	ResetPassword(ctx context.Context, token string, password string) (*model.OperationResult, error)
 	DeleteMyAccount(ctx context.Context, password string) (*model.OperationResult, error)
 	Login(ctx context.Context, email string, password string, totpCode *string) (*model.AuthPayload, error)
+	AppealModerationAction(ctx context.Context, actionID string, reason string) (*model.ModerationAppeal, error)
 	RefreshSession(ctx context.Context) (*model.AuthPayload, error)
 	Logout(ctx context.Context) (*model.OperationResult, error)
 	UpdateProfile(ctx context.Context, input model.ProfileInput) (*model.Profile, error)
@@ -332,6 +363,8 @@ type MutationResolver interface {
 	BlockMember(ctx context.Context, accountID string) (*model.OperationResult, error)
 	CreateBooking(ctx context.Context, eventID string, paymentMethod *string, idempotencyKey string) (*model.Booking, error)
 	CancelBooking(ctx context.Context, bookingID string, idempotencyKey string) (*model.Booking, error)
+	CollectVenuePayment(ctx context.Context, bookingID string, method string, idempotencyKey string) (*model.Booking, error)
+	CheckInBooking(ctx context.Context, bookingID string, idempotencyKey string) (*model.Booking, error)
 	InitiatePayment(ctx context.Context, input model.CheckoutCustomerInput, idempotencyKey string) (*model.Checkout, error)
 	MarkNotificationRead(ctx context.Context, notificationID string) (*model.OperationResult, error)
 	MarkAllNotificationsRead(ctx context.Context) (*model.UpdatedCount, error)
@@ -349,6 +382,7 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Me(ctx context.Context) (*model.Me, error)
+	MyModerationActions(ctx context.Context) (*model.ModerationActionPage, error)
 	CommunityProfiles(ctx context.Context, limit *int, cursor *string) (*model.CommunityPage, error)
 	CommunityProfile(ctx context.Context, profileID string) (*model.CommunityProfile, error)
 	Events(ctx context.Context, limit *int, cursor *string) (*model.EventPage, error)
@@ -425,6 +459,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.AuthPayload.Me(childComplexity), true
+	case "AuthPayload.roles":
+		if e.ComplexityRoot.AuthPayload.Roles == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AuthPayload.Roles(childComplexity), true
 
 	case "Booking.amount":
 		if e.ComplexityRoot.Booking.Amount == nil {
@@ -444,6 +484,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Booking.CancelledAt(childComplexity), true
+	case "Booking.checkedInAt":
+		if e.ComplexityRoot.Booking.CheckedInAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Booking.CheckedInAt(childComplexity), true
 	case "Booking.confirmedAt":
 		if e.ComplexityRoot.Booking.ConfirmedAt == nil {
 			break
@@ -492,6 +538,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Booking.State(childComplexity), true
+	case "Booking.venueCollectedAt":
+		if e.ComplexityRoot.Booking.VenueCollectedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Booking.VenueCollectedAt(childComplexity), true
+	case "Booking.venueCollectionMethod":
+		if e.ComplexityRoot.Booking.VenueCollectionMethod == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Booking.VenueCollectionMethod(childComplexity), true
 	case "Booking.version":
 		if e.ComplexityRoot.Booking.Version == nil {
 			break
@@ -782,6 +840,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.EventRegistration.BookingID(childComplexity), true
+	case "EventRegistration.checkedInAt":
+		if e.ComplexityRoot.EventRegistration.CheckedInAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EventRegistration.CheckedInAt(childComplexity), true
 	case "EventRegistration.confirmedAt":
 		if e.ComplexityRoot.EventRegistration.ConfirmedAt == nil {
 			break
@@ -806,6 +870,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.EventRegistration.Email(childComplexity), true
+	case "EventRegistration.entryEligible":
+		if e.ComplexityRoot.EventRegistration.EntryEligible == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EventRegistration.EntryEligible(childComplexity), true
 	case "EventRegistration.eventId":
 		if e.ComplexityRoot.EventRegistration.EventID == nil {
 			break
@@ -830,6 +900,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.EventRegistration.State(childComplexity), true
+	case "EventRegistration.venueCollectedAt":
+		if e.ComplexityRoot.EventRegistration.VenueCollectedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EventRegistration.VenueCollectedAt(childComplexity), true
+	case "EventRegistration.venueCollectionMethod":
+		if e.ComplexityRoot.EventRegistration.VenueCollectionMethod == nil {
+			break
+		}
+
+		return e.ComplexityRoot.EventRegistration.VenueCollectionMethod(childComplexity), true
 
 	case "EventRegistrationPage.hasMore":
 		if e.ComplexityRoot.EventRegistrationPage.HasMore == nil {
@@ -1010,6 +1092,74 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Me.Profile(childComplexity), true
 
+	case "ModerationAction.actionClass":
+		if e.ComplexityRoot.ModerationAction.ActionClass == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAction.ActionClass(childComplexity), true
+	case "ModerationAction.actionId":
+		if e.ComplexityRoot.ModerationAction.ActionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAction.ActionID(childComplexity), true
+	case "ModerationAction.effectiveAt":
+		if e.ComplexityRoot.ModerationAction.EffectiveAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAction.EffectiveAt(childComplexity), true
+	case "ModerationAction.expiresAt":
+		if e.ComplexityRoot.ModerationAction.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAction.ExpiresAt(childComplexity), true
+	case "ModerationAction.scope":
+		if e.ComplexityRoot.ModerationAction.Scope == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAction.Scope(childComplexity), true
+
+	case "ModerationActionPage.items":
+		if e.ComplexityRoot.ModerationActionPage.Items == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationActionPage.Items(childComplexity), true
+
+	case "ModerationAppeal.actionId":
+		if e.ComplexityRoot.ModerationAppeal.ActionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAppeal.ActionID(childComplexity), true
+	case "ModerationAppeal.appealId":
+		if e.ComplexityRoot.ModerationAppeal.AppealID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAppeal.AppealID(childComplexity), true
+	case "ModerationAppeal.state":
+		if e.ComplexityRoot.ModerationAppeal.State == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ModerationAppeal.State(childComplexity), true
+
+	case "Mutation.appealModerationAction":
+		if e.ComplexityRoot.Mutation.AppealModerationAction == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_appealModerationAction_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.AppealModerationAction(childComplexity, args["actionId"].(string), args["reason"].(string)), true
 	case "Mutation.archiveEvent":
 		if e.ComplexityRoot.Mutation.ArchiveEvent == nil {
 			break
@@ -1043,6 +1193,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CancelBooking(childComplexity, args["bookingId"].(string), args["idempotencyKey"].(string)), true
+	case "Mutation.checkInBooking":
+		if e.ComplexityRoot.Mutation.CheckInBooking == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_checkInBooking_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CheckInBooking(childComplexity, args["bookingId"].(string), args["idempotencyKey"].(string)), true
+	case "Mutation.collectVenuePayment":
+		if e.ComplexityRoot.Mutation.CollectVenuePayment == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_collectVenuePayment_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CollectVenuePayment(childComplexity, args["bookingId"].(string), args["method"].(string), args["idempotencyKey"].(string)), true
 	case "Mutation.createBooking":
 		if e.ComplexityRoot.Mutation.CreateBooking == nil {
 			break
@@ -1662,6 +1834,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Me(childComplexity), true
+	case "Query.myModerationActions":
+		if e.ComplexityRoot.Query.MyModerationActions == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Query.MyModerationActions(childComplexity), true
 	case "Query.notifications":
 		if e.ComplexityRoot.Query.Notifications == nil {
 			break
@@ -1865,6 +2043,8 @@ func (ec *executionContext) childFields_AuthPayload(ctx context.Context, field g
 	switch field.Name {
 	case "accessToken":
 		return ec.fieldContext_AuthPayload_accessToken(ctx, field)
+	case "roles":
+		return ec.fieldContext_AuthPayload_roles(ctx, field)
 	case "me":
 		return ec.fieldContext_AuthPayload_me(ctx, field)
 	}
@@ -1897,6 +2077,12 @@ func (ec *executionContext) childFields_Booking(ctx context.Context, field graph
 		return ec.fieldContext_Booking_confirmedAt(ctx, field)
 	case "cancelledAt":
 		return ec.fieldContext_Booking_cancelledAt(ctx, field)
+	case "venueCollectedAt":
+		return ec.fieldContext_Booking_venueCollectedAt(ctx, field)
+	case "venueCollectionMethod":
+		return ec.fieldContext_Booking_venueCollectionMethod(ctx, field)
+	case "checkedInAt":
+		return ec.fieldContext_Booking_checkedInAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Booking", field.Name)
 }
@@ -2043,6 +2229,8 @@ func (ec *executionContext) childFields_EventRegistration(ctx context.Context, f
 		return ec.fieldContext_EventRegistration_eventId(ctx, field)
 	case "state":
 		return ec.fieldContext_EventRegistration_state(ctx, field)
+	case "entryEligible":
+		return ec.fieldContext_EventRegistration_entryEligible(ctx, field)
 	case "paymentMethod":
 		return ec.fieldContext_EventRegistration_paymentMethod(ctx, field)
 	case "amount":
@@ -2053,6 +2241,12 @@ func (ec *executionContext) childFields_EventRegistration(ctx context.Context, f
 		return ec.fieldContext_EventRegistration_createdAt(ctx, field)
 	case "confirmedAt":
 		return ec.fieldContext_EventRegistration_confirmedAt(ctx, field)
+	case "venueCollectedAt":
+		return ec.fieldContext_EventRegistration_venueCollectedAt(ctx, field)
+	case "venueCollectionMethod":
+		return ec.fieldContext_EventRegistration_venueCollectionMethod(ctx, field)
+	case "checkedInAt":
+		return ec.fieldContext_EventRegistration_checkedInAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type EventRegistration", field.Name)
 }
@@ -2143,6 +2337,42 @@ func (ec *executionContext) childFields_Me(ctx context.Context, field graphql.Co
 		return ec.fieldContext_Me_preferences(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Me", field.Name)
+}
+
+func (ec *executionContext) childFields_ModerationAction(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "actionId":
+		return ec.fieldContext_ModerationAction_actionId(ctx, field)
+	case "actionClass":
+		return ec.fieldContext_ModerationAction_actionClass(ctx, field)
+	case "scope":
+		return ec.fieldContext_ModerationAction_scope(ctx, field)
+	case "effectiveAt":
+		return ec.fieldContext_ModerationAction_effectiveAt(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_ModerationAction_expiresAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ModerationAction", field.Name)
+}
+
+func (ec *executionContext) childFields_ModerationActionPage(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "items":
+		return ec.fieldContext_ModerationActionPage_items(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ModerationActionPage", field.Name)
+}
+
+func (ec *executionContext) childFields_ModerationAppeal(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "appealId":
+		return ec.fieldContext_ModerationAppeal_appealId(ctx, field)
+	case "actionId":
+		return ec.fieldContext_ModerationAppeal_actionId(ctx, field)
+	case "state":
+		return ec.fieldContext_ModerationAppeal_state(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ModerationAppeal", field.Name)
 }
 
 func (ec *executionContext) childFields_Notification(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2415,6 +2645,28 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_appealModerationAction_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "actionId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["actionId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "reason",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["reason"] = arg1
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_archiveEvent_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2470,6 +2722,58 @@ func (ec *executionContext) field_Mutation_cancelBooking_args(ctx context.Contex
 		return nil, err
 	}
 	args["idempotencyKey"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_checkInBooking_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "bookingId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["bookingId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "idempotencyKey",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["idempotencyKey"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_collectVenuePayment_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "bookingId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["bookingId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "method",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["method"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "idempotencyKey",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNString2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["idempotencyKey"] = arg2
 	return args, nil
 }
 
@@ -3371,6 +3675,29 @@ func (ec *executionContext) fieldContext_AuthPayload_accessToken(_ context.Conte
 	return graphql.NewScalarFieldContext("AuthPayload", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _AuthPayload_roles(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AuthPayload_roles(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Roles, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AuthPayload_roles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AuthPayload", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _AuthPayload_me(ctx context.Context, field graphql.CollectedField, obj *model.AuthPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3676,6 +4003,75 @@ func (ec *executionContext) _Booking_cancelledAt(ctx context.Context, field grap
 	)
 }
 func (ec *executionContext) fieldContext_Booking_cancelledAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Booking", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Booking_venueCollectedAt(ctx context.Context, field graphql.CollectedField, obj *model.Booking) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Booking_venueCollectedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VenueCollectedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Booking_venueCollectedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Booking", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Booking_venueCollectionMethod(ctx context.Context, field graphql.CollectedField, obj *model.Booking) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Booking_venueCollectionMethod(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VenueCollectionMethod, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Booking_venueCollectionMethod(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Booking", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Booking_checkedInAt(ctx context.Context, field graphql.CollectedField, obj *model.Booking) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Booking_checkedInAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CheckedInAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Booking_checkedInAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Booking", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -4842,6 +5238,29 @@ func (ec *executionContext) fieldContext_EventRegistration_state(_ context.Conte
 	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _EventRegistration_entryEligible(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EventRegistration_entryEligible(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EntryEligible, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_EventRegistration_entryEligible(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
 func (ec *executionContext) _EventRegistration_paymentMethod(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4954,6 +5373,75 @@ func (ec *executionContext) _EventRegistration_confirmedAt(ctx context.Context, 
 	)
 }
 func (ec *executionContext) fieldContext_EventRegistration_confirmedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EventRegistration_venueCollectedAt(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EventRegistration_venueCollectedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VenueCollectedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_EventRegistration_venueCollectedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EventRegistration_venueCollectionMethod(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EventRegistration_venueCollectionMethod(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.VenueCollectionMethod, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_EventRegistration_venueCollectionMethod(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _EventRegistration_checkedInAt(ctx context.Context, field graphql.CollectedField, obj *model.EventRegistration) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_EventRegistration_checkedInAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CheckedInAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_EventRegistration_checkedInAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("EventRegistration", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -5705,6 +6193,222 @@ func (ec *executionContext) fieldContext_Me_preferences(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _ModerationAction_actionId(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAction_actionId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAction_actionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAction", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAction_actionClass(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAction_actionClass(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionClass, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAction_actionClass(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAction", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAction_scope(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAction_scope(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Scope, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAction_scope(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAction", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAction_effectiveAt(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAction_effectiveAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.EffectiveAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAction_effectiveAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAction", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAction_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAction) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAction_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAction_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAction", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationActionPage_items(ctx context.Context, field graphql.CollectedField, obj *model.ModerationActionPage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationActionPage_items(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Items, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ModerationAction) graphql.Marshaler {
+			return ec.marshalNModerationAction2ᚕᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationActionᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationActionPage_items(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ModerationActionPage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ModerationAction(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ModerationAppeal_appealId(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAppeal) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAppeal_appealId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AppealID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAppeal_appealId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAppeal", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAppeal_actionId(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAppeal) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAppeal_actionId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ActionID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAppeal_actionId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAppeal", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ModerationAppeal_state(ctx context.Context, field graphql.CollectedField, obj *model.ModerationAppeal) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ModerationAppeal_state(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.State, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ModerationAppeal_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ModerationAppeal", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _Mutation_register(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6013,6 +6717,50 @@ func (ec *executionContext) fieldContext_Mutation_login(ctx context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_appealModerationAction(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_appealModerationAction(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().AppealModerationAction(ctx, fc.Args["actionId"].(string), fc.Args["reason"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ModerationAppeal) graphql.Marshaler {
+			return ec.marshalNModerationAppeal2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationAppeal(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_appealModerationAction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ModerationAppeal(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_appealModerationAction_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_refreshSession(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6291,6 +7039,94 @@ func (ec *executionContext) fieldContext_Mutation_cancelBooking(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_cancelBooking_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_collectVenuePayment(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_collectVenuePayment(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CollectVenuePayment(ctx, fc.Args["bookingId"].(string), fc.Args["method"].(string), fc.Args["idempotencyKey"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
+			return ec.marshalNBooking2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐBooking(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_collectVenuePayment(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Booking(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_collectVenuePayment_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_checkInBooking(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_checkInBooking(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CheckInBooking(ctx, fc.Args["bookingId"].(string), fc.Args["idempotencyKey"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Booking) graphql.Marshaler {
+			return ec.marshalNBooking2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐBooking(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_checkInBooking(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Booking(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_checkInBooking_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7857,6 +8693,38 @@ func (ec *executionContext) fieldContext_Query_me(_ context.Context, field graph
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_Me(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myModerationActions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_myModerationActions(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.Query().MyModerationActions(ctx)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ModerationActionPage) graphql.Marshaler {
+			return ec.marshalNModerationActionPage2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationActionPage(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_myModerationActions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ModerationActionPage(ctx, field)
 		},
 	}
 	return fc, nil
@@ -10244,6 +11112,11 @@ func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "roles":
+			out.Values[i] = ec._AuthPayload_roles(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "me":
 			out.Values[i] = ec._AuthPayload_me(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
@@ -10339,6 +11212,21 @@ func (ec *executionContext) _Booking(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "cancelledAt":
 			out.Values[i] = ec._Booking_cancelledAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "venueCollectedAt":
+			out.Values[i] = ec._Booking_venueCollectedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "venueCollectionMethod":
+			out.Values[i] = ec._Booking_venueCollectionMethod(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "checkedInAt":
+			out.Values[i] = ec._Booking_checkedInAt(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -10851,6 +11739,11 @@ func (ec *executionContext) _EventRegistration(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "entryEligible":
+			out.Values[i] = ec._EventRegistration_entryEligible(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "paymentMethod":
 			out.Values[i] = ec._EventRegistration_paymentMethod(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10873,6 +11766,21 @@ func (ec *executionContext) _EventRegistration(ctx context.Context, sel ast.Sele
 			}
 		case "confirmedAt":
 			out.Values[i] = ec._EventRegistration_confirmedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "venueCollectedAt":
+			out.Values[i] = ec._EventRegistration_venueCollectedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "venueCollectionMethod":
+			out.Values[i] = ec._EventRegistration_venueCollectionMethod(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "checkedInAt":
+			out.Values[i] = ec._EventRegistration_checkedInAt(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -11207,6 +12115,150 @@ func (ec *executionContext) _Me(ctx context.Context, sel ast.SelectionSet, obj *
 	return out
 }
 
+var moderationActionImplementors = []string{"ModerationAction"}
+
+func (ec *executionContext) _ModerationAction(ctx context.Context, sel ast.SelectionSet, obj *model.ModerationAction) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, moderationActionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModerationAction")
+		case "actionId":
+			out.Values[i] = ec._ModerationAction_actionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "actionClass":
+			out.Values[i] = ec._ModerationAction_actionClass(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "scope":
+			out.Values[i] = ec._ModerationAction_scope(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "effectiveAt":
+			out.Values[i] = ec._ModerationAction_effectiveAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._ModerationAction_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var moderationActionPageImplementors = []string{"ModerationActionPage"}
+
+func (ec *executionContext) _ModerationActionPage(ctx context.Context, sel ast.SelectionSet, obj *model.ModerationActionPage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, moderationActionPageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModerationActionPage")
+		case "items":
+			out.Values[i] = ec._ModerationActionPage_items(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var moderationAppealImplementors = []string{"ModerationAppeal"}
+
+func (ec *executionContext) _ModerationAppeal(ctx context.Context, sel ast.SelectionSet, obj *model.ModerationAppeal) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, moderationAppealImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ModerationAppeal")
+		case "appealId":
+			out.Values[i] = ec._ModerationAppeal_appealId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "actionId":
+			out.Values[i] = ec._ModerationAppeal_actionId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._ModerationAppeal_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -11276,6 +12328,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "appealModerationAction":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_appealModerationAction(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "refreshSession":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_refreshSession(ctx, field)
@@ -11321,6 +12380,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "cancelBooking":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_cancelBooking(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "collectVenuePayment":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_collectVenuePayment(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "checkInBooking":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_checkInBooking(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11872,6 +12945,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_me(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myModerationActions":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myModerationActions(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -13150,6 +14245,60 @@ func (ec *executionContext) marshalNMe2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatch
 		return graphql.Null
 	}
 	return ec._Me(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNModerationAction2ᚕᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationActionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ModerationAction) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNModerationAction2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationAction(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNModerationAction2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationAction(ctx context.Context, sel ast.SelectionSet, v *model.ModerationAction) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModerationAction(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNModerationActionPage2githubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationActionPage(ctx context.Context, sel ast.SelectionSet, v model.ModerationActionPage) graphql.Marshaler {
+	return ec._ModerationActionPage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNModerationActionPage2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationActionPage(ctx context.Context, sel ast.SelectionSet, v *model.ModerationActionPage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModerationActionPage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNModerationAppeal2githubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationAppeal(ctx context.Context, sel ast.SelectionSet, v model.ModerationAppeal) graphql.Marshaler {
+	return ec._ModerationAppeal(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNModerationAppeal2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐModerationAppeal(ctx context.Context, sel ast.SelectionSet, v *model.ModerationAppeal) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ModerationAppeal(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNNotification2ᚕᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐNotificationᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Notification) graphql.Marshaler {

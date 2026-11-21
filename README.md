@@ -1,10 +1,12 @@
 # MatchMate
 
+Venue bookings now support administrator-recorded cash or external card collection followed by check-in for eligible confirmed attendees. Confirmed venue seats have no cancellation option. See [ADR-0006](docs/adr/0006-venue-collection-and-checkin.md).
+
 Account security now has email verification and password recovery links (through Notification SMTP), administrator TOTP when configured, durable Account-owned login/discovery limits, JWT signing-key overlap, and password-confirmed account deletion with Account-owned data minimization. The default local notification sink does not deliver email links; configure SMTP to test them. Start with [Account security runbook](docs/runbooks/account-security.md). Cross-service retention, live SMTP evidence, edge limits, and MFA recovery remain production gates.
 
 Administrators can attach one optional image while an event is a draft. The Event Service stores a sanitized JPEG, and published event pages use it instead of rotating artwork. See [ADR-0002](docs/adr/0002-event-image-storage.md).
 
-Event drafts now support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until the member pays at the entrance. Existing events retain online-only behavior. Venue collection/check-in and a production deployment without Payment/Matchmaking remain separate work.
+Event drafts support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until staff records collection at the entrance. Existing events retain online-only behavior. A production deployment without Payment/Matchmaking remains separate work.
 
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.
 
@@ -92,7 +94,7 @@ Match-Mate-Dating-Web/
 
 The browser-facing migration now uses one GraphQL endpoint and one role-aware web application. The GraphQL gateway is a BFF over the existing service REST contracts; it does not own domain data or replace RabbitMQ.
 
-The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and initial Moderation slices. Moderation reporting/case/action/appeal APIs publish minimum-safe enforcement facts; downstream enforcement consumers and moderator UI remain incremental work.
+The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and Moderation slices. Moderation reports/actions/appeals publish minimum-safe facts. Account, Booking, Matchmaking, and Notification read current effective actions through a private, fail-closed Moderation API at safety-sensitive decisions. Suspended members can use the restricted browser appeal route, and administrators see current entry eligibility for event registrations. See [ADR-0005](docs/adr/0005-authoritative-moderation-safety-reads.md) for the remaining race and policy limits.
 
 The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
 Event provides scoped draft management, lifecycle commands, safe future-event

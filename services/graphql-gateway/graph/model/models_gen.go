@@ -11,23 +11,27 @@ type Account struct {
 }
 
 type AuthPayload struct {
-	AccessToken string `json:"accessToken"`
-	Me          *Me    `json:"me,omitempty"`
+	AccessToken string   `json:"accessToken"`
+	Roles       []string `json:"roles"`
+	Me          *Me      `json:"me,omitempty"`
 }
 
 type Booking struct {
-	BookingID     string  `json:"bookingId"`
-	EventID       string  `json:"eventId"`
-	State         string  `json:"state"`
-	PaymentMethod string  `json:"paymentMethod"`
-	Amount        string  `json:"amount"`
-	Currency      string  `json:"currency"`
-	PolicyVersion int     `json:"policyVersion"`
-	ExpiresAt     string  `json:"expiresAt"`
-	Version       int     `json:"version"`
-	CreatedAt     string  `json:"createdAt"`
-	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
-	CancelledAt   *string `json:"cancelledAt,omitempty"`
+	BookingID             string  `json:"bookingId"`
+	EventID               string  `json:"eventId"`
+	State                 string  `json:"state"`
+	PaymentMethod         string  `json:"paymentMethod"`
+	Amount                string  `json:"amount"`
+	Currency              string  `json:"currency"`
+	PolicyVersion         int     `json:"policyVersion"`
+	ExpiresAt             string  `json:"expiresAt"`
+	Version               int     `json:"version"`
+	CreatedAt             string  `json:"createdAt"`
+	ConfirmedAt           *string `json:"confirmedAt,omitempty"`
+	CancelledAt           *string `json:"cancelledAt,omitempty"`
+	VenueCollectedAt      *string `json:"venueCollectedAt,omitempty"`
+	VenueCollectionMethod *string `json:"venueCollectionMethod,omitempty"`
+	CheckedInAt           *string `json:"checkedInAt,omitempty"`
 }
 
 type BookingPage struct {
@@ -124,17 +128,21 @@ type EventPage struct {
 }
 
 type EventRegistration struct {
-	BookingID     string  `json:"bookingId"`
-	AccountID     string  `json:"accountId"`
-	Nickname      string  `json:"nickname"`
-	Email         string  `json:"email"`
-	EventID       string  `json:"eventId"`
-	State         string  `json:"state"`
-	PaymentMethod string  `json:"paymentMethod"`
-	Amount        string  `json:"amount"`
-	Currency      string  `json:"currency"`
-	CreatedAt     string  `json:"createdAt"`
-	ConfirmedAt   *string `json:"confirmedAt,omitempty"`
+	BookingID             string  `json:"bookingId"`
+	AccountID             string  `json:"accountId"`
+	Nickname              string  `json:"nickname"`
+	Email                 string  `json:"email"`
+	EventID               string  `json:"eventId"`
+	State                 string  `json:"state"`
+	EntryEligible         bool    `json:"entryEligible"`
+	PaymentMethod         string  `json:"paymentMethod"`
+	Amount                string  `json:"amount"`
+	Currency              string  `json:"currency"`
+	CreatedAt             string  `json:"createdAt"`
+	ConfirmedAt           *string `json:"confirmedAt,omitempty"`
+	VenueCollectedAt      *string `json:"venueCollectedAt,omitempty"`
+	VenueCollectionMethod *string `json:"venueCollectionMethod,omitempty"`
+	CheckedInAt           *string `json:"checkedInAt,omitempty"`
 }
 
 type EventRegistrationPage struct {
@@ -179,6 +187,24 @@ type Me struct {
 	Account     *Account             `json:"account"`
 	Profile     *Profile             `json:"profile"`
 	Preferences *MatchingPreferences `json:"preferences,omitempty"`
+}
+
+type ModerationAction struct {
+	ActionID    string  `json:"actionId"`
+	ActionClass string  `json:"actionClass"`
+	Scope       string  `json:"scope"`
+	EffectiveAt string  `json:"effectiveAt"`
+	ExpiresAt   *string `json:"expiresAt,omitempty"`
+}
+
+type ModerationActionPage struct {
+	Items []*ModerationAction `json:"items"`
+}
+
+type ModerationAppeal struct {
+	AppealID string `json:"appealId"`
+	ActionID string `json:"actionId"`
+	State    string `json:"state"`
 }
 
 type Mutation struct {

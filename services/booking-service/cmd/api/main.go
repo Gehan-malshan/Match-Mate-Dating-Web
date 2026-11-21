@@ -8,6 +8,7 @@ import (
 	"github.com/gehan-malshan/matchmate/booking-service/internal/config"
 	eventclient "github.com/gehan-malshan/matchmate/booking-service/internal/event"
 	"github.com/gehan-malshan/matchmate/booking-service/internal/httpapi"
+	"github.com/gehan-malshan/matchmate/booking-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/booking-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
@@ -37,6 +38,9 @@ func main() {
 	defer pool.Close()
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	app := application.New(postgres.New(pool), eventclient.New(cfg.EventAPIURL), cfg.HoldDuration)
+	if cfg.ModerationURL != "" {
+		app.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
+	}
 	server := &http.Server{Addr: cfg.HTTPAddress, Handler: cors(httpapi.New(app, v, log), cfg.AllowedOrigins), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

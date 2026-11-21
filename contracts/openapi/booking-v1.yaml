@@ -5,25 +5,25 @@ paths:
   /admin/registrations:
     get:
       summary: Page booking records across all events for administrators only
-      description: Returns all booking states; a confirmed AT_VENUE reservation is not proof of payment collection.
+      description: Returns all booking states and current entryEligible safety decision; a confirmed AT_VENUE reservation is not proof of payment collection.
       security: [{bearerAuth: []}]
       parameters:
         - {name: limit, in: query, required: true, schema: {type: integer, minimum: 1, maximum: 50}}
         - {name: offset, in: query, required: true, schema: {type: integer, minimum: 0}}
       responses:
-        "200": {description: Page of bookings with account IDs, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {type: object}}, hasMore: {type: boolean}}}}}}
+        "200": {description: Page of bookings with current safety eligibility, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {$ref: '#/components/schemas/Registration'}}, hasMore: {type: boolean}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
   /admin/events/{eventId}/registrations:
     get:
       summary: List an event's bookings for administrators only
-      description: Returns all booking states, including pending and expired. A confirmed AT_VENUE reservation is not proof of payment collection.
+      description: Returns all booking states, including pending and expired, plus current entryEligible safety decision. A confirmed AT_VENUE reservation is not proof of payment collection.
       security: [{bearerAuth: []}]
       parameters:
         - {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: limit, in: query, required: true, schema: {type: integer, minimum: 1, maximum: 50}}
         - {name: offset, in: query, required: true, schema: {type: integer, minimum: 0}}
       responses:
-        "200": {description: Page of bookings with account IDs, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {type: object}}, hasMore: {type: boolean}}}}}}
+        "200": {description: Page of bookings with current safety eligibility, content: {application/json: {schema: {type: object, required: [items,hasMore], properties: {items: {type: array, items: {$ref: '#/components/schemas/Registration'}}, hasMore: {type: boolean}}}}}}
         "403": {$ref: "#/components/responses/Problem"}
   /bookings:
     get:
@@ -51,7 +51,7 @@ paths:
         "404": {$ref: "#/components/responses/Problem"}
   /bookings/{bookingId}/cancel:
     post:
-      summary: Cancel and release an active online payment hold; confirmed venue bookings await an approved cancellation policy
+      summary: Cancel and release an unpaid online payment hold only; confirmed venue bookings cannot be cancelled
       security: [{bearerAuth: []}]
       parameters:
         - {name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}
@@ -60,10 +60,27 @@ paths:
         "200": {description: Cancelled booking, content: {application/json: {schema: {$ref: "#/components/schemas/Booking"}}}}
         "404": {$ref: "#/components/responses/Problem"}
         "409": {$ref: "#/components/responses/Problem"}
+  /admin/bookings/{bookingId}/venue-collection:
+    post:
+      summary: Administrator records cash or external card collection of the immutable venue ticket price
+      security: [{bearerAuth: []}]
+      parameters: [{name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}, {name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [method], properties: {method: {type: string, enum: [CASH,CARD_AT_VENUE]}}}}}}
+      responses: {'200': {description: Booking with collection time}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
+  /admin/bookings/{bookingId}/check-in:
+    post:
+      summary: Administrator checks in an eligible confirmed booking after required venue collection
+      security: [{bearerAuth: []}]
+      parameters: [{name: bookingId, in: path, required: true, schema: {type: string, format: uuid}}, {name: Idempotency-Key, in: header, required: true, schema: {type: string}}]
+      responses: {'200': {description: Booking with check-in time}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}}
 components:
   securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
   responses: {Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}}
   schemas:
+    Registration:
+      allOf:
+        - {$ref: '#/components/schemas/Booking'}
+        - {type: object, required: [accountId,entryEligible], properties: {accountId: {type: string, format: uuid}, entryEligible: {type: boolean, description: Current moderation eligibility; false prevents entry even when booking remains confirmed}}}
     Booking:
       type: object
       required: [bookingId,eventId,state,paymentMethod,amount,currency,policyVersion,expiresAt,version,createdAt]
@@ -80,4 +97,7 @@ components:
         createdAt: {type: string, format: date-time}
         confirmedAt: {type: string, format: date-time}
         cancelledAt: {type: string, format: date-time}
+        venueCollectedAt: {type: string, format: date-time}
+        venueCollectionMethod: {type: string, enum: [CASH,CARD_AT_VENUE]}
+        checkedInAt: {type: string, format: date-time}
     Problem: {type: object, required: [type,title,status,code,detail,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, traceId: {type: string}}}

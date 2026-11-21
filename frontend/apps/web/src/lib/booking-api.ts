@@ -1,11 +1,11 @@
 import {graphqlClient} from './account-api'
 
 export type BookingState='PENDING_PAYMENT'|'CONFIRMED'|'EXPIRED'|'CANCELLED'|'PAYMENT_REVIEW'
-export type Booking={bookingId:string;eventId:string;state:BookingState;paymentMethod:'ONLINE'|'AT_VENUE';amount:string;currency:string;policyVersion:number;expiresAt:string;version:number;createdAt:string;confirmedAt?:string;cancelledAt?:string}
+export type Booking={bookingId:string;eventId:string;state:BookingState;paymentMethod:'ONLINE'|'AT_VENUE';amount:string;currency:string;policyVersion:number;expiresAt:string;version:number;createdAt:string;confirmedAt?:string;cancelledAt?:string;venueCollectedAt?:string;checkedInAt?:string}
 export type PaymentState='PENDING'|'COMPLETED'|'FAILED'|'REVIEW'
 export type Payment={paymentId:string;bookingId:string;orderId:string;amount:string;currency:string;provider:'PAYHERE';state:PaymentState;version:number;createdAt:string;updatedAt:string;completedAt?:string}
 export type Checkout={payment:Payment;actionUrl:string;fields:Record<string,string>}
-const bookingFields='bookingId eventId state paymentMethod amount currency policyVersion expiresAt version createdAt confirmedAt cancelledAt'
+const bookingFields='bookingId eventId state paymentMethod amount currency policyVersion expiresAt version createdAt confirmedAt cancelledAt venueCollectedAt checkedInAt'
 const paymentFields='paymentId bookingId orderId amount currency provider state version createdAt updatedAt completedAt'
 export async function createBooking(eventId:string,idempotencyKey:string=crypto.randomUUID(),paymentMethod?:'ONLINE'|'AT_VENUE'){const data=await graphqlClient.execute<{createBooking:Booking}>(`mutation CreateBooking($eventId:ID!,$paymentMethod:String,$idempotencyKey:String!){createBooking(eventId:$eventId,paymentMethod:$paymentMethod,idempotencyKey:$idempotencyKey){${bookingFields}}}`,{eventId,idempotencyKey,...(paymentMethod?{paymentMethod}:{})});return data.createBooking}
 export async function listBookings(){const data=await graphqlClient.execute<{bookings:{items:Booking[]}}>(`query Bookings{bookings{items{${bookingFields}}}}`);return data.bookings}

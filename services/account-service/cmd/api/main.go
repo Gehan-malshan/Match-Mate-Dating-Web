@@ -13,6 +13,7 @@ import (
 	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/config"
 	"github.com/gehan-malshan/matchmate/account-service/internal/httpapi"
+	"github.com/gehan-malshan/matchmate/account-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/account-service/internal/securitymail"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store/postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -40,6 +41,9 @@ func main() {
 	}
 	repo := postgres.New(pool)
 	app := application.New(repo, tokens, cfg.AccessTTL, cfg.RefreshTTL, cfg.VerificationTTL, cfg.MinimumAge, cfg.CurrentConsentVersion, cfg.DevExposeVerificationToken)
+	if cfg.ModerationURL != "" {
+		app.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
+	}
 	if cfg.AdminMFAEncryptionKey != "" {
 		key, keyErr := auth.DecodeMFAKey(cfg.AdminMFAEncryptionKey)
 		if keyErr != nil {
