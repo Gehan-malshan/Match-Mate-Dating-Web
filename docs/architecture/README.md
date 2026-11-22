@@ -180,7 +180,7 @@ Producers persist business state and outbox in one transaction. Consumers persis
 
 ## 10. Core API map
 
-The browser calls one endpoint, `POST /graphql`. Representative operations are `login`, `me`, `events`, `bookings`, `initiatePayment`, `notifications`, `managedEvents`, and the administrator-only matching-run mutations. The complete contract is `services/graphql-gateway/graph/schema.graphqls`.
+The browser calls one endpoint, `POST /graphql`. Representative operations are `login`, `me`, `events`, `bookings`, `initiatePayment`, `notifications`, `managedEvents`, and the administrator-only matching-run mutations. The gateway caps request bytes, query depth, complexity, and browser list size before forwarding requests; each owner service independently repeats pagination and object authorization. The complete contract is `services/graphql-gateway/graph/schema.graphqls`.
 
 The following REST map remains the internal service contract used by the GraphQL BFF and non-browser integrations.
 

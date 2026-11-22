@@ -30,10 +30,17 @@ func query(values map[string]string) string {
 	return upstream.Query(values)
 }
 func intValue(value *int, fallback int) string {
-	if value == nil {
-		return strconv.Itoa(fallback)
+	result := fallback
+	if value != nil {
+		result = *value
 	}
-	return strconv.Itoa(*value)
+	if result < 1 {
+		result = fallback
+	}
+	if result > 50 {
+		result = 50
+	}
+	return strconv.Itoa(result)
 }
 func stringValue(value *string) string {
 	if value == nil {

@@ -59,7 +59,7 @@ type Query {
   notifications(limit: Int = 20, cursor: String): NotificationPage!
   unreadNotificationCount: UnreadCount!
   notificationPreferences: [NotificationPreference!]!
-  managedEvents(limit: Int = 100, archived: Boolean = false): EventPage!
+  managedEvents(limit: Int = 50, archived: Boolean = false): EventPage!
   matchingRuns(eventId: ID!): MatchingRunPage!
   matchingRun(runId: ID!): MatchingRun!
 }

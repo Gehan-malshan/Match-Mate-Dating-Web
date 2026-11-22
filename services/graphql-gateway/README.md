@@ -66,3 +66,9 @@ go vet ./...
 Change `graph/schema.graphqls` first, regenerate, implement resolvers, update frontend operations, and add contract tests in the same change. Never log tokens, cookies, profile preferences, payment fields, or GraphQL variables containing private data.
 
 Production must disable the explorer, use TLS, exact origins, edge rate limiting, persisted/allow-listed operations where appropriate, bounded pagination, query depth/complexity protection, upstream circuit-breaking, and multiple stateless replicas.
+
+## Request bounds and authorization
+
+The gateway applies a fixed GraphQL complexity limit of `250`, rejects POST request bodies above `GRAPHQL_MAX_QUERY_BYTES` (default `262144` bytes), and rejects selection nesting beyond `GRAPHQL_MAX_QUERY_DEPTH` (default `12`). Browser list arguments are clamped to 50 records before they are forwarded; owner services retain their own pagination and authorization checks.
+
+Gateway role checks are defense in depth only. Every service remains the source of truth for subject ownership, event scope, and current resource state. Tests must cover both a rejected gateway request and the equivalent rejected owner-service request for any protected operation.

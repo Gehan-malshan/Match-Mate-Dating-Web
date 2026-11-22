@@ -14,6 +14,8 @@ Event production review (before → after): Publication previously depended on a
 
 Notification production readiness (before → after): Notification supported an SMTP adapter and in-app feed, but production had no sender-verification startup gate, members had no preference surface, and terminal provider failures had no owner-audited recovery. Production SMTP now requires `SMTP_SENDER_VERIFIED=true` after external provider verification, includes a no-send sender preflight, exposes owner-scoped email preferences through REST/GraphQL/member UI, and uses migration 5 plus a targeted audited replay command for terminal deliveries. Provider dashboard verification, secret-manager configuration, category-policy approval, and controlled canary evidence remain deployment-owned actions. See [ADR-0008](../adr/0008-notification-email-provider-readiness.md).
 
+GraphQL request safety (before → after): The gateway had a fixed complexity limit but accepted large or deeply nested operations and forwarded caller-selected large pages. It now rejects oversized/deep POST operations and clamps browser list pages to 50 while owner services continue enforcing their own limits and object authorization. Browser journey, accessibility, error-state, and session suites remain required coverage for every critical route.
+
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
 ## 1. Delivery strategy

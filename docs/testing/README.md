@@ -344,6 +344,7 @@ Coverage percentages are secondary. Critical invariants require explicit tests e
 - [ ] Happy, boundary, invalid, unauthorized, duplicate, concurrent, and dependency-failure paths are considered.
 - [ ] Migrations and contracts are tested.
 - [ ] Logs/events/notifications are checked for sensitive data.
+- [x] Gateway request-bound tests reject excessive selection depth and request payloads; gateway/owner role checks remain covered by GraphQL and service tests.
 - [ ] Test data is fictional and isolated.
 - [ ] Performance/security/recovery tests are included when risk requires them.
 - [ ] CI commands and local reproduction are documented.

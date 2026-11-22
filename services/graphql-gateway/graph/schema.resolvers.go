@@ -376,7 +376,7 @@ func (r *queryResolver) ManagedEvents(ctx context.Context, limit *int, archived 
 	if archived != nil && *archived {
 		showArchived = "true"
 	}
-	err := r.Upstream.Do(ctx, r.Upstream.Services.Event, "/organizer/events"+query(map[string]string{"limit": intValue(limit, 100), "archived": showArchived}), http.MethodGet, nil, &result, nil)
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Event, "/organizer/events"+query(map[string]string{"limit": intValue(limit, 50), "archived": showArchived}), http.MethodGet, nil, &result, nil)
 	return &result, err
 }
 

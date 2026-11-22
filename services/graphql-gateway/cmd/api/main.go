@@ -50,7 +50,10 @@ func main() {
 	mux.Handle("GET /media/events/{eventId}", eventImageProxy(client))
 	mux.Handle("/graphql", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		if err := validateGraphQLRequest(r, cfg.MaxQueryBytes, cfg.MaxQueryDepth); err != nil {
+			writeGraphQLRequestError(w, err)
+			return
+		}
 		server.ServeHTTP(w, r.WithContext(requestcontext.WithHTTP(r.Context(), r, w)))
 	}))
 	if os.Getenv("APP_ENV") != "production" {

@@ -155,6 +155,7 @@ The current per-process report limiter is defense-in-depth for local/single-repl
 - [ ] Threat model and data-flow/trust boundaries updated.
 - [ ] Authentication/session and authorization matrix tests pass.
 - [ ] APIs/events/logs/notifications contain no restricted fields.
+- [x] The GraphQL gateway bounds POST body size, selection depth, fixed complexity, and browser list pages; protected owner services still repeat subject and role checks.
 - [ ] Booking/payment idempotency and callback replay tests pass.
 - [ ] Match/block/restriction/reveal races pass.
 - [ ] Upload/input/XSS/injection/SSRF/rate-limit tests apply where relevant.

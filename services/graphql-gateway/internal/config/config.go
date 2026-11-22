@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gehan-malshan/matchmate/graphql-gateway/internal/upstream"
@@ -11,12 +12,16 @@ type Config struct {
 	Address        string
 	AllowedOrigins map[string]bool
 	Services       upstream.Services
+	MaxQueryDepth  int
+	MaxQueryBytes  int64
 }
 
 func Load() Config {
 	return Config{
 		Address:        value("GRAPHQL_HTTP_ADDRESS", ":8080"),
 		AllowedOrigins: origins(value("GRAPHQL_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
+		MaxQueryDepth:  positiveInt("GRAPHQL_MAX_QUERY_DEPTH", 12),
+		MaxQueryBytes:  int64(positiveInt("GRAPHQL_MAX_QUERY_BYTES", 262144)),
 		Services: upstream.Services{
 			Account:      value("ACCOUNT_API_URL", "http://account-api:8081/api/v1"),
 			Event:        value("EVENT_API_URL", "http://event-api:8082/api/v1"),
@@ -27,6 +32,14 @@ func Load() Config {
 			Moderation:   value("MODERATION_API_URL", "http://moderation-api:8087/api/v1"),
 		},
 	}
+}
+
+func positiveInt(key string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+	if err != nil || value < 1 {
+		return fallback
+	}
+	return value
 }
 
 func value(key, fallback string) string {
