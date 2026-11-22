@@ -12,6 +12,8 @@ Current payment-choice slice: Event draft editor supports venue, online, or both
 
 Event production review (before → after): Publication previously depended on administrator access without a recorded rights, content, or safety decision, and lifecycle coverage stopped at API/component tests. Publishing now requires the `event-publication-v1` rights, moderation, and event-safety confirmations, retains the approver/time/version in Event data, and runs a Playwright browser journey for create, image upload, publish, cancel, delete/restore, and registrations. See [ADR-0007](../adr/0007-event-publication-approval.md).
 
+Notification production readiness (before → after): Notification supported an SMTP adapter and in-app feed, but production had no sender-verification startup gate, members had no preference surface, and terminal provider failures had no owner-audited recovery. Production SMTP now requires `SMTP_SENDER_VERIFIED=true` after external provider verification, includes a no-send sender preflight, exposes owner-scoped email preferences through REST/GraphQL/member UI, and uses migration 5 plus a targeted audited replay command for terminal deliveries. Provider dashboard verification, secret-manager configuration, category-policy approval, and controlled canary evidence remain deployment-owned actions. See [ADR-0008](../adr/0008-notification-email-provider-readiness.md).
+
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
 ## 1. Delivery strategy

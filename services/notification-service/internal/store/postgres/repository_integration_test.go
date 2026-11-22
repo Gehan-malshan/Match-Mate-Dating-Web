@@ -45,7 +45,7 @@ func TestRepositoryEventDeduplicationDeliveryAndSuppression(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	for _, name := range []string{"000001_init.up.sql", "000002_member_feed.up.sql", "000003_email_templates.up.sql", "000004_safety_delivery.up.sql"} {
+	for _, name := range []string{"000001_init.up.sql", "000002_member_feed.up.sql", "000003_email_templates.up.sql", "000004_safety_delivery.up.sql", "000005_delivery_replay.up.sql"} {
 		migration, readErr := migrations.Files.ReadFile(name)
 		if readErr != nil {
 			t.Fatal(readErr)
@@ -120,5 +120,28 @@ func TestRepositoryEventDeduplicationDeliveryAndSuppression(t *testing.T) {
 	}
 	if inboxCount != 2 || deliveryCount != 1 || suppressionCount != 1 {
 		t.Fatalf("inbox=%d delivery=%d suppression=%d", inboxCount, deliveryCount, suppressionCount)
+	}
+	preference, err := repository.SetPreference(ctx, accountID, "EMAIL", "ACCOUNT", false, "MEMBER_SELF_SERVICE", now)
+	if err != nil || preference.Allowed || preference.Category != "ACCOUNT" {
+		t.Fatalf("preference=%+v err=%v", preference, err)
+	}
+	preferences, err := repository.ListPreferences(ctx, accountID, "EMAIL")
+	if err != nil || len(preferences) != 1 || preferences[0].Allowed {
+		t.Fatalf("preferences=%+v err=%v", preferences, err)
+	}
+
+	if _, err = pool.Exec(ctx, `UPDATE notification_delivery SET state='DEAD_LETTERED',attempt_count=3 WHERE id=$1`, delivery.ID); err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := repository.Replay(ctx, delivery.ID, "operator@example.test", "SMTP sender verification was corrected", 3, now.Add(3*time.Second))
+	if err != nil || !replayed {
+		t.Fatalf("replayed=%v err=%v", replayed, err)
+	}
+	var replayCount int
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM notification_delivery_replay WHERE delivery_id=$1`, delivery.ID).Scan(&replayCount); err != nil {
+		t.Fatal(err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT state FROM notification_delivery WHERE id=$1`, delivery.ID).Scan(&state); err != nil || state != domain.DeliveryRetryScheduled || replayCount != 1 {
+		t.Fatalf("state=%s replays=%d err=%v", state, replayCount, err)
 	}
 }

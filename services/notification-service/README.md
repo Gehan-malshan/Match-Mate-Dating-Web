@@ -28,7 +28,7 @@ The first executable vertical slice provides:
 - An authenticated member-owned in-app feed with cursor pagination, unread counts, idempotent mark-read operations, and historical template-version rendering.
 - A Midnight Chemistry member notification bell, recent-items popover, full history page, and polling-based popup toasts.
 
-This is an executable in-app and SMTP email slice. SMTP credentials, a verified sender domain, consent/preference source integration, retry replay operations, metrics/traces, and broader Event/Payment/Matchmaking/Moderation recipients still require production approval.
+This is an executable in-app and SMTP email slice. Member-owned email preferences, terminal-delivery replay, sender transport preflight, and production sender-verification configuration gates are implemented. A real provider dashboard/domain verification, secret-manager configuration, approved recipient-category policy, and controlled canary evidence remain required deployment actions because they need the organization's provider account and verified domain.
 
 ## Safe initial boundary
 
@@ -70,6 +70,8 @@ GET /api/v1/notifications?limit=20&cursor=...
 GET /api/v1/notifications/unread-count
 PATCH /api/v1/notifications/{notificationId}/read
 POST /api/v1/notifications/read-all
+GET /api/v1/notification-preferences
+PUT /api/v1/notification-preferences/{ACCOUNT|BOOKING}
 ```
 
 Member endpoints validate Account-issued ES256 tokens and derive ownership only from the token subject. They never accept a caller-selected account ID, never expose delivery/provider diagnostics, and conceal another member's notification as not found. The canonical contract is `contracts/openapi/notification-v1.yaml`. There is no admin delivery-list API.
@@ -136,9 +138,11 @@ Configuration rejects `dev-sink` when `APP_ENV` is not `development` or `test`. 
 | `NOTIFICATION_PROVIDER` | `dev-sink` | `dev-sink` for local testing or `smtp` for real email |
 | `SMTP_HOST` / `SMTP_PORT` | Empty / `587` | STARTTLS SMTP server |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | Empty | Provider credentials and verified sender; required for `smtp` |
+| `SMTP_SENDER_VERIFIED` | `false` | Must be `true` in production only after provider-domain/sender verification and preflight |
 | `NOTIFICATION_ACCOUNT_CONTACT_URL` | Required for SMTP | Narrow Account recipient-resolution endpoint |
 | `INTERNAL_SERVICE_TOKEN` | Required for SMTP | Shared Account/Notification internal credential |
 | `NOTIFICATION_DEFAULT_LOCALE` | `en-LK` | Template locale |
+| `NOTIFICATION_PREFERENCE_CATEGORIES` | `ACCOUNT,BOOKING` | Comma-separated member-controllable email categories |
 | `NOTIFICATION_MAX_ATTEMPTS` | `5` | Maximum provider attempts |
 | `NOTIFICATION_POLL_INTERVAL` | `1s` | Worker polling interval |
 | `NOTIFICATION_LEASE_DURATION` | `30s` | Crash-recovery delivery lease |
@@ -150,6 +154,20 @@ Configuration rejects `dev-sink` when `APP_ENV` is not `development` or `test`. 
 | `ALLOWED_ORIGINS` | Member Vite origins | Exact browser CORS allow-list |
 
 Real provider credentials must use the deployment secret manager and must never be committed or placed in Compose defaults. See `docs/runbooks/google-email-local.md` for local Google and SMTP setup.
+
+Before a production rollout, first verify the sender/domain in the provider dashboard, configure the secret manager, then run `/notification-provider-preflight` inside the target deployment. It checks SMTP TLS/authentication and sender-envelope acceptance without sending a message. A controlled fictional-account canary is still required to prove inbox delivery.
+
+## Preferences and recovery
+
+`GET /api/v1/notification-preferences` returns an authenticated member's effective `EMAIL` settings. `PUT /api/v1/notification-preferences/{ACCOUNT|BOOKING}` with `{ "emailEnabled": true|false }` persists an owner-scoped choice. Security verification and recovery mail never use this preference path. The GraphQL BFF exposes `notificationPreferences` and `updateNotificationPreference` for the member notification page.
+
+Only the owner-service recovery command may replay a failed delivery:
+
+```powershell
+docker compose run --rm --no-deps --entrypoint /notification-delivery-replay notification-api --delivery-id <uuid> --actor <operator-id> --reason "SMTP sender was corrected" --confirm REPLAY
+```
+
+It reopens exactly one `PERMANENTLY_FAILED` or `DEAD_LETTERED` record, appends an audit record, preserves provider idempotency through the original delivery ID, and never replays a safety-suppressed delivery. See the Notification runbook before using it.
 
 ## Local development
 
@@ -193,12 +211,11 @@ The frontend reads notifications through `VITE_GRAPHQL_API_URL`, which defaults 
 
 ## Required production follow-up
 
-- Approve email/SMS/push and legally required versus suppressible categories.
-- Add a narrow authenticated Account contact-resolution API; do not place destinations in RabbitMQ facts.
-- Implement an approved provider adapter with timeouts, provider idempotency, rate limits, and sandbox evidence.
-- Add preference-update ingestion and unsubscribe/bounce suppression policy.
+- Approve email/SMS/push and legally required versus suppressible categories, including the production `NOTIFICATION_PREFERENCE_CATEGORIES` selection.
+- Store provider webhook/bounce complaints through a reviewed minimum-data contract and convert them to suppression where policy requires.
+- Record real provider domain verification and controlled canary delivery evidence in deployment records.
 - Add Event/Payment/Matchmaking/Moderation recipient projections/contracts.
-- Add broker retry topology, guarded DLQ inspection/replay tooling, dashboards, metrics, traces, alerts, and provider outage runbook evidence.
+- Add broker retry topology, dashboards, metrics, traces, alerts, and provider outage runbook evidence.
 - Add real PostgreSQL/RabbitMQ component and failure tests to required CI.
 - Define retention/deletion periods and backup/restore evidence.
 - Add production real-time delivery only if polling no longer meets the approved experience/SLO; WebSocket/SSE is not required by the current slice.

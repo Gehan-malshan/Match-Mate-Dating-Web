@@ -159,7 +159,7 @@ The implemented prototype adds `event_scope` and `participant_projection` as Mat
 
 ## 8. Notification database
 
-Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. Migration 3 installs SMTP template variants. Migration 4 adds nullable `event_id` to delivery and a suppressed-attempt outcome so current event exclusion can stop pending sends and hide event-scoped feed items. Legacy booking deliveries without an event ID are conservatively suppressed when safety checking is enabled. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence.
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. Migration 3 installs SMTP template variants. Migration 4 adds nullable `event_id` to delivery and a suppressed-attempt outcome so current event exclusion can stop pending sends and hide event-scoped feed items. Legacy booking deliveries without an event ID are conservatively suppressed when safety checking is enabled. Migration 5 adds immutable, delivery-ID-scoped `notification_delivery_replay` records for owner-command recovery of terminal failures. Replay keeps the existing business delivery/provider identity and only adds a bounded future-attempt budget. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -167,6 +167,7 @@ Migration 1 implements `notification_template`, `notification_delivery`, `notifi
 | `delivery` | business idempotency key unique, recipient account/channel, template version, state, scheduled time |
 | `delivery_attempt` | delivery, attempt number, provider reference/status, sanitized error, timing |
 | `notification_preference` | account/channel/category, allowed/suppressed, source/time |
+| `notification_delivery_replay` | delivery, operator, reason, previous terminal state/attempts, bounded replay budget, timestamp; no destination/body/provider response |
 | `suppression` | destination hash/account, reason, expiry/indefinite, audit |
 | `notification_feed_item` | delivery unique, recipient account, read time, creation time; no copied message body or provider diagnostics |
 | `inbox` / `outbox` | `notification_inbox` implements event consumption; a Notification outbox is deferred until safe delivery facts have an approved consumer |

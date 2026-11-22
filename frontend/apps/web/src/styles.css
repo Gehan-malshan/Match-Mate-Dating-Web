@@ -17,6 +17,7 @@
   --primary: #ffb2be;
   --primary-container: #ff4e7c;
   --secondary: #ffbf81;
+	--error: #ffb4ab;
   --brand-gradient: linear-gradient(115deg, #ff006b 0%, #ff8c00 100%);
   --container: min(1200px, calc(100% - 48px));
 }

@@ -234,6 +234,18 @@ type NotificationPage struct {
 	UnreadCount int             `json:"unreadCount"`
 }
 
+type NotificationPreference struct {
+	Channel   string `json:"channel"`
+	Category  string `json:"category"`
+	Allowed   bool   `json:"allowed"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+type NotificationPreferenceInput struct {
+	Category     string `json:"category"`
+	EmailEnabled bool   `json:"emailEnabled"`
+}
+
 type OperationResult struct {
 	Success bool `json:"success"`
 }

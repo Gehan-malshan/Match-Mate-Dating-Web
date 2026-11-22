@@ -9,7 +9,7 @@ NOTIFICATION_DIR := services/notification-service
 MODERATION_DIR := services/moderation-service
 GRAPHQL_DIR := services/graphql-gateway
 
-.PHONY: help setup start backend apps frontend status logs stop test test-event-e2e build
+.PHONY: help setup start backend apps frontend status logs stop test test-event-e2e test-notification-component build
 
 help: ## Show the basic local-development commands
 	@echo "MatchMate — basic local commands"
@@ -24,6 +24,7 @@ help: ## Show the basic local-development commands
 	@echo "  make stop        Stop backend containers; keep database data"
 	@echo "  make test        Run backend and frontend tests"
 	@echo "  make test-event-e2e Run the Event browser lifecycle test"
+	@echo "  make test-notification-component Run Notification PostgreSQL component tests"
 	@echo "  make build       Build Docker backend and frontend production files"
 
 setup: ## Install project dependencies
@@ -82,6 +83,9 @@ test: ## Run implemented backend and frontend tests
 
 test-event-e2e: ## Run the Event browser lifecycle against the local backend
 	bun run test:e2e:event
+
+test-notification-component: ## Run Notification PostgreSQL component tests against local Compose
+	NOTIFICATION_TEST_DATABASE_URL=postgres://matchmate:matchmate@localhost:5438/matchmate_notification?sslmode=disable go -C $(NOTIFICATION_DIR) test ./internal/store/postgres -count=1
 
 build: ## Build the Docker backend and frontend production assets
 	docker compose build

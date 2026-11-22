@@ -87,6 +87,8 @@ The Payment slice validates Account-issued ES256 tokens for member operations, f
 - Member feed endpoints validate Account-issued ES256 issuer/audience/expiry, derive ownership from `sub`, accept no caller-selected recipient, and return not found for absent or other-member item IDs.
 - Member DTOs expose only safe rendered template text, category, time, read state, and allow-listed application paths; provider references/errors and source payloads remain private.
 - The development sink logs no recipient destination or rendered message body and is rejected outside development/test.
+- Production SMTP refuses to start until a verified-sender attestation is present. Operators must complete provider-side domain/sender verification and the no-send STARTTLS/auth/sender-envelope preflight; code cannot truthfully claim external verification without provider evidence.
+- Members can change only their own configured email-category preferences; security verification/recovery messages bypass this path. Preferences store no destination. Terminal deliveries use audited delivery-ID-scoped owner-command replay, while safety-suppressed deliveries remain unreplayable.
 - Exact-origin CORS permits the member application in local development. Production edge rate limits and TLS remain deployment requirements.
 - Production email delivery requires an approved provider, credentials from a secret manager, authenticated constrained Account contact resolution, provider idempotency, timeout/rate controls, preference/legal-category policy, and sanitized provider errors.
 

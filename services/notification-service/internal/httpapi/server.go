@@ -11,6 +11,7 @@ import (
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/application"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/auth"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
 	"github.com/google/uuid"
 )
 
@@ -23,6 +24,8 @@ type Feed interface {
 	UnreadCount(context.Context, string) (int, error)
 	MarkRead(context.Context, string, string) error
 	MarkAllRead(context.Context, string) (int64, error)
+	ListPreferences(context.Context, string) ([]domain.Preference, error)
+	SetEmailPreference(context.Context, string, string, bool) (domain.Preference, error)
 }
 
 type Verifier interface {
@@ -48,7 +51,41 @@ func New(readiness Readiness, feed Feed, verifier Verifier) http.Handler {
 	mux.Handle("GET /api/v1/notifications/unread-count", server.protect(http.HandlerFunc(server.unreadCount)))
 	mux.Handle("PATCH /api/v1/notifications/{notificationId}/read", server.protect(http.HandlerFunc(server.markRead)))
 	mux.Handle("POST /api/v1/notifications/read-all", server.protect(http.HandlerFunc(server.markAllRead)))
+	mux.Handle("GET /api/v1/notification-preferences", server.protect(http.HandlerFunc(server.listPreferences)))
+	mux.Handle("PUT /api/v1/notification-preferences/{category}", server.protect(http.HandlerFunc(server.setPreference)))
 	return mux
+}
+
+func (s *Server) listPreferences(w http.ResponseWriter, r *http.Request) {
+	items, err := s.feed.ListPreferences(r.Context(), principal(r).Subject)
+	if err != nil {
+		problem(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Notification preferences could not be loaded.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) setPreference(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		EmailEnabled *bool `json:"emailEnabled"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1024)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&input) != nil || input.EmailEnabled == nil {
+		problem(w, r, http.StatusBadRequest, "INVALID_PREFERENCE", "Notification preference is invalid.")
+		return
+	}
+	preference, err := s.feed.SetEmailPreference(r.Context(), principal(r).Subject, r.PathValue("category"), *input.EmailEnabled)
+	if errors.Is(err, application.ErrPreferenceUnsupported) {
+		problem(w, r, http.StatusBadRequest, "NOTIFICATION_PREFERENCE_UNSUPPORTED", "This notification preference cannot be changed.")
+		return
+	}
+	if err != nil {
+		problem(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Notification preference could not be updated.")
+		return
+	}
+	writeJSON(w, http.StatusOK, preference)
 }
 
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {

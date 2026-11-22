@@ -172,6 +172,67 @@ func (r *Repository) MarkAllRead(ctx context.Context, accountID string, now time
 	return tag.RowsAffected(), err
 }
 
+func (r *Repository) ListPreferences(ctx context.Context, accountID, channel string) ([]domain.Preference, error) {
+	rows, err := r.pool.Query(ctx, `SELECT channel,category,allowed,updated_at FROM notification_preference WHERE account_id=$1 AND channel=$2 ORDER BY category`, accountID, channel)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []domain.Preference{}
+	for rows.Next() {
+		var item domain.Preference
+		if err = rows.Scan(&item.Channel, &item.Category, &item.Allowed, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) SetPreference(ctx context.Context, accountID, channel, category string, allowed bool, source string, now time.Time) (domain.Preference, error) {
+	var preference domain.Preference
+	err := r.pool.QueryRow(ctx, `INSERT INTO notification_preference(account_id,channel,category,allowed,source,updated_at)
+VALUES($1,$2,$3,$4,$5,$6)
+ON CONFLICT(account_id,channel,category) DO UPDATE SET allowed=EXCLUDED.allowed,source=EXCLUDED.source,updated_at=EXCLUDED.updated_at
+RETURNING channel,category,allowed,updated_at`, accountID, channel, category, allowed, source, now).Scan(&preference.Channel, &preference.Category, &preference.Allowed, &preference.UpdatedAt)
+	return preference, err
+}
+
+// Replay reopens one terminal delivery after an operator has corrected the
+// cause. It preserves delivery identity (and therefore provider idempotency),
+// attempt history, and a narrow operator audit record. Suppressed deliveries
+// are intentionally never replayed because a current safety decision must win.
+func (r *Repository) Replay(ctx context.Context, deliveryID, actorID, reason string, additionalAttempts int, now time.Time) (bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	var state domain.DeliveryState
+	var attempts int
+	err = tx.QueryRow(ctx, `SELECT state,attempt_count FROM notification_delivery WHERE id=$1 FOR UPDATE`, deliveryID).Scan(&state, &attempts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if state != domain.DeliveryPermanentlyFailed && state != domain.DeliveryDeadLettered {
+		return false, nil
+	}
+	var replayID string
+	err = tx.QueryRow(ctx, `INSERT INTO notification_delivery_replay(id,delivery_id,actor_id,reason,previous_state,previous_attempt_count,additional_attempts,requested_at)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, uuid.NewString(), deliveryID, actorID, reason, state, attempts, additionalAttempts, now).Scan(&replayID)
+	if err != nil {
+		return false, err
+	}
+	_, err = tx.Exec(ctx, `UPDATE notification_delivery SET state='RETRY_SCHEDULED',next_attempt_at=$2,max_attempts=attempt_count+$3,lease_until=NULL,last_error_code=NULL,updated_at=$2 WHERE id=$1`, deliveryID, now, additionalAttempts)
+	if err != nil {
+		return false, err
+	}
+	return true, tx.Commit(ctx)
+}
+
 func (r *Repository) ClaimDue(ctx context.Context, now time.Time, lease time.Duration) (domain.Delivery, bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

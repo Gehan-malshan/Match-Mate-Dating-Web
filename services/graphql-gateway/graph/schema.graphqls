@@ -26,6 +26,7 @@ type Checkout { payment: Payment!, actionUrl: String!, fields: JSON! }
 type Notification { notificationId: ID!, sourceEventType: String!, category: String!, title: String!, message: String!, actionPath: String!, readAt: String, createdAt: String! }
 type NotificationPage { items: [Notification!]!, nextCursor: String, unreadCount: Int! }
 type UnreadCount { unreadCount: Int! }
+type NotificationPreference { channel: String!, category: String!, allowed: Boolean!, updatedAt: String! }
 type UpdatedCount { updatedCount: Int! }
 type OperationResult { success: Boolean! }
 
@@ -42,6 +43,7 @@ input CheckoutCustomerInput { bookingId: ID!, firstName: String!, lastName: Stri
 input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String, configuredCapacity: Int!, matchingRulesetVersion: String! }
 input EventPublicationApprovalInput { imageRightsConfirmed: Boolean!, imageModerationConfirmed: Boolean!, eventSafetyConfirmed: Boolean!, reviewVersion: String! }
 input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, participantB: ID!, reason: String! }
+input NotificationPreferenceInput { category: String!, emailEnabled: Boolean! }
 
 type Query {
   me: Me!
@@ -56,6 +58,7 @@ type Query {
   payment(bookingId: ID!): Payment!
   notifications(limit: Int = 20, cursor: String): NotificationPage!
   unreadNotificationCount: UnreadCount!
+  notificationPreferences: [NotificationPreference!]!
   managedEvents(limit: Int = 100, archived: Boolean = false): EventPage!
   matchingRuns(eventId: ID!): MatchingRunPage!
   matchingRun(runId: ID!): MatchingRun!
@@ -82,6 +85,7 @@ type Mutation {
   initiatePayment(input: CheckoutCustomerInput!, idempotencyKey: String!): Checkout!
   markNotificationRead(notificationId: ID!): OperationResult!
   markAllNotificationsRead: UpdatedCount!
+  updateNotificationPreference(input: NotificationPreferenceInput!): NotificationPreference!
   createEvent(input: EventInput!): Event!
   uploadEventImage(eventId: ID!, imageBase64: String!): Event!
   updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!

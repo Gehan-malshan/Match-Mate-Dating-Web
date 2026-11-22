@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -24,6 +25,7 @@ type Config struct {
 	SMTPUsername                   string
 	SMTPPassword                   string
 	SMTPFrom                       string
+	SMTPVerifiedSender             bool
 	AccountContactURL              string
 	InternalServiceToken           string
 	SecurityMailToken              string
@@ -38,6 +40,7 @@ type Config struct {
 	JWTIssuer                      string
 	JWTAudience                    string
 	AllowedOrigins                 []string
+	PreferenceCategories           []string
 	ModerationURL, ModerationToken string
 }
 
@@ -63,6 +66,28 @@ func positiveDuration(key, fallback string) (time.Duration, error) {
 		return 0, errors.New(key + " must be a positive duration")
 	}
 	return parsed, nil
+}
+
+func requiredBoolean(key string) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	value, err := strconv.ParseBool(raw)
+	if err != nil || !value {
+		return false, errors.New(key + " must be true")
+	}
+	return true, nil
+}
+
+func categories(raw string) []string {
+	seen := map[string]bool{}
+	values := []string{}
+	for _, candidate := range strings.Split(raw, ",") {
+		candidate = strings.ToUpper(strings.TrimSpace(candidate))
+		if (candidate == "ACCOUNT" || candidate == "BOOKING") && !seen[candidate] {
+			seen[candidate] = true
+			values = append(values, candidate)
+		}
+	}
+	return values
 }
 
 func Load() (Config, error) {
@@ -98,6 +123,7 @@ func Load() (Config, error) {
 		SMTPUsername:         strings.TrimSpace(os.Getenv("SMTP_USERNAME")),
 		SMTPPassword:         os.Getenv("SMTP_PASSWORD"),
 		SMTPFrom:             strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		SMTPVerifiedSender:   false,
 		AccountContactURL:    strings.TrimSpace(os.Getenv("NOTIFICATION_ACCOUNT_CONTACT_URL")),
 		InternalServiceToken: os.Getenv("INTERNAL_SERVICE_TOKEN"),
 		SecurityMailToken:    os.Getenv("SECURITY_MAIL_TOKEN"),
@@ -112,10 +138,14 @@ func Load() (Config, error) {
 		JWTIssuer:            value("JWT_ISSUER", "matchmate-account"),
 		JWTAudience:          value("JWT_AUDIENCE", "matchmate-api"),
 		AllowedOrigins:       strings.Split(value("ALLOWED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173"), ","),
+		PreferenceCategories: categories(value("NOTIFICATION_PREFERENCE_CATEGORIES", "ACCOUNT,BOOKING")),
 		ModerationURL:        os.Getenv("MODERATION_API_URL"), ModerationToken: os.Getenv("MODERATION_SERVICE_TOKEN"),
 	}
 	if cfg.DatabaseURL == "" {
 		return cfg, errors.New("NOTIFICATION_DATABASE_URL is required")
+	}
+	if len(cfg.PreferenceCategories) == 0 {
+		return cfg, errors.New("NOTIFICATION_PREFERENCE_CATEGORIES must include ACCOUNT and/or BOOKING")
 	}
 	if cfg.AppEnv == "production" && (cfg.ModerationURL == "" || cfg.ModerationToken == "") {
 		return cfg, errors.New("MODERATION_API_URL and MODERATION_SERVICE_TOKEN are required in production")
@@ -138,6 +168,16 @@ func Load() (Config, error) {
 	}
 	if cfg.SMTPHost == "" || cfg.SMTPUsername == "" || cfg.SMTPPassword == "" || cfg.SMTPFrom == "" {
 		return cfg, errors.New("SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM are required for smtp")
+	}
+	parsedFrom, err := mail.ParseAddress(cfg.SMTPFrom)
+	if err != nil || parsedFrom.Address == "" {
+		return cfg, errors.New("SMTP_FROM must be a valid sender address")
+	}
+	if cfg.AppEnv == "production" {
+		cfg.SMTPVerifiedSender, err = requiredBoolean("SMTP_SENDER_VERIFIED")
+		if err != nil {
+			return cfg, err
+		}
 	}
 	if cfg.AccountContactURL == "" || cfg.InternalServiceToken == "" {
 		return cfg, errors.New("NOTIFICATION_ACCOUNT_CONTACT_URL and INTERNAL_SERVICE_TOKEN are required for smtp")

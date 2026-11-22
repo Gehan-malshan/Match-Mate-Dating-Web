@@ -4,7 +4,7 @@
 
 **Owner:** Notification Service team
 
-Use this runbook to start and verify the Account/Booking notification slice and authenticated in-app member feed, inspect delivery/read state, and diagnose a local API/consumer/worker failure. This procedure is for fictional development data only. It does not prove production email delivery.
+Use this runbook to start and verify the Account/Booking notification slice, authenticated in-app member feed, real SMTP sender readiness, preference behavior, and one-delivery recovery. This procedure uses fictional data only. It does not authorize sending to real members or expose recipient addresses.
 
 ## Safety warnings
 
@@ -13,6 +13,8 @@ Use this runbook to start and verify the Account/Booking notification slice and 
 - Do not manually change inbox/delivery state to make a test pass.
 - Preserve the Notification PostgreSQL volume during ordinary stop/restart operations.
 - `dev-sink` must never be used in staging/production.
+- Do not set `SMTP_SENDER_VERIFIED=true` until the provider dashboard has verified the sender/domain and the target-environment preflight succeeds.
+- A replay can resend an external message. Correct the cause first, obtain the required operational approval, and use a specific delivery ID only.
 
 ## Start and health verification
 
@@ -49,6 +51,47 @@ notification_delivery_processed state=DELIVERED
 ```
 
 Do not expect an email: the initial provider is intentionally a development sink.
+
+## Production SMTP sender readiness
+
+**Required access:** deployment secret manager, SMTP provider dashboard, and the target environment's restricted operator shell. Do not paste SMTP credentials into tickets, terminals shared with others, or Git.
+
+1. Verify the sender domain/address in the email provider dashboard and preserve the provider's verification evidence in the restricted deployment record.
+2. Add the following target-environment secrets/configuration: `NOTIFICATION_PROVIDER=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_SENDER_VERIFIED=true`, `INTERNAL_SERVICE_TOKEN`, `SECURITY_MAIL_TOKEN`, and HTTPS `SECURITY_PUBLIC_URL`.
+3. Set `NOTIFICATION_PREFERENCE_CATEGORIES` only after Product/Safety approves which Account/Booking categories a member may control. Security verification and password recovery always bypass this preference setting.
+4. Deploy the new Notification image and run the no-send sender preflight in the target environment:
+
+```powershell
+docker compose run --rm --no-deps --entrypoint /notification-provider-preflight notification-api
+```
+
+The command checks STARTTLS, credentials, and that the SMTP server accepts the configured sender envelope. It sends no recipient/message. A failure leaves normal delivery disabled for the rollout: fix the sender/provider configuration and rerun preflight.
+
+5. Use an approved fictional/internal canary account to create one safe Account or Booking fact. Confirm one provider acceptance, one Notification `DELIVERED` attempt, and the expected member feed item. Do not record the recipient address or rendered body in evidence.
+6. If the canary fails, stop the worker or revert to the previously verified configuration. Do not turn on `dev-sink` in production and do not edit delivery rows directly.
+
+## Recipient preferences
+
+Members manage only their own email preference categories at **Updates** → **Choose your delivery preferences**. The UI is backed by member-authenticated GraphQL and Notification's owner-scoped REST API; it never displays an email address, provider reference, or delivery failure. In-app feed entries continue independently of email preference. Verify a toggle with a fictional member and confirm `notification_preference` stores only account ID/channel/category/decision/time.
+
+## Terminal delivery replay
+
+Use this only after the provider/outage/root cause is fixed and a second operator has reviewed the target and reason.
+
+1. Identify one terminal delivery without querying recipient destinations or message body:
+
+```powershell
+docker compose exec -T postgres-notification sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "SELECT id,source_event_type,state,attempt_count,last_error_code,created_at FROM notification_delivery WHERE state IN ('\''PERMANENTLY_FAILED'\'','\''DEAD_LETTERED'\'') ORDER BY updated_at DESC LIMIT 20;"'
+```
+
+2. Run the owner command with the exact UUID, named operator, specific reason, and explicit confirmation:
+
+```powershell
+docker compose run --rm --no-deps --entrypoint /notification-delivery-replay notification-api --delivery-id <uuid> --actor <operator-id> --reason "Provider sender restriction was corrected" --confirm REPLAY
+```
+
+3. Verify that the same delivery is `RETRY_SCHEDULED`, its original ID is unchanged, and one `notification_delivery_replay` audit row exists. The worker retains ordinary safety checks and provider idempotency.
+4. Never replay `SUPPRESSED`, `PROCESSING`, `PENDING`, or `DELIVERED` rows. Do not use RabbitMQ payload replay for a completed Notification delivery; inbox/business-key deduplication and provider side effects make it unsafe for this purpose.
 
 ## Member web verification
 
@@ -127,7 +170,7 @@ docker compose stop notification-api notification-consumer notification-worker
 
 Account, Event, Booking, Payment, and Matchmaking transactions continue while Notification is stopped; RabbitMQ retains bound supported facts for later consumption. Do not remove the Notification volume as rollback.
 
-Production provider outage response, recipient contact investigation, provider reconciliation, guarded DLQ replay, dashboards/alerts, and escalation contacts remain required before production deployment.
+Provider dashboard outage response, bounce/complaint webhook processing, metrics/traces/alerts, retention approval, and named escalation contacts remain required before broad production launch.
 
-**Last locally exercised:** 2026-08-30
-**Next review:** when a production email provider/contact-resolution contract is selected
+**Last locally exercised:** 2026-11-23
+**Next review:** before the first real provider canary and after any provider/domain change

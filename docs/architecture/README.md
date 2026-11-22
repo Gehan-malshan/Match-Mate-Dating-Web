@@ -211,6 +211,8 @@ OpenAPI becomes authoritative when specifications exist.
 | GET | `/api/v1/notifications` | Notification | List own in-app notifications |
 | PATCH | `/api/v1/notifications/{notificationId}/read` | Notification | Mark an owned notification read |
 | POST | `/api/v1/notifications/read-all` | Notification | Mark all own notifications read |
+| GET | `/api/v1/notification-preferences` | Notification | List own allowed email-category preferences |
+| PUT | `/api/v1/notification-preferences/{category}` | Notification | Update one own allowed email-category preference |
 | POST | `/api/v1/reports` | Moderation | Report behavior/content |
 
 Self-service uses authenticated subject identity. Caller-provided account IDs are not trusted.
@@ -312,6 +314,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 - Provide block/report from profile and match surfaces.
 - A block applies to discovery, eligibility, pairing, reveal, and relevant notifications.
 - Notification APIs derive the recipient from the authenticated subject, conceal other-member item identifiers, and never expose provider destinations, delivery errors, private preferences, or moderation evidence.
+- Production SMTP requires provider-side sender/domain verification, an explicit sender-verification deployment attestation, no-send STARTTLS/auth/sender-envelope preflight, and a controlled fictional-account canary. Terminal provider failures recover only through Notification's audited targeted replay command; raw broker replay is not delivery recovery.
 - Moderators can hide profiles, suspend accounts, exclude participation, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is not shown to the reported member.
 - Admin/organizer actions store actor, target, reason, prior/new state, time, and correlation ID.

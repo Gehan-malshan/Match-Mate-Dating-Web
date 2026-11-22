@@ -1,0 +1,52 @@
+name: Notification service
+
+on:
+  pull_request:
+    paths:
+      - 'services/notification-service/**'
+      - 'services/graphql-gateway/**'
+      - 'frontend/apps/web/**'
+      - 'contracts/openapi/notification-v1.yaml'
+      - 'infrastructure/compose/notification.compose.yml'
+      - '.github/workflows/notification-service.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notification:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: matchmate_notification
+          POSTGRES_USER: matchmate
+          POSTGRES_PASSWORD: matchmate
+        ports: ['5438:5432']
+        options: >-
+          --health-cmd "pg_isready -U matchmate -d matchmate_notification"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.26.x'}
+      - name: Unit, HTTP, and repository component tests
+        working-directory: services/notification-service
+        env:
+          NOTIFICATION_TEST_DATABASE_URL: postgres://matchmate:matchmate@localhost:5438/matchmate_notification?sslmode=disable
+        run: go test -count=1 ./...
+      - name: Static analysis
+        working-directory: services/notification-service
+        run: go vet ./...
+      - uses: oven-sh/setup-bun@v2
+        with: {bun-version: 1.3.14}
+      - name: GraphQL and member preference build checks
+        run: |
+          bun install --frozen-lockfile
+          go -C services/graphql-gateway test ./...
+          bun run typecheck:web
+          bun run test:web

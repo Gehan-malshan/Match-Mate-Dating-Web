@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	ErrInvalidCursor       = errors.New("invalid notification cursor")
-	ErrNotificationMissing = errors.New("notification not found")
+	ErrInvalidCursor         = errors.New("invalid notification cursor")
+	ErrNotificationMissing   = errors.New("notification not found")
+	ErrPreferenceUnsupported = errors.New("notification preference is unsupported")
 )
 
 type FeedRepository interface {
@@ -24,6 +25,8 @@ type FeedRepository interface {
 	UnreadCount(context.Context, string) (int, error)
 	MarkRead(context.Context, string, string, time.Time) (bool, error)
 	MarkAllRead(context.Context, string, time.Time) (int64, error)
+	ListPreferences(context.Context, string, string) ([]domain.Preference, error)
+	SetPreference(context.Context, string, string, string, bool, string, time.Time) (domain.Preference, error)
 }
 
 type FeedPage struct {
@@ -33,9 +36,10 @@ type FeedPage struct {
 }
 
 type FeedService struct {
-	repository FeedRepository
-	now        func() time.Time
-	safety     interface {
+	repository           FeedRepository
+	now                  func() time.Time
+	preferenceCategories map[string]bool
+	safety               interface {
 		Check(context.Context, string, string) (safety.Decision, error)
 	}
 }
@@ -52,8 +56,63 @@ func (s *FeedService) checkSafety(ctx context.Context, accountID, eventID string
 	return s.safety.Check(ctx, accountID, eventID)
 }
 
-func NewFeedService(repository FeedRepository) *FeedService {
-	return &FeedService{repository: repository, now: time.Now}
+func NewFeedService(repository FeedRepository, preferenceCategories ...string) *FeedService {
+	allowed := map[string]bool{}
+	for _, category := range preferenceCategories {
+		category = strings.ToUpper(strings.TrimSpace(category))
+		if category == "ACCOUNT" || category == "BOOKING" {
+			allowed[category] = true
+		}
+	}
+	if len(allowed) == 0 {
+		allowed["ACCOUNT"], allowed["BOOKING"] = true, true
+	}
+	return &FeedService{repository: repository, now: time.Now, preferenceCategories: allowed}
+}
+
+func (s *FeedService) ListPreferences(ctx context.Context, accountID string) ([]domain.Preference, error) {
+	decision, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return nil, err
+	}
+	if decision.Suspended {
+		return []domain.Preference{}, nil
+	}
+	stored, err := s.repository.ListPreferences(ctx, accountID, "EMAIL")
+	if err != nil {
+		return nil, err
+	}
+	byCategory := map[string]domain.Preference{}
+	for _, preference := range stored {
+		byCategory[preference.Category] = preference
+	}
+	items := make([]domain.Preference, 0, len(s.preferenceCategories))
+	for _, category := range []string{"ACCOUNT", "BOOKING"} {
+		if !s.preferenceCategories[category] {
+			continue
+		}
+		if preference, ok := byCategory[category]; ok {
+			items = append(items, preference)
+			continue
+		}
+		items = append(items, domain.Preference{Channel: "EMAIL", Category: category, Allowed: true})
+	}
+	return items, nil
+}
+
+func (s *FeedService) SetEmailPreference(ctx context.Context, accountID, category string, allowed bool) (domain.Preference, error) {
+	decision, err := s.checkSafety(ctx, accountID, "")
+	if err != nil {
+		return domain.Preference{}, err
+	}
+	if decision.Suspended {
+		return domain.Preference{}, ErrPreferenceUnsupported
+	}
+	category = strings.ToUpper(strings.TrimSpace(category))
+	if !s.preferenceCategories[category] {
+		return domain.Preference{}, ErrPreferenceUnsupported
+	}
+	return s.repository.SetPreference(ctx, accountID, "EMAIL", category, allowed, "MEMBER_SELF_SERVICE", s.now().UTC())
 }
 
 func (s *FeedService) List(ctx context.Context, accountID string, limit int, encodedCursor string) (FeedPage, error) {

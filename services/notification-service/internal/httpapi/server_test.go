@@ -10,6 +10,7 @@ import (
 
 	"github.com/gehan-malshan/matchmate/notification-service/internal/application"
 	"github.com/gehan-malshan/matchmate/notification-service/internal/auth"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
 	"github.com/google/uuid"
 )
 
@@ -31,6 +32,7 @@ type feedStub struct {
 	markID         string
 	markAllAccount string
 	unread         int
+	preferences    []domain.Preference
 	err            error
 }
 
@@ -46,6 +48,12 @@ func (s *feedStub) MarkRead(_ context.Context, accountID, notificationID string)
 func (s *feedStub) MarkAllRead(_ context.Context, accountID string) (int64, error) {
 	s.markAllAccount = accountID
 	return 2, s.err
+}
+func (s *feedStub) ListPreferences(context.Context, string) ([]domain.Preference, error) {
+	return s.preferences, s.err
+}
+func (s *feedStub) SetEmailPreference(_ context.Context, _ string, category string, allowed bool) (domain.Preference, error) {
+	return domain.Preference{Channel: "EMAIL", Category: category, Allowed: allowed}, s.err
 }
 
 func TestHealthEndpoints(t *testing.T) {
@@ -66,6 +74,25 @@ func TestHealthEndpoints(t *testing.T) {
 				t.Fatalf("status = %d, want %d", response.Code, test.want)
 			}
 		})
+	}
+}
+
+func TestPreferenceEndpointUsesTokenSubjectAndRejectsMalformedInput(t *testing.T) {
+	accountID := uuid.NewString()
+	handler := New(readinessStub{}, &feedStub{}, verifierStub{principal: auth.Principal{Subject: accountID}})
+	request := httptest.NewRequest(http.MethodPut, "/api/v1/notification-preferences/ACCOUNT", strings.NewReader(`{"emailEnabled":false}`))
+	request.Header.Set("Authorization", "Bearer valid")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"allowed":false`) {
+		t.Fatalf("unexpected preference response: %d %s", response.Code, response.Body.String())
+	}
+	invalid := httptest.NewRequest(http.MethodPut, "/api/v1/notification-preferences/ACCOUNT", strings.NewReader(`{}`))
+	invalid.Header.Set("Authorization", "Bearer valid")
+	bad := httptest.NewRecorder()
+	handler.ServeHTTP(bad, invalid)
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("invalid preference accepted: %d", bad.Code)
 	}
 }
 

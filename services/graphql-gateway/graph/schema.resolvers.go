@@ -179,6 +179,13 @@ func (r *mutationResolver) MarkAllNotificationsRead(ctx context.Context) (*model
 	return &result, err
 }
 
+// UpdateNotificationPreference is the resolver for the updateNotificationPreference field.
+func (r *mutationResolver) UpdateNotificationPreference(ctx context.Context, input model.NotificationPreferenceInput) (*model.NotificationPreference, error) {
+	var result model.NotificationPreference
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Notification, "/notification-preferences/"+escape(input.Category), http.MethodPut, map[string]bool{"emailEnabled": input.EmailEnabled}, &result, nil)
+	return &result, err
+}
+
 // CreateEvent is the resolver for the createEvent field.
 func (r *mutationResolver) CreateEvent(ctx context.Context, input model.EventInput) (*model.Event, error) {
 	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
@@ -348,6 +355,15 @@ func (r *queryResolver) UnreadNotificationCount(ctx context.Context) (*model.Unr
 	var result model.UnreadCount
 	err := r.Upstream.Do(ctx, r.Upstream.Services.Notification, "/notifications/unread-count", http.MethodGet, nil, &result, nil)
 	return &result, err
+}
+
+// NotificationPreferences is the resolver for the notificationPreferences field.
+func (r *queryResolver) NotificationPreferences(ctx context.Context) ([]*model.NotificationPreference, error) {
+	var result struct {
+		Items []*model.NotificationPreference `json:"items"`
+	}
+	err := r.Upstream.Do(ctx, r.Upstream.Services.Notification, "/notification-preferences", http.MethodGet, nil, &result, nil)
+	return result.Items, err
 }
 
 // ManagedEvents is the resolver for the managedEvents field.

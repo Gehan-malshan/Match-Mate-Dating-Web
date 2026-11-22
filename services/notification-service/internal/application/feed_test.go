@@ -17,6 +17,7 @@ type feedRepositoryStub struct {
 	markID         string
 	markAllAccount string
 	markFound      bool
+	preferences    []domain.Preference
 }
 
 func (s *feedRepositoryStub) ListFeed(context.Context, string, int, *domain.FeedCursor) ([]domain.FeedRecord, bool, error) {
@@ -30,6 +31,12 @@ func (s *feedRepositoryStub) MarkRead(_ context.Context, accountID, notification
 func (s *feedRepositoryStub) MarkAllRead(_ context.Context, accountID string, _ time.Time) (int64, error) {
 	s.markAllAccount = accountID
 	return 3, nil
+}
+func (s *feedRepositoryStub) ListPreferences(context.Context, string, string) ([]domain.Preference, error) {
+	return s.preferences, nil
+}
+func (s *feedRepositoryStub) SetPreference(_ context.Context, _ string, channel, category string, allowed bool, _ string, now time.Time) (domain.Preference, error) {
+	return domain.Preference{Channel: channel, Category: category, Allowed: allowed, UpdatedAt: now}, nil
 }
 
 func TestFeedRendersSafeTemplateAndAction(t *testing.T) {
@@ -50,6 +57,17 @@ func TestFeedRendersSafeTemplateAndAction(t *testing.T) {
 	}
 	if len(page.Items) != 1 || page.Items[0].ActionPath != "/app/bookings" || page.Items[0].Title != "Booking confirmed" || page.UnreadCount != 1 {
 		t.Fatalf("unexpected page: %+v", page)
+	}
+}
+
+func TestMemberCanSetOnlySupportedEmailPreferences(t *testing.T) {
+	service := NewFeedService(&feedRepositoryStub{}, "ACCOUNT")
+	preference, err := service.SetEmailPreference(context.Background(), uuid.NewString(), "account", false)
+	if err != nil || preference.Channel != "EMAIL" || preference.Category != "ACCOUNT" || preference.Allowed {
+		t.Fatalf("unexpected preference=%+v err=%v", preference, err)
+	}
+	if _, err = service.SetEmailPreference(context.Background(), uuid.NewString(), "BOOKING", false); err != ErrPreferenceUnsupported {
+		t.Fatalf("unsupported category err=%v", err)
 	}
 }
 

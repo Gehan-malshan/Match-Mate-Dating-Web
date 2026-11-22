@@ -1,7 +1,7 @@
-import {useInfiniteQuery,useMutation,useQueryClient} from '@tanstack/react-query'
+import {useInfiniteQuery,useMutation,useQuery,useQueryClient} from '@tanstack/react-query'
 import {Link} from '@tanstack/react-router'
 import {MemberNavigation} from '../components/MemberNavigation'
-import {listNotifications,markAllNotificationsRead,markNotificationRead,type NotificationItem} from '../lib/notification-api'
+import {listNotificationPreferences,listNotifications,markAllNotificationsRead,markNotificationRead,updateNotificationPreference,type NotificationItem} from '../lib/notification-api'
 import './NotificationsPage.css'
 
 function destination(item:NotificationItem):'/app/profile'|'/app/bookings'{
@@ -20,6 +20,8 @@ export function NotificationsPage(){
   const refresh=()=>client.invalidateQueries({queryKey:['notifications']})
   const mark=useMutation({mutationFn:markNotificationRead,onSuccess:refresh})
   const markAll=useMutation({mutationFn:markAllNotificationsRead,onSuccess:refresh})
+  const preferences=useQuery({queryKey:['notification-preferences'],queryFn:listNotificationPreferences,retry:false})
+  const updatePreference=useMutation({mutationFn:({category,enabled}:{category:string;enabled:boolean})=>updateNotificationPreference(category,enabled),onSuccess:()=>client.invalidateQueries({queryKey:['notification-preferences']})})
   const items=query.data?.pages.flatMap((page)=>page.items)??[]
   const unread=query.data?.pages[0]?.unreadCount??0
 
@@ -29,6 +31,7 @@ export function NotificationsPage(){
       <header><div><p>Private member updates</p><h1>Your notifications</h1><span>Account and booking changes appear here without exposing contact details or private matching answers.</span></div>{unread>0&&<button type="button" disabled={markAll.isPending} onClick={()=>markAll.mutate()}>Mark all as read</button>}</header>
       {query.isPending&&<p className="notifications-status" role="status">Loading your notifications…</p>}
       {query.isError&&<div className="notifications-empty"><h2>Sign in to view your notifications</h2><p>This history belongs only to the authenticated member.</p><Link className="button" to="/login">Log in</Link></div>}
+      {!query.isError&&<section className="notification-preferences" aria-labelledby="notification-preferences-title"><div><p>EMAIL PREFERENCES</p><h2 id="notification-preferences-title">Choose your delivery preferences</h2><span>In-app notifications remain available. Security verification and password-recovery messages are never controlled here.</span></div>{preferences.isPending&&<p role="status">Loading email preferences…</p>}{preferences.isError&&<p role="alert">Email preferences could not be loaded. Your existing delivery settings were not changed.</p>}<div className="notification-preference-list">{preferences.data?.map((preference)=><label key={preference.category}><span><strong>{preference.category==='BOOKING'?'Booking updates':'Account updates'}</strong><small>{preference.category==='BOOKING'?'Reservation and event booking updates':'Account and profile updates'}</small></span><input type="checkbox" checked={preference.allowed} disabled={updatePreference.isPending} onChange={(event)=>updatePreference.mutate({category:preference.category,enabled:event.target.checked})}/><b aria-hidden="true">{preference.allowed?'Enabled':'Disabled'}</b></label>)}</div></section>}
       {!query.isPending&&!query.isError&&items.length===0&&<div className="notifications-empty"><h2>You are all caught up</h2><p>New account and booking updates will appear here.</p><Link className="button" to="/events">Explore events</Link></div>}
       <div className="notifications-list">{items.map((item)=><article className={item.readAt?'':'is-unread'} key={item.notificationId}>
         <span className="notifications-marker" aria-hidden="true"/>

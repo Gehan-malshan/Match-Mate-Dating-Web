@@ -40,7 +40,7 @@ func main() {
 	}
 	defer pool.Close()
 	repository := postgres.New(pool)
-	feed := application.NewFeedService(repository)
+	feed := application.NewFeedService(repository, cfg.PreferenceCategories...)
 	if cfg.ModerationURL != "" {
 		feed.SetSafety(safety.New(cfg.ModerationURL, cfg.ModerationToken))
 	}

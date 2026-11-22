@@ -117,6 +117,15 @@ type FeedItem struct {
 	CreatedAt       time.Time  `json:"createdAt"`
 }
 
+// Preference is deliberately destination-free. Notification stores an account
+// identifier and the member's channel/category decision, never their email.
+type Preference struct {
+	Channel   string    `json:"channel"`
+	Category  string    `json:"category"`
+	Allowed   bool      `json:"allowed"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 type RenderedMessage struct {
 	Subject string
 	Body    string

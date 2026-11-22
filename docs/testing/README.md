@@ -108,7 +108,7 @@ The first executable slice has deterministic unit coverage for snapshot money/st
 
 ### Notification
 
-The executable slice has deterministic coverage for event routing/schema validation, privacy-safe ignored payloads, template variable allow-lists, subject safety, bounded retry timing, configuration safety, health behavior, ES256 member authentication, owner-scoped feed/read behavior, cursor/popup selection, frontend API behavior, and a disposable-schema PostgreSQL component harness for inbox/delivery/feed/suppression/attempt behavior. Required RabbitMQ redelivery/DLQ, provider-failure, crash-window, load, browser E2E, and production email-provider evidence remain open.
+The executable slice has deterministic coverage for event routing/schema validation, privacy-safe ignored payloads, template variable allow-lists, subject safety, bounded retry timing, production sender-verification configuration, health behavior, ES256 member authentication, owner-scoped feed/read/preference behavior, cursor/popup selection, frontend API behavior, and a disposable-schema PostgreSQL component harness for inbox/delivery/feed/suppression/attempt/replay behavior. Required RabbitMQ redelivery/DLQ, SMTP-provider sandbox evidence, crash-window/load evidence, bounce/complaint webhook tests, and production canary evidence remain deployment gates.
 
 - Template variable validation and privacy policy.
 - Business idempotency key.
