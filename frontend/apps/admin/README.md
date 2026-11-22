@@ -2,6 +2,8 @@
 
 The Registrations table lets administrators record cash or external card collection for eligible venue bookings and check in confirmed eligible members. The table shows persisted collection and check-in timestamps after refresh. Collection is a staff record of the booking's immutable price, not a PayHere transaction. Confirmed venue reservations have no cancellation option.
 
+Publishing an event opens a required `event-publication-v1` review. The administrator must confirm image rights, image-content moderation, and the event safety plan. Event Service rejects bypassed or incomplete approvals and retains the approving account, UTC time, and review version. Follow `docs/runbooks/event-publication-safety.md`.
+
 Registration rows now show current `entryEligible` from Booking through GraphQL. A confirmed booking with a safety exclusion appears as **Entry blocked**; staff must refresh before admitting a member. Historical booking and payment records remain visible to authorized administrators.
 
 Event manager has **Delete** for draft/cancelled events (published or open events must first be cancelled). Delete requests confirmation, then archives the record; it is removed from the normal list without erasing bookings. **Show deleted** displays archived cards and **Restore** returns one to the managed list. Restoring a cancelled event does not reopen registration. Event audit history is not stored.

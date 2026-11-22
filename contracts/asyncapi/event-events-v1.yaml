@@ -34,3 +34,4 @@ components:
               status: {type: string}
               version: {type: integer}
               archived: {type: boolean, description: Present on archive/restore facts}
+              publicationReviewVersion: {type: string, description: Present on EventPublished; identifies the completed rights, moderation, and safety procedure without copying review details}

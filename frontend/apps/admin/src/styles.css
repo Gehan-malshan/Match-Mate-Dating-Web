@@ -196,6 +196,7 @@ button { color: inherit; }
 .event-editor label small { color: var(--quiet); font-weight: 500; }
 .event-editor textarea, .override-dialog textarea { min-height: 100px; padding-block: 13px; resize: vertical; }
 .event-image-preview{display:block;width:min(100%,440px);max-height:250px;object-fit:cover;border:1px solid var(--line);border-radius:13px}.event-image-note{color:var(--quiet);font-size:.85rem}.event-editor input[type=file]{padding:12px;height:auto;min-height:50px}
+.publication-check{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:.75rem;margin:.75rem 0;line-height:1.5}.publication-check input{width:1.1rem;height:1.1rem;margin-top:.2rem;accent-color:#ff3d81}
 .editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .editor-footer p { max-width: 500px; margin: 0; color: var(--quiet); font-size: 12px; line-height: 1.55; }
 .editor-footer > div { display: flex; gap: 10px; }

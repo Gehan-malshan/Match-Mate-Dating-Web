@@ -2,7 +2,7 @@
 
 Migration 4 adds a recoverable event archive (`archived_at`). Admin-only `POST /events/{eventId}/archive` implements the UI's Delete button; it requires an expected version and accepts only drafts or cancelled events. `POST /events/{eventId}/restore` returns the event to the managed list but does not undo cancellation. Archive/restore emit outbox facts. Event and booking rows are not hard-deleted. Migration 5 removes the Event audit table, including any existing records. `GET /organizer/events` excludes archived records by default; administrators may use `?archived=true` to review deleted events. See [ADR-0003](../../docs/adr/0003-event-recoverable-delete.md).
 
-Admin draft images are now owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft and re-encodes it to strip metadata. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. See [ADR-0002](../../docs/adr/0002-event-image-storage.md). Production image-rights/moderation and storage scaling remain open.
+Admin draft images are owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft and re-encodes it to strip metadata. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. Migration 6 records the administrator, UTC time, and `event-publication-v1` review version. Publication requires image-rights, image-moderation, and event-safety confirmations at both GraphQL and Event Service boundaries. See [ADR-0002](../../docs/adr/0002-event-image-storage.md), [ADR-0007](../../docs/adr/0007-event-publication-approval.md), and the [publication runbook](../../docs/runbooks/event-publication-safety.md).
 
 Owns the event catalog, organizer ownership, event lifecycle, venue, schedule, ticket price, configured capacity, registration windows, and event discovery.
 
@@ -88,9 +88,9 @@ The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL
 
 Discovery intentionally omits organizer IDs and the exact venue name. It returns only future events in `PUBLISHED`, `REGISTRATION_OPEN`, or `REGISTRATION_CLOSED` state. Configured capacity is a catalog value and is not an availability promise; Booking remains authoritative for holds and consumed seats.
 
-The protected administrator UI is in `frontend/apps/admin`; member discovery/detail is in `frontend/apps/web`. A real-PostgreSQL component suite is available when `EVENT_TEST_DATABASE_URL` is set, and `tests/e2e/event-service-smoke.ps1` verifies the local authenticated administrator create/publish/public-discovery path.
+The protected administrator UI is in `frontend/apps/admin`; member discovery/detail is in `frontend/apps/web`. A real-PostgreSQL component suite is available when `EVENT_TEST_DATABASE_URL` is set. `tests/e2e/event-service-smoke.ps1` verifies the authenticated API path, while `tests/e2e/browser/event-administration.spec.ts` covers the actual admin browser journey for create, image upload, review-gated publish, cancel, delete/restore, and registration view.
 
-Still open for Phase 2: separate policy history/replacement endpoints, Booking validation before capacity reduction, later lifecycle states, production gateway integration, automated browser E2E, RabbitMQ failure/DLQ tests, and production operational evidence. The service is not production complete until these items and related policy decisions are resolved.
+Still open for Phase 2: separate policy history/replacement endpoints, Booking validation before capacity reduction, later lifecycle states, production gateway integration, RabbitMQ failure/DLQ tests, object-storage scaling, and production operational evidence. The service is not production complete until these items are resolved.
 
 ## Beginner verification
 

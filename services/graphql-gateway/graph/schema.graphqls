@@ -40,6 +40,7 @@ input ProfileInput { nickname: String, broadLocation: String, bio: String, visib
 input PreferencesInput { minAge: Int, maxAge: Int, intentions: [String!], interestedIn: [String!], languages: [String!], dealBreakers: [String!] }
 input CheckoutCustomerInput { bookingId: ID!, firstName: String!, lastName: String!, email: String!, phone: String!, address: String!, city: String!, country: String! }
 input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String, configuredCapacity: Int!, matchingRulesetVersion: String! }
+input EventPublicationApprovalInput { imageRightsConfirmed: Boolean!, imageModerationConfirmed: Boolean!, eventSafetyConfirmed: Boolean!, reviewVersion: String! }
 input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, participantB: ID!, reason: String! }
 
 type Query {
@@ -84,7 +85,7 @@ type Mutation {
   createEvent(input: EventInput!): Event!
   uploadEventImage(eventId: ID!, imageBase64: String!): Event!
   updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!
-  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!): Event!
+  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!, publicationApproval: EventPublicationApprovalInput): Event!
   archiveEvent(eventId: ID!, expectedVersion: Int!): Event!
   restoreEvent(eventId: ID!, expectedVersion: Int!): Event!
   generateMatchingRun(eventId: ID!, idempotencyKey: String!): MatchingRun!

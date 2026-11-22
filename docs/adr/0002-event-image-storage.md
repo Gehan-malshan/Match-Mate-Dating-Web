@@ -6,7 +6,7 @@
 
 ## Context
 
-Event cards previously used rotating stock artwork, and administrators could not attach an image. A URL-only field would depend on untrusted external hosts and would not give Event control over visibility or retention. Production object storage and image moderation are not yet configured.
+Event cards previously used rotating stock artwork, and administrators could not attach an image. A URL-only field would depend on untrusted external hosts and would not give Event control over visibility or retention. Production object storage is not yet configured; publication rights and moderation are governed by [ADR-0007](0007-event-publication-approval.md).
 
 ## Decision
 
@@ -18,8 +18,8 @@ GraphQL carries the authenticated, bounded upload mutation. The gateway exposes 
 
 The schema migration is additive; existing events have `image_version=0`. Saving a new draft followed by upload is a two-step UI workflow. A failed image upload leaves the draft intact and visible for retry. Image replacement increments `image_version` while the event configuration version remains unchanged. Rollback should retain the Event-owned bytes; do not drop `event_image` while uploaded images exist.
 
-PostgreSQL byte storage is deliberately bounded for the current small catalogue. Moving to object storage/CDN later requires a new ADR, migration, backup/retention plan, and URL compatibility strategy. Before production, review image rights, consent, manual approval/moderation, malware scanning, rate limits, abuse handling, backup size, and accessibility text policy. Upload is admin-only, but that is not a substitute for those controls.
+PostgreSQL byte storage is deliberately bounded for the current small catalogue. Moving to object storage/CDN later requires a new ADR, migration, backup/retention plan, and URL compatibility strategy. Publication now requires the versioned rights, moderation, and event-safety approval in ADR-0007. Object-storage scaling, edge upload rate limits, backup-size evidence, and a richer accessibility text policy remain infrastructure/product work. Upload is admin-only, but that is not a substitute for those controls.
 
 ## Verification
 
-Unit tests cover image validation/metadata stripping. Disposable-schema PostgreSQL tests cover draft-only storage, public visibility after publication, and image version. Gateway tests cover narrow proxy behavior. Browser build/tests cover image URL selection and fallback. Production release additionally requires end-to-end image upload and publication checks.
+Unit tests cover image validation/metadata stripping. Disposable-schema PostgreSQL tests cover draft-only storage, public visibility after publication, image version, and retained publication review. Gateway tests cover narrow proxy behavior. The Playwright Event journey covers real browser image upload and approval-gated publication.

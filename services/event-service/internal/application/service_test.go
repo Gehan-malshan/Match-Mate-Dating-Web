@@ -31,13 +31,20 @@ func (f *fakeRepo) Update(_ context.Context, _ string, in domain.UpdateInput, _ 
 	f.event.Version++
 	return f.event, nil
 }
-func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.Status, _ domain.Fact) (domain.Event, error) {
+func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.Status, approval *domain.PublicationApproval, _ domain.Fact) (domain.Event, error) {
 	if v != f.event.Version {
 		return domain.Event{}, store.ErrConflict
 	}
 	f.event.Status = to
 	f.event.Version++
+	if approval != nil && to == domain.Published {
+		f.event.PublicationReviewVersion = approval.ReviewVersion
+	}
 	return f.event, nil
+}
+
+func approvedPublication() *domain.PublicationApproval {
+	return &domain.PublicationApproval{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: true, ReviewVersion: "event-publication-v1"}
 }
 func (f *fakeRepo) ListDiscoverable(context.Context, string, int, time.Time) (domain.Page, error) {
 	return domain.Page{}, nil
@@ -84,9 +91,33 @@ func TestAdminCanCreateAndPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e, err = s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, e.Version, domain.Published, "c")
+	e, err = s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, e.Version, domain.Published, approvedPublication(), "c")
 	if err != nil || e.Status != domain.Published {
 		t.Fatalf("publish failed: %v %#v", err, e)
+	}
+}
+
+func TestPublishRequiresCompleteAdministratorReview(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	admin := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	e, _ := s.Create(context.Background(), admin, appInput(), "c")
+	for _, approval := range []*domain.PublicationApproval{
+		nil,
+		{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: false, ReviewVersion: "event-publication-v1"},
+		{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: true, ReviewVersion: "old-review"},
+	} {
+		_, err := s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, approval, "c")
+		p, ok := err.(*domain.ProblemError)
+		if !ok || p.Code != "EVENT_PUBLICATION_REVIEW_REQUIRED" {
+			t.Fatalf("incomplete review accepted: %#v %v", approval, err)
+		}
+	}
+	organizer := domain.Principal{Subject: e.OrganizerID, Roles: []string{"organizer"}}
+	_, err := s.Transition(context.Background(), organizer, e.ID, e.Version, domain.Published, approvedPublication(), "c")
+	p, ok := err.(*domain.ProblemError)
+	if !ok || p.Code != "EVENT_ADMIN_REQUIRED" {
+		t.Fatalf("organizer approved publication: %v", err)
 	}
 }
 func TestAdminDeleteRequiresSafeStateAndCanRestore(t *testing.T) {
@@ -112,7 +143,7 @@ func TestAdminDeleteRequiresSafeStateAndCanRestore(t *testing.T) {
 	if err != nil || e.ArchivedAt != nil {
 		t.Fatalf("restore draft: %+v %v", e, err)
 	}
-	e, err = s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, "c")
+	e, err = s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, approvedPublication(), "c")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +155,7 @@ func TestStaleTransitionReturnsStableConflict(t *testing.T) {
 	r := &fakeRepo{}
 	s := New(r)
 	e, _ := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
-	_, err := s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, 99, domain.Published, "c")
+	_, err := s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, 99, domain.Published, approvedPublication(), "c")
 	p, ok := err.(*domain.ProblemError)
 	if !ok || p.Code != "EVENT_VERSION_CONFLICT" {
 		t.Fatalf("unexpected error: %v", err)
@@ -169,7 +200,7 @@ func TestPublishRejectsExpiredRegistrationWindow(t *testing.T) {
 	principal := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
 	event, _ := s.Create(context.Background(), principal, appInput(), "c")
 	r.event.RegistrationClosesAt = time.Now().UTC().Add(-time.Minute)
-	_, err := s.Transition(context.Background(), principal, event.ID, event.Version, domain.Published, "c")
+	_, err := s.Transition(context.Background(), principal, event.ID, event.Version, domain.Published, approvedPublication(), "c")
 	p, ok := err.(*domain.ProblemError)
 	if !ok || p.Code != "EVENT_PUBLICATION_WINDOW_EXPIRED" {
 		t.Fatalf("unexpected error: %v", err)

@@ -1,0 +1,69 @@
+name: Event browser E2E
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/apps/admin/**'
+      - 'frontend/apps/web/**'
+      - 'services/event-service/**'
+      - 'services/graphql-gateway/**'
+      - 'services/booking-service/**'
+      - 'contracts/openapi/event-v1.yaml'
+      - 'playwright.config.ts'
+      - 'tests/e2e/browser/**'
+      - 'compose.yaml'
+      - 'infrastructure/compose/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/event-browser-e2e.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  event-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Start MatchMate backend
+        run: docker compose up --build -d
+      - name: Wait for required APIs
+        shell: bash
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:8080/health/live >/dev/null \
+              && curl --fail --silent http://localhost:8082/health/ready >/dev/null \
+              && curl --fail --silent http://localhost:8085/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose ps -a
+          docker compose logs --tail=100 account-api event-api booking-api graphql-api
+          exit 1
+      - name: Run Event browser journey
+        run: bun run test:e2e:event
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-browser-evidence
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --tail=150 account-api event-api booking-api graphql-api

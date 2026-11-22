@@ -63,6 +63,8 @@ Constraints and privacy:
 
 ## 4. Event database
 
+Event migration 6 adds `publication_review_version`, `publication_reviewed_by`, and `publication_reviewed_at` with an all-or-none constraint. They record the current event's publication approval without storing rights documents, venue contacts, or checklist evidence. Existing published rows remain null and require controlled review before production promotion. Do not remove populated review fields during rollback; forward-fix publication behavior and preserve evidence.
+
 The Event service owns `event`, `event_image`, and transactional `outbox` tables. Migration 5 drops the former `event_audit` table and permanently removes any records it contained; new databases do not create it. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
 
 Suggested tables:

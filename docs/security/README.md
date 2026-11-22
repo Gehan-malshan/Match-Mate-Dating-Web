@@ -97,6 +97,7 @@ The Payment slice validates Account-issued ES256 tokens for member operations, f
 - Escape/sanitize displayed text; define approved rich-content policy or use plain text.
 - Protect against SSRF by blocking arbitrary server-side URL fetches and validating provider destinations.
 - Upload through private storage with randomized object keys, content/type verification, size/dimension limits, malware scan, moderation state, and controlled delivery URLs.
+- Event publication additionally requires the versioned administrator confirmation for image rights, prohibited-content review, and the event safety plan. Event stores only the approver, time, and procedure version; restricted evidence and venue contacts stay outside public APIs, events, and logs. See ADR-0007 and the event publication runbook.
 - Configure CORS narrowly. Apply CSRF controls if browser credentials are cookie-based.
 - Set appropriate security headers and avoid exposing stack traces/internal IDs.
 

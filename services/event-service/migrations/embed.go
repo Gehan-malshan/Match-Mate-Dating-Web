@@ -16,3 +16,6 @@ var EventArchiveUp string
 
 //go:embed 000005_remove_event_audit.up.sql
 var RemoveEventAuditUp string
+
+//go:embed 000006_publication_review.up.sql
+var PublicationReviewUp string

@@ -4,7 +4,9 @@
 
 Account owns one-time verification/recovery tokens, password and session revocation, administrator TOTP, and per-account security rate windows. Notification accepts transient security-message requests from Account over a separate internal token and delivers through SMTP; raw links are never RabbitMQ facts. GraphQL exposes the matching browser mutations. Account migration 2 revokes pre-MFA administrator sessions. Account deletion pseudonymizes email and erases Account-owned profile/credential data while retaining stable IDs for unresolved cross-service retention; see [ADR-0003](../adr/0003-account-security-lifecycle.md).
 
-Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md). Image rights and moderation remain production gates.
+Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md).
+
+Publication is an administrator-only safety boundary. The browser gathers `event-publication-v1` confirmations for image rights, prohibited-content review, and the event safety plan; GraphQL and Event Service both enforce administrator access, and Event persists approver/time/version before emitting `EventPublished`. Restricted evidence and venue contacts are not copied into Event facts or public DTOs. See [ADR-0007](../adr/0007-event-publication-approval.md).
 
 ## Current event payment-choice slice
 

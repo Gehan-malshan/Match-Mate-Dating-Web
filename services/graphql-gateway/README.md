@@ -2,6 +2,8 @@
 
 Administrator-only `collectVenuePayment` and `checkInBooking` forward idempotent commands to Booking. The gateway checks the admin role; Booking repeats authorization and eligibility. Booking and registration GraphQL types expose venue collection and check-in timestamps.
 
+Event publication accepts an optional `EventPublicationApprovalInput` only through the administrator mutation. The gateway forwards it to Event Service, which requires all `event-publication-v1` confirmations for `publish`; other lifecycle actions do not require the approval object.
+
 Appeal-only Account sessions return `roles: ["appeal"]` and no `me` from `login`/`refreshSession`. Owner-scoped `myModerationActions` and `appealModerationAction` forward bearer authorization to Moderation, which repeats subject and action ownership checks. Configure `MODERATION_API_URL` for this private service route.
 
 Administrator registration queries preserve Booking's current `entryEligible` value through the Account identity join. They do not infer admission from booking state alone.
