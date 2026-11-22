@@ -239,7 +239,7 @@ type ComplexityRoot struct {
 		ResetPassword            func(childComplexity int, token string, password string) int
 		RestoreEvent             func(childComplexity int, eventID string, expectedVersion int) int
 		ReviewMatchingRun        func(childComplexity int, runID string, expectedVersion int) int
-		TransitionEvent          func(childComplexity int, eventID string, action string, expectedVersion int) int
+		TransitionEvent          func(childComplexity int, eventID string, action string, expectedVersion int, publicationApproval *model.EventPublicationApprovalInput) int
 		UpdateEvent              func(childComplexity int, eventID string, input model.EventInput, expectedVersion int) int
 		UpdatePreferences        func(childComplexity int, input model.PreferencesInput) int
 		UpdateProfile            func(childComplexity int, input model.ProfileInput) int
@@ -371,7 +371,7 @@ type MutationResolver interface {
 	CreateEvent(ctx context.Context, input model.EventInput) (*model.Event, error)
 	UploadEventImage(ctx context.Context, eventID string, imageBase64 string) (*model.Event, error)
 	UpdateEvent(ctx context.Context, eventID string, input model.EventInput, expectedVersion int) (*model.Event, error)
-	TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int) (*model.Event, error)
+	TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int, publicationApproval *model.EventPublicationApprovalInput) (*model.Event, error)
 	ArchiveEvent(ctx context.Context, eventID string, expectedVersion int) (*model.Event, error)
 	RestoreEvent(ctx context.Context, eventID string, expectedVersion int) (*model.Event, error)
 	GenerateMatchingRun(ctx context.Context, eventID string, idempotencyKey string) (*model.MatchingRun, error)
@@ -1419,7 +1419,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.TransitionEvent(childComplexity, args["eventId"].(string), args["action"].(string), args["expectedVersion"].(int)), true
+		return e.ComplexityRoot.Mutation.TransitionEvent(childComplexity, args["eventId"].(string), args["action"].(string), args["expectedVersion"].(int), args["publicationApproval"].(*model.EventPublicationApprovalInput)), true
 	case "Mutation.updateEvent":
 		if e.ComplexityRoot.Mutation.UpdateEvent == nil {
 			break
@@ -1925,6 +1925,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCheckoutCustomerInput,
 		ec.unmarshalInputEventInput,
+		ec.unmarshalInputEventPublicationApprovalInput,
 		ec.unmarshalInputPairingOverrideInput,
 		ec.unmarshalInputPreferencesInput,
 		ec.unmarshalInputProfileInput,
@@ -3156,6 +3157,14 @@ func (ec *executionContext) field_Mutation_transitionEvent_args(ctx context.Cont
 		return nil, err
 	}
 	args["expectedVersion"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "publicationApproval",
+		func(ctx context.Context, v any) (*model.EventPublicationApprovalInput, error) {
+			return ec.unmarshalOEventPublicationApprovalInput2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐEventPublicationApprovalInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["publicationApproval"] = arg3
 	return args, nil
 }
 
@@ -7395,7 +7404,7 @@ func (ec *executionContext) _Mutation_transitionEvent(ctx context.Context, field
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().TransitionEvent(ctx, fc.Args["eventId"].(string), fc.Args["action"].(string), fc.Args["expectedVersion"].(int))
+			return ec.Resolvers.Mutation().TransitionEvent(ctx, fc.Args["eventId"].(string), fc.Args["action"].(string), fc.Args["expectedVersion"].(int), fc.Args["publicationApproval"].(*model.EventPublicationApprovalInput))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model.Event) graphql.Marshaler {
@@ -10785,6 +10794,57 @@ func (ec *executionContext) unmarshalInputEventInput(ctx context.Context, obj an
 				return it, err
 			}
 			it.MatchingRulesetVersion = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputEventPublicationApprovalInput(ctx context.Context, obj any) (model.EventPublicationApprovalInput, error) {
+	var it model.EventPublicationApprovalInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"imageRightsConfirmed", "imageModerationConfirmed", "eventSafetyConfirmed", "reviewVersion"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "imageRightsConfirmed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imageRightsConfirmed"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImageRightsConfirmed = data
+		case "imageModerationConfirmed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("imageModerationConfirmed"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ImageModerationConfirmed = data
+		case "eventSafetyConfirmed":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("eventSafetyConfirmed"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.EventSafetyConfirmed = data
+		case "reviewVersion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("reviewVersion"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ReviewVersion = data
 		}
 	}
 	return it, nil
@@ -14699,6 +14759,14 @@ func (ec *executionContext) marshalOCandidate2ᚕᚖgithubᚗcomᚋgehanᚑmalsh
 	}
 
 	return ret
+}
+
+func (ec *executionContext) unmarshalOEventPublicationApprovalInput2ᚖgithubᚗcomᚋgehanᚑmalshanᚋmatchmateᚋgraphqlᚑgatewayᚋgraphᚋmodelᚐEventPublicationApprovalInput(ctx context.Context, v any) (*model.EventPublicationApprovalInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputEventPublicationApprovalInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {

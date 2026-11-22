@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AdminAccount, archiveEvent, createEvent, EventInput, listArchivedEvents, ManagedEvent, Problem, restoreEvent, transitionEvent, updateEvent, uploadEventImage } from '../lib/api'
+import { AdminAccount, archiveEvent, createEvent, EventInput, EventPublicationApproval, listArchivedEvents, ManagedEvent, Problem, restoreEvent, transitionEvent, updateEvent, uploadEventImage } from '../lib/api'
 import { prepareEventImage } from '../lib/event-image'
 
 export function EventsView({ account, events, loading, error, onViewRegistrations }: { account: AdminAccount; events: ManagedEvent[]; loading: boolean; error: boolean; onViewRegistrations: (eventId: string) => void }) {
@@ -8,19 +8,21 @@ export function EventsView({ account, events, loading, error, onViewRegistration
   const [editing, setEditing] = useState<ManagedEvent | 'new'>()
   const [showDeleted, setShowDeleted] = useState(false)
   const [message, setMessage] = useState('')
+  const [reviewing, setReviewing] = useState<ManagedEvent>()
   const deletedQuery = useQuery({ queryKey: ['admin-archived-events'], queryFn: listArchivedEvents, enabled: showDeleted })
   const visibleEvents = showDeleted ? deletedQuery.data?.items ?? [] : events
   const visibleLoading = showDeleted ? deletedQuery.isPending : loading
   const visibleError = showDeleted ? deletedQuery.isError : error
 
-  async function transition(event: ManagedEvent, action: 'publish' | 'open-registration' | 'close-registration' | 'cancel') {
+  async function transition(event: ManagedEvent, action: 'publish' | 'open-registration' | 'close-registration' | 'cancel', approval?: EventPublicationApproval) {
     if (action === 'cancel') {
       if (!window.confirm(`Cancel “${event.name}”? This changes its public status.`)) return
     }
     setMessage('Applying the versioned event change…')
     try {
-      await transitionEvent(event, action)
+      await transitionEvent(event, action, approval)
       await queryClient.invalidateQueries({ queryKey: ['admin-events'] })
+      setReviewing(undefined)
       setMessage('Event lifecycle updated.')
     } catch (problem) {
       setMessage((problem as unknown as Problem).detail ?? 'The event could not be updated.')
@@ -50,6 +52,7 @@ export function EventsView({ account, events, loading, error, onViewRegistration
       <div className="event-policy-banner"><span aria-hidden="true">⌾</span><div><strong>Administrator-only event controls</strong><p>Delete removes a draft or cancelled event from the active list without erasing booking history. Cancel a live event before deleting it.</p></div></div>
 
       {editing && <EventEditor account={account} event={editing === 'new' ? undefined : editing} onClose={() => setEditing(undefined)} />}
+      {reviewing && <PublicationReview event={reviewing} onClose={() => setReviewing(undefined)} onApprove={(approval) => void transition(reviewing, 'publish', approval)} />}
 
       <section className="panel event-catalog">
         <div className="panel-heading"><div><p className="eyebrow">Event inventory</p><h2>{showDeleted ? 'Deleted events' : 'Managed events'}</h2></div><button className="ghost-action" type="button" onClick={() => { setShowDeleted(!showDeleted); setMessage('') }}>{showDeleted ? 'Show active' : 'Show deleted'}</button></div>
@@ -67,7 +70,7 @@ export function EventsView({ account, events, loading, error, onViewRegistration
               <div className="card-actions">
                 <button className="ghost-action" type="button" onClick={() => onViewRegistrations(event.eventId)}>View registrations</button>
                 {showDeleted ? <button className="small-primary" type="button" onClick={() => void setDeleted(event, true)}>Restore</button> : <>
-                  {event.status === 'DRAFT' && <><button className="ghost-action" type="button" onClick={() => setEditing(event)}>Edit draft</button><button className="small-primary" type="button" onClick={() => void transition(event, 'publish')}>Publish</button></>}
+                  {event.status === 'DRAFT' && <><button className="ghost-action" type="button" onClick={() => setEditing(event)}>Edit draft</button><button className="small-primary" type="button" onClick={() => setReviewing(event)}>Publish</button></>}
                   {event.status === 'PUBLISHED' && <button className="small-primary" type="button" onClick={() => void transition(event, 'open-registration')}>Open registration</button>}
                   {event.status === 'REGISTRATION_OPEN' && <button className="small-primary" type="button" onClick={() => void transition(event, 'close-registration')}>Close registration</button>}
                   {event.status !== 'CANCELLED' && <button className="danger-action" type="button" onClick={() => void transition(event, 'cancel')}>Cancel</button>}
@@ -81,6 +84,23 @@ export function EventsView({ account, events, loading, error, onViewRegistration
       </section>
     </section>
   )
+}
+
+function PublicationReview({ event, onClose, onApprove }: { event: ManagedEvent; onClose: () => void; onApprove: (approval: EventPublicationApproval) => void }) {
+  return <section className="panel event-editor" aria-labelledby="publication-review-title">
+    <div className="panel-heading"><div><p className="eyebrow">Required publication review</p><h2 id="publication-review-title">Approve {event.name}</h2></div><button className="icon-button" type="button" onClick={onClose} aria-label="Close publication review">×</button></div>
+    <form onSubmit={(formEvent) => { formEvent.preventDefault(); onApprove({ imageRightsConfirmed: true, imageModerationConfirmed: true, eventSafetyConfirmed: true, reviewVersion: 'event-publication-v1' }) }}>
+      <fieldset><legend>Image rights and moderation</legend>
+        <label className="publication-check"><input name="imageRightsConfirmed" type="checkbox" required /> I confirm MatchMate owns or has documented permission to publish the attached image, including consent from identifiable people.</label>
+        <label className="publication-check"><input name="imageModerationConfirmed" type="checkbox" required /> I reviewed the image for minors, nudity, harassment, hate, illegal content, contact details, and exact private venue information.</label>
+      </fieldset>
+      <fieldset><legend>Event safety plan</legend>
+        <label className="publication-check"><input name="eventSafetyConfirmed" type="checkbox" required /> I confirmed the venue contact, trained check-in staff, incident lead, emergency escalation, attendee privacy, accessibility, and cancellation communication plan.</label>
+      </fieldset>
+      <p className="event-image-note">Your account ID, review time, and procedure version will be retained with the event publication record.</p>
+      <div className="editor-footer"><p>All three confirmations are required by the Event Service.</p><div><button className="ghost-action" type="button" onClick={onClose}>Back</button><button className="primary-action" type="submit">Approve and publish</button></div></div>
+    </form>
+  </section>
 }
 
 function EventEditor({ account, event, onClose }: { account: AdminAccount; event?: ManagedEvent; onClose: () => void }) {

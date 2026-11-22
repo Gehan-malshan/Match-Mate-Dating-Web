@@ -157,12 +157,13 @@ func (s *Server) update(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) transition(w http.ResponseWriter, r *http.Request, to domain.Status) {
 	var in struct {
-		ExpectedVersion int64 `json:"expectedVersion"`
+		ExpectedVersion     int64                       `json:"expectedVersion"`
+		PublicationApproval *domain.PublicationApproval `json:"publicationApproval,omitempty"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	e, err := s.app.Transition(r.Context(), principal(r), r.PathValue("eventId"), in.ExpectedVersion, to, correlation(r))
+	e, err := s.app.Transition(r.Context(), principal(r), r.PathValue("eventId"), in.ExpectedVersion, to, in.PublicationApproval, correlation(r))
 	if handle(w, r, err) {
 		return
 	}

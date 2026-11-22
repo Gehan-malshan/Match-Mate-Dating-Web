@@ -217,7 +217,7 @@ func (r *mutationResolver) UpdateEvent(ctx context.Context, eventID string, inpu
 }
 
 // TransitionEvent is the resolver for the transitionEvent field.
-func (r *mutationResolver) TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int) (*model.Event, error) {
+func (r *mutationResolver) TransitionEvent(ctx context.Context, eventID string, action string, expectedVersion int, publicationApproval *model.EventPublicationApprovalInput) (*model.Event, error) {
 	if _, err := r.Upstream.RequireAdmin(ctx); err != nil {
 		return nil, err
 	}
@@ -226,6 +226,9 @@ func (r *mutationResolver) TransitionEvent(ctx context.Context, eventID string, 
 		return nil, errors.New("unsupported event transition")
 	}
 	body := map[string]any{"expectedVersion": expectedVersion}
+	if publicationApproval != nil {
+		body["publicationApproval"] = publicationApproval
+	}
 	var result model.Event
 	err := r.Upstream.Do(ctx, r.Upstream.Services.Event, "/events/"+escape(eventID)+"/"+action, http.MethodPost, body, &result, nil)
 	return &result, err

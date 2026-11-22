@@ -65,6 +65,9 @@ func TestRepositoryMigrationLifecycleAndOutbox(t *testing.T) {
 	if _, err = pool.Exec(ctx, migrations.RemoveEventAuditUp); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = pool.Exec(ctx, migrations.PublicationReviewUp); err != nil {
+		t.Fatal(err)
+	}
 	var auditTable *string
 	if err = pool.QueryRow(ctx, `SELECT to_regclass('event_audit')::text`).Scan(&auditTable); err != nil || auditTable != nil {
 		t.Fatalf("event audit table was not removed: %v %v", auditTable, err)
@@ -86,9 +89,12 @@ func TestRepositoryMigrationLifecycleAndOutbox(t *testing.T) {
 	if _, err = repo.PublicImage(ctx, event.ID); err == nil {
 		t.Fatal("draft image leaked publicly")
 	}
-	event, err = app.Transition(ctx, principal, event.ID, event.Version, domain.Published, "component-correlation")
+	event, err = app.Transition(ctx, principal, event.ID, event.Version, domain.Published, &domain.PublicationApproval{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: true, ReviewVersion: "event-publication-v1"}, "component-correlation")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if event.PublicationReviewVersion != "event-publication-v1" || event.PublicationReviewedBy != principal.Subject || event.PublicationReviewedAt == nil {
+		t.Fatalf("publication review was not retained: %+v", event)
 	}
 	publicImage, err := repo.PublicImage(ctx, event.ID)
 	if err != nil || !bytes.Equal(publicImage, imageBytes) {

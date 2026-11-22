@@ -32,14 +32,14 @@ func (r *Repository) Create(ctx context.Context, e domain.Event, f domain.Fact) 
 	return e, tx.Commit(ctx)
 }
 
-const eventColumns = `event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version,archived_at`
+const eventColumns = `event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version,archived_at,COALESCE(publication_review_version,''),COALESCE(publication_reviewed_by,''),publication_reviewed_at`
 const selectEvent = `SELECT ` + eventColumns + ` FROM event`
 
 type row interface{ Scan(...any) error }
 
 func scan(q row) (domain.Event, error) {
 	var e domain.Event
-	err := q.Scan(&e.ID, &e.OrganizerID, &e.Name, &e.Description, &e.VenueName, &e.BroadLocation, &e.TimeZone, &e.StartsAt, &e.EndsAt, &e.RegistrationOpensAt, &e.RegistrationClosesAt, &e.Price, &e.Currency, &e.ConfiguredCapacity, &e.CapacityPolicyVersion, &e.MatchingRulesetVersion, &e.Status, &e.Version, &e.CreatedAt, &e.UpdatedAt, &e.PaymentOptions, &e.ImageVersion, &e.ArchivedAt)
+	err := q.Scan(&e.ID, &e.OrganizerID, &e.Name, &e.Description, &e.VenueName, &e.BroadLocation, &e.TimeZone, &e.StartsAt, &e.EndsAt, &e.RegistrationOpensAt, &e.RegistrationClosesAt, &e.Price, &e.Currency, &e.ConfiguredCapacity, &e.CapacityPolicyVersion, &e.MatchingRulesetVersion, &e.Status, &e.Version, &e.CreatedAt, &e.UpdatedAt, &e.PaymentOptions, &e.ImageVersion, &e.ArchivedAt, &e.PublicationReviewVersion, &e.PublicationReviewedBy, &e.PublicationReviewedAt)
 	return e, err
 }
 func (r *Repository) Get(ctx context.Context, id string) (domain.Event, error) {
@@ -106,14 +106,19 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInpu
 	}
 	return e, tx.Commit(ctx)
 }
-func (r *Repository) Transition(ctx context.Context, id string, expected int64, to domain.Status, f domain.Fact) (domain.Event, error) {
+func (r *Repository) Transition(ctx context.Context, id string, expected int64, to domain.Status, approval *domain.PublicationApproval, f domain.Fact) (domain.Event, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return domain.Event{}, err
 	}
 	defer tx.Rollback(ctx)
 	now := time.Now().UTC()
-	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET status=$3,version=version+1,updated_at=$4 WHERE event_id=$1 AND version=$2 AND archived_at IS NULL RETURNING `+eventColumns, id, expected, to, now))
+	var reviewVersion, reviewedBy any
+	var reviewedAt *time.Time
+	if to == domain.Published && approval != nil {
+		reviewVersion, reviewedBy, reviewedAt = approval.ReviewVersion, f.ActorID, &now
+	}
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET status=$3,version=version+1,updated_at=$4,publication_review_version=COALESCE($5,publication_review_version),publication_reviewed_by=COALESCE($6,publication_reviewed_by),publication_reviewed_at=COALESCE($7,publication_reviewed_at) WHERE event_id=$1 AND version=$2 AND archived_at IS NULL RETURNING `+eventColumns, id, expected, to, now, reviewVersion, reviewedBy, reviewedAt))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return e, store.ErrConflict
 	}
@@ -122,6 +127,9 @@ func (r *Repository) Transition(ctx context.Context, id string, expected int64, 
 	}
 	f.AggregateID = e.ID
 	f.Payload = map[string]any{"eventId": e.ID, "status": e.Status, "version": e.Version}
+	if to == domain.Published {
+		f.Payload["publicationReviewVersion"] = e.PublicationReviewVersion
+	}
 	if err = insertFact(ctx, tx, f, e); err != nil {
 		return e, err
 	}

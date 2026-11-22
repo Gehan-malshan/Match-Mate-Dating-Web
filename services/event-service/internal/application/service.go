@@ -66,7 +66,7 @@ func (s *Service) Update(ctx context.Context, p domain.Principal, id string, in 
 	}
 	return v, err
 }
-func (s *Service) Transition(ctx context.Context, p domain.Principal, id string, expected int64, to domain.Status, corr string) (domain.Event, error) {
+func (s *Service) Transition(ctx context.Context, p domain.Principal, id string, expected int64, to domain.Status, approval *domain.PublicationApproval, corr string) (domain.Event, error) {
 	e, err := s.authorize(ctx, p, id)
 	if err != nil {
 		return e, err
@@ -77,6 +77,14 @@ func (s *Service) Transition(ctx context.Context, p domain.Principal, id string,
 	if to == domain.Published && !s.now().Before(e.RegistrationClosesAt) {
 		return e, problem(409, "EVENT_PUBLICATION_WINDOW_EXPIRED", "An event cannot be published after registration has closed", nil)
 	}
+	if to == domain.Published {
+		if !p.HasRole("admin") {
+			return e, problem(403, "EVENT_ADMIN_REQUIRED", "Only an administrator can approve event publication", nil)
+		}
+		if approval == nil || !approval.ImageRightsConfirmed || !approval.ImageModerationConfirmed || !approval.EventSafetyConfirmed || strings.TrimSpace(approval.ReviewVersion) != "event-publication-v1" {
+			return e, problem(422, "EVENT_PUBLICATION_REVIEW_REQUIRED", "Image rights, image moderation, and event safety review must be approved before publication", map[string]string{"publicationApproval": "all confirmations and event-publication-v1 are required"})
+		}
+	}
 	if to == domain.RegistrationOpen {
 		now := s.now()
 		if now.Before(e.RegistrationOpensAt) || !now.Before(e.RegistrationClosesAt) {
@@ -84,7 +92,10 @@ func (s *Service) Transition(ctx context.Context, p domain.Principal, id string,
 		}
 	}
 	name := map[domain.Status]string{domain.Published: "EventPublished", domain.RegistrationOpen: "EventRegistrationOpened", domain.RegistrationClosed: "EventRegistrationClosed", domain.Cancelled: "EventCancelled"}[to]
-	v, err := s.repo.Transition(ctx, id, expected, to, fact(name, e, p, corr))
+	if approval != nil {
+		approval.ReviewVersion = strings.TrimSpace(approval.ReviewVersion)
+	}
+	v, err := s.repo.Transition(ctx, id, expected, to, approval, fact(name, e, p, corr))
 	if errors.Is(err, store.ErrConflict) {
 		return v, problem(409, "EVENT_VERSION_CONFLICT", "Event changed; reload and retry", nil)
 	}

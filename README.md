@@ -6,6 +6,8 @@ Account security now has email verification and password recovery links (through
 
 Administrators can attach one optional image while an event is a draft. The Event Service stores a sanitized JPEG, and published event pages use it instead of rotating artwork. See [ADR-0002](docs/adr/0002-event-image-storage.md).
 
+Event publication now requires the accepted `event-publication-v1` image-rights, content-moderation, and event-safety review. Event retains the approving administrator, UTC time, and procedure version, and the browser journey is enforced in CI. See [ADR-0007](docs/adr/0007-event-publication-approval.md).
+
 Event drafts support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until staff records collection at the entrance. Existing events retain online-only behavior. A production deployment without Payment/Matchmaking remains separate work.
 
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.

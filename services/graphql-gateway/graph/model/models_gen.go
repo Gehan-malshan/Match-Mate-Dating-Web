@@ -127,6 +127,13 @@ type EventPage struct {
 	Limit      int      `json:"limit"`
 }
 
+type EventPublicationApprovalInput struct {
+	ImageRightsConfirmed     bool   `json:"imageRightsConfirmed"`
+	ImageModerationConfirmed bool   `json:"imageModerationConfirmed"`
+	EventSafetyConfirmed     bool   `json:"eventSafetyConfirmed"`
+	ReviewVersion            string `json:"reviewVersion"`
+}
+
 type EventRegistration struct {
 	BookingID             string  `json:"bookingId"`
 	AccountID             string  `json:"accountId"`

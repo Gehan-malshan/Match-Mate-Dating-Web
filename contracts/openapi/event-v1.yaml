@@ -71,7 +71,7 @@ paths:
       - {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
       - {name: action, in: path, required: true, schema: {type: string, enum: [publish, open-registration, close-registration, cancel]}}
     post:
-      summary: Apply an event lifecycle command
+      summary: Apply an event lifecycle command; publication requires the approved rights, moderation, and safety review
       security: [{bearerAuth: []}]
       requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/TransitionInput"}}}}
       responses:
@@ -137,6 +137,9 @@ components:
             createdAt: {type: string, format: date-time}
             updatedAt: {type: string, format: date-time}
             archivedAt: {type: string, format: date-time, description: Present only when removed from the active admin list}
+            publicationReviewVersion: {type: string, description: Approved checklist version; empty before the first approved publication}
+            publicationReviewedBy: {type: string, description: Administrator account ID that approved publication; never exposed by PublicEvent}
+            publicationReviewedAt: {type: string, format: date-time, description: UTC approval time; absent before the first approved publication}
     PublicEvent:
       type: object
       required: [eventId,name,description,broadLocation,timeZone,startsAt,endsAt,registrationOpensAt,registrationClosesAt,price,currency,paymentOptions,imageVersion,configuredCapacity,matchingRulesetVersion,status,version]
@@ -160,6 +163,21 @@ components:
         version: {type: integer}
     EventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/PublicEvent"}}, nextCursor: {type: string}, limit: {type: integer}}}
     ManagedEventPage: {type: object, required: [items,limit], properties: {items: {type: array, items: {$ref: "#/components/schemas/Event"}}, nextCursor: {type: string}, limit: {type: integer}}}
-    TransitionInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}
+    PublicationApproval:
+      type: object
+      additionalProperties: false
+      required: [imageRightsConfirmed,imageModerationConfirmed,eventSafetyConfirmed,reviewVersion]
+      properties:
+        imageRightsConfirmed: {type: boolean, const: true}
+        imageModerationConfirmed: {type: boolean, const: true}
+        eventSafetyConfirmed: {type: boolean, const: true}
+        reviewVersion: {type: string, const: event-publication-v1}
+    TransitionInput:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: {type: integer, minimum: 1}
+        publicationApproval: {$ref: "#/components/schemas/PublicationApproval", description: Required when action is publish; ignored for other lifecycle actions}
     ArchiveInput: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}
     Problem: {type: object, required: [type,title,status,code,detail,instance,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, instance: {type: string}, traceId: {type: string}, fieldErrors: {type: object, additionalProperties: {type: string}}}}

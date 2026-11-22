@@ -17,7 +17,7 @@ describe('RegistrationsView', () => {
     const onSelectedEventIdChange = vi.fn()
     const { rerender } = render(<QueryClientProvider client={client}><RegistrationsView events={events} eventsLoading={false} eventsError={false} selectedEventId="" onSelectedEventIdChange={onSelectedEventIdChange} /></QueryClientProvider>)
     expect(await screen.findByText('Asha')).toBeVisible()
-    expect(screen.getByText('Not collected in app')).toBeVisible()
+    expect(screen.getByText('Due at venue')).toBeVisible()
     expect(listAllRegistrations).toHaveBeenCalledWith(0)
 
     fireEvent.change(screen.getByLabelText('Event'), { target: { value: 'event-a' } })

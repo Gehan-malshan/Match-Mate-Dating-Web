@@ -9,7 +9,7 @@ NOTIFICATION_DIR := services/notification-service
 MODERATION_DIR := services/moderation-service
 GRAPHQL_DIR := services/graphql-gateway
 
-.PHONY: help setup start backend apps frontend status logs stop test build
+.PHONY: help setup start backend apps frontend status logs stop test test-event-e2e build
 
 help: ## Show the basic local-development commands
 	@echo "MatchMate — basic local commands"
@@ -23,6 +23,7 @@ help: ## Show the basic local-development commands
 	@echo "  make logs        Follow backend logs"
 	@echo "  make stop        Stop backend containers; keep database data"
 	@echo "  make test        Run backend and frontend tests"
+	@echo "  make test-event-e2e Run the Event browser lifecycle test"
 	@echo "  make build       Build Docker backend and frontend production files"
 
 setup: ## Install project dependencies
@@ -78,6 +79,9 @@ test: ## Run implemented backend and frontend tests
 	go -C $(MODERATION_DIR) test ./...
 	go -C $(GRAPHQL_DIR) test ./...
 	bun run test:web
+
+test-event-e2e: ## Run the Event browser lifecycle against the local backend
+	bun run test:e2e:event
 
 build: ## Build the Docker backend and frontend production assets
 	docker compose build
