@@ -1,5 +1,9 @@
 # MatchMate Base Design System — Midnight Chemistry
 
+Security link pages (`/verify-email`, `/forgot-password`, `/reset-password`) reuse the existing dark login card and action tokens. The administrator authenticator field belongs to the shared login form and uses the same accessible label/input treatment. Account deletion uses a plain confirmation panel in the private profile workspace; security and confirmation text take priority over decorative motion.
+
+Event-specific artwork may replace the existing catalogue and detail hero images only when attached by an administrator to a draft and served through the Event media route after publication. Keep the current dark gradient wash for legible text, cover crop rather than stretch, and the existing project artwork as fallback. Avoid imagery that reveals attendees, contact details, or exact private venue details without approved rights and consent. See [ADR-0002](../adr/0002-event-image-storage.md).
+
 This document is the canonical visual-design source of truth for MatchMate applications and shared UI packages. It incorporates the approved **Midnight Chemistry** design reference into the repository while remaining subordinate to `AGENTS.md`, accepted ADRs, accessibility requirements, and MatchMate's privacy and safety boundaries.
 
 ## 1. Status and authority
@@ -215,6 +219,17 @@ Icons use rounded caps and corners. Rounded shapes should support hierarchy and 
 - Never display legal names, date of birth, exact address, contact details, social handles, private preferences, verification evidence, or moderation data.
 - Cards require keyboard access, descriptive alternatives for meaningful imagery, loading/failure states, and clear block/report entry points where applicable.
 
+Event discovery cards use the same tonal hierarchy without member imagery. They show only approved catalog fields: event name/description, broad location, schedule, fixed-precision price/currency, configured capacity, lifecycle label, and a detail action. Exact venue and organizer identifiers remain operational. Configured capacity always carries a text disclaimer that Booking is authoritative for availability.
+
+### Organizer event operations
+
+- Use compact, calm forms on `surface` containers; privileged work must favor legibility over decorative motion.
+- Separate broad public location from exact operational venue with explicit labels.
+- Show lifecycle state and optimistic version together, and provide only transitions valid for the current state.
+- Cancellation requires an explicit reason and visually distinct destructive treatment; confirmation cannot rely on color alone.
+- Capacity fields state that they configure policy and do not represent consumed or available seats.
+- Loading, empty, error, stale-conflict, and successful-save messages use live status semantics and remain visible without animation.
+
 ### Chips and tags
 
 - Use `radius-full` or `radius-xl`, a translucent white surface near 10%, and `label-sm` typography.
@@ -227,6 +242,14 @@ Icons use rounded caps and corners. Rounded shapes should support hierarchy and 
 - Mobile application routes may use a bottom-fixed glass navigation bar; public marketing pages may retain an accessible compact top navigation when more appropriate.
 - Active items may use the brand gradient but also require a shape, label, weight, or indicator.
 - Fixed navigation must respect safe-area insets and must not cover focused content, toasts, forms, or payment controls.
+
+### In-app notifications
+
+- Authenticated member navigation uses a 44px bell target with a text-equivalent unread count; the badge never relies on color alone.
+- The recent-items popover uses a level-2 dark glass surface, explicit unread markers, safe title/body/time content, mark-all control, and a link to the full history.
+- Popup toasts announce only notifications observed after the initial successful poll, remain dismissible, never block navigation/payment/consent controls, and automatically dismiss after a calm interval.
+- The full history uses the standard dark application surface, newest-first readable rows, persistent read state, loading/empty/error/pagination states, and related-page actions.
+- Motion is presentation-only and disabled under `prefers-reduced-motion`. Provider errors, contact destinations, private preferences, moderation evidence, and internal event payloads never appear in member notification UI.
 
 ### Cards, dialogs, and overlays
 
@@ -249,8 +272,9 @@ The member landing page applies Midnight Chemistry as a cinematic AIDA narrative
 
 - Attention uses the approved full-bleed event image, a strong left editorial gradient, a two-line headline, a restrained privacy note, and a glass navigation surface. Do not replace it with a detached portrait or partially visible decorative image.
 - Interest introduces the product through a concise image-led About composition, then pairs one large visual with one open editorial column containing the privacy and mutual-choice principles instead of stacking separate cards. Sections use warm tonal changes rather than decorative grid lines or large empty gaps.
-- Desire places local event imagery beside a fully visible five-stage process list with short, understandable headings and descriptions. A simple matching visual shows preferences moving through approved rules and human review, followed by event imagery that scales into view; decorative marquees and dashboard-like dividers are avoided.
-- Action uses a truthful pre-launch state instead of an operational registration form or invented event inventory.
+- Desire places local event imagery beside a fully visible five-stage process list with short, understandable headings and descriptions. The public event preview appears after this process in the middle of the landing page, before the matching explanation. It uses only published Event Service data and offers a clear path to the complete public catalogue; decorative marquees and dashboard-like dividers are avoided.
+- Event discovery is public: visitors can view published event summaries and detail pages without signing in. Public event content may include the approved event name, description, schedule, broad location, price/currency, configured capacity, and lifecycle label. Attendee identity and exact venue remain private. Booking and payment actions continue through their authenticated flow.
+- Never invent sample events in the live landing page. When the public catalogue is empty, show an honest empty/pre-launch state and retain the link to all events. If the Event Service is unavailable, show a retryable error state.
 
 The public footer provides only real in-page navigation, trust guidance, development status, copyright, and a back-to-top action. Do not add placeholder social, contact, policy, or legal destinations before those routes and owners exist.
 
@@ -278,7 +302,8 @@ This design system does not authorize new product behavior. All interfaces must 
 - No publication of contact information or exact addresses.
 - Private matchmaking preferences remain private.
 - Matchmaking is deterministic and explainable without machine learning.
-- Blocking, reporting, moderation, organizer review, consent, and audit states are first-class UI requirements.
+- Blocking, reporting, moderation, administrator matchmaking review, consent, and audit states are first-class UI requirements.
+- The protected administration app uses a persistent dark sidebar, compact operational cards, editorial serif headings, and the brand magenta/orange accent. Event creation and matchmaking controls must clearly show administrator authority, non-ML behavior, and version state; matchmaking retains its own audit consequences. Participant imagery and private preference details are excluded in favor of participant codes and generalized reasons.
 - Payment success is confirmed from server state, not browser redirects alone.
 - Unapproved events, metrics, availability, verification claims, or safety promises must not be presented as facts.
 

@@ -4,12 +4,36 @@
   "workspaces": {
     "": {
       "name": "matchmate",
+      "devDependencies": {
+        "@playwright/test": "^1.65.1",
+      },
+    },
+    "frontend/apps/admin": {
+      "name": "@matchmate/admin",
+      "version": "0.0.0",
+      "dependencies": {
+        "@tanstack/react-query": "^5.102.8",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+      },
+      "devDependencies": {
+        "@testing-library/jest-dom": "^7.0.1",
+        "@testing-library/react": "^16.3.3",
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+        "@vitejs/plugin-react": "^6.1.0",
+        "jsdom": "^30.0.1",
+        "typescript": "^7.0.2",
+        "vite": "^8.2.2",
+        "vitest": "^4.1.11",
+      },
     },
     "frontend/apps/web": {
       "name": "@matchmate/web",
       "version": "0.0.0",
       "dependencies": {
         "@gsap/react": "^2.1.2",
+        "@matchmate/graphql-client": "workspace:*",
         "@tanstack/react-form": "^1.33.5",
         "@tanstack/react-query": "^5.102.8",
         "@tanstack/react-router": "^1.170.32",
@@ -29,6 +53,10 @@
         "vite": "^8.2.2",
         "vitest": "^4.1.11",
       },
+    },
+    "frontend/packages/graphql-client": {
+      "name": "@matchmate/graphql-client",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -64,9 +92,15 @@
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
+    "@matchmate/admin": ["@matchmate/admin@workspace:frontend/apps/admin"],
+
+    "@matchmate/graphql-client": ["@matchmate/graphql-client@workspace:frontend/packages/graphql-client"],
+
     "@matchmate/web": ["@matchmate/web@workspace:frontend/apps/web"],
 
     "@oxc-project/types": ["@oxc-project/types@0.147.0", "", {}, "sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg=="],
+
+    "@playwright/test": ["@playwright/test@1.65.1", "", { "dependencies": { "playwright": "1.65.1" }, "bin": { "playwright": "cli.js" } }, "sha512-y+NCIRm2LvY4slUVWvGh1nujJ8RF/hEisIsq2mtUPgdQC4L701bq5hZGMhrpeXjACvwvO9tj5dJqhvM6TP9lbw=="],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.6", "", { "os": "android", "cpu": "arm" }, "sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ=="],
 
@@ -301,6 +335,10 @@
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
     "picomatch": ["picomatch@4.0.7", "", {}, "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="],
+
+    "playwright": ["playwright@1.65.1", "", { "dependencies": { "playwright-core": "1.65.1" }, "bin": { "playwright": "cli.js" } }, "sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw=="],
+
+    "playwright-core": ["playwright-core@1.65.1", "", { "bin": { "playwright-core": "cli.js" } }, "sha512-hqPpz7blSMPxWVdoeE1yiBSzXsKiVOd2k+kjCvmUywD2GPO2Dd9HfcWnq9NN0GHbNZDFgZ9JfBFr+X5/BLo0qw=="],
 
     "postcss": ["postcss@8.5.26", "", { "dependencies": { "nanoid": "^3.3.17", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ=="],
 

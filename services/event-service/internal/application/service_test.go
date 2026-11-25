@@ -1,0 +1,208 @@
+package application
+
+import (
+	"context"
+	"encoding/base64"
+	"github.com/gehan-malshan/matchmate/event-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/event-service/internal/store"
+	"testing"
+	"time"
+)
+
+type fakeRepo struct{ event domain.Event }
+
+func (f *fakeRepo) Ping(context.Context) error { return nil }
+func (f *fakeRepo) Create(_ context.Context, e domain.Event, _ domain.Fact) (domain.Event, error) {
+	f.event = e
+	return e, nil
+}
+func (f *fakeRepo) Get(context.Context, string) (domain.Event, error) {
+	if f.event.ID == "" {
+		return domain.Event{}, store.ErrNotFound
+	}
+	return f.event, nil
+}
+func (f *fakeRepo) Update(_ context.Context, _ string, in domain.UpdateInput, _ domain.Fact) (domain.Event, error) {
+	if in.ExpectedVersion != f.event.Version {
+		return domain.Event{}, store.ErrConflict
+	}
+	f.event.Name = in.Name
+	f.event.PaymentOptions = in.PaymentOptions
+	f.event.Version++
+	return f.event, nil
+}
+func (f *fakeRepo) Transition(_ context.Context, _ string, v int64, to domain.Status, approval *domain.PublicationApproval, _ domain.Fact) (domain.Event, error) {
+	if v != f.event.Version {
+		return domain.Event{}, store.ErrConflict
+	}
+	f.event.Status = to
+	f.event.Version++
+	if approval != nil && to == domain.Published {
+		f.event.PublicationReviewVersion = approval.ReviewVersion
+	}
+	return f.event, nil
+}
+
+func approvedPublication() *domain.PublicationApproval {
+	return &domain.PublicationApproval{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: true, ReviewVersion: "event-publication-v1"}
+}
+func (f *fakeRepo) ListDiscoverable(context.Context, string, int, time.Time) (domain.Page, error) {
+	return domain.Page{}, nil
+}
+func (f *fakeRepo) ListManaged(context.Context, string, bool, bool, string, int) (domain.Page, error) {
+	return domain.Page{}, nil
+}
+func (f *fakeRepo) SetArchived(_ context.Context, _ string, expected int64, archive bool, _ domain.Fact) (domain.Event, error) {
+	if f.event.Version != expected {
+		return domain.Event{}, store.ErrConflict
+	}
+	if archive {
+		now := time.Now().UTC()
+		f.event.ArchivedAt = &now
+	} else {
+		f.event.ArchivedAt = nil
+	}
+	f.event.Version++
+	return f.event, nil
+}
+func (f *fakeRepo) SaveImage(_ context.Context, _ string, _ []byte) (domain.Event, error) {
+	f.event.ImageVersion++
+	return f.event, nil
+}
+func (f *fakeRepo) PublicImage(context.Context, string) ([]byte, error) {
+	return nil, store.ErrNotFound
+}
+func appInput() domain.CreateInput {
+	start := time.Now().UTC().Add(10 * 24 * time.Hour)
+	return domain.CreateInput{OrganizerID: "org-1", Name: "Colombo Social", BroadLocation: "Colombo", TimeZone: "Asia/Colombo", StartsAt: start, EndsAt: start.Add(2 * time.Hour), RegistrationOpensAt: start.Add(-9 * 24 * time.Hour), RegistrationClosesAt: start.Add(-time.Hour), Price: "2500.00", Currency: "LKR", ConfiguredCapacity: 40, MatchingRulesetVersion: "v1"}
+}
+func TestOrganizerCannotCreateEvent(t *testing.T) {
+	s := New(&fakeRepo{})
+	_, err := s.Create(context.Background(), domain.Principal{Subject: "org-1", Roles: []string{"organizer"}}, appInput(), "")
+	p, ok := err.(*domain.ProblemError)
+	if !ok || p.Code != "EVENT_ADMIN_REQUIRED" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+func TestAdminCanCreateAndPublish(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	e, err := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err = s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, e.Version, domain.Published, approvedPublication(), "c")
+	if err != nil || e.Status != domain.Published {
+		t.Fatalf("publish failed: %v %#v", err, e)
+	}
+}
+
+func TestPublishRequiresCompleteAdministratorReview(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	admin := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	e, _ := s.Create(context.Background(), admin, appInput(), "c")
+	for _, approval := range []*domain.PublicationApproval{
+		nil,
+		{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: false, ReviewVersion: "event-publication-v1"},
+		{ImageRightsConfirmed: true, ImageModerationConfirmed: true, EventSafetyConfirmed: true, ReviewVersion: "old-review"},
+	} {
+		_, err := s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, approval, "c")
+		p, ok := err.(*domain.ProblemError)
+		if !ok || p.Code != "EVENT_PUBLICATION_REVIEW_REQUIRED" {
+			t.Fatalf("incomplete review accepted: %#v %v", approval, err)
+		}
+	}
+	organizer := domain.Principal{Subject: e.OrganizerID, Roles: []string{"organizer"}}
+	_, err := s.Transition(context.Background(), organizer, e.ID, e.Version, domain.Published, approvedPublication(), "c")
+	p, ok := err.(*domain.ProblemError)
+	if !ok || p.Code != "EVENT_ADMIN_REQUIRED" {
+		t.Fatalf("organizer approved publication: %v", err)
+	}
+}
+func TestAdminDeleteRequiresSafeStateAndCanRestore(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	admin := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	member := domain.Principal{Subject: "member", Roles: []string{"member"}}
+	e, err := s.Create(context.Background(), admin, appInput(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SetArchived(context.Background(), member, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("member deleted event")
+	}
+	e, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c")
+	if err != nil || e.ArchivedAt == nil {
+		t.Fatalf("delete draft: %+v %v", e, err)
+	}
+	if _, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("double delete accepted")
+	}
+	e, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, false, "c")
+	if err != nil || e.ArchivedAt != nil {
+		t.Fatalf("restore draft: %+v %v", e, err)
+	}
+	e, err = s.Transition(context.Background(), admin, e.ID, e.Version, domain.Published, approvedPublication(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.SetArchived(context.Background(), admin, e.ID, e.Version, true, "c"); err == nil {
+		t.Fatal("published event deleted without cancellation")
+	}
+}
+func TestStaleTransitionReturnsStableConflict(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	e, _ := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
+	_, err := s.Transition(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, 99, domain.Published, approvedPublication(), "c")
+	p, ok := err.(*domain.ProblemError)
+	if !ok || p.Code != "EVENT_VERSION_CONFLICT" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDraftPaymentChoiceAndLegacyUpdate(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	in := appInput()
+	in.PaymentOptions = "AT_VENUE"
+	e, err := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, in, "c")
+	if err != nil || e.PaymentOptions != "AT_VENUE" {
+		t.Fatalf("create option: %+v %v", e, err)
+	}
+	in.PaymentOptions = ""
+	e, err = s.Update(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, domain.UpdateInput{CreateInput: in, ExpectedVersion: e.Version}, "c")
+	if err != nil || e.PaymentOptions != "AT_VENUE" {
+		t.Fatalf("legacy update changed option: %+v %v", e, err)
+	}
+}
+
+func TestImageUploadRequiresAdminAndValidImage(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	e, err := s.Create(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, appInput(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid := base64.StdEncoding.EncodeToString([]byte("not a JPEG"))
+	if _, err = s.UploadImage(context.Background(), domain.Principal{Subject: "member", Roles: []string{"member"}}, e.ID, invalid); err == nil {
+		t.Fatal("member image upload accepted")
+	}
+	if _, err = s.UploadImage(context.Background(), domain.Principal{Subject: "admin", Roles: []string{"admin"}}, e.ID, invalid); err == nil {
+		t.Fatal("invalid image accepted")
+	}
+}
+
+func TestPublishRejectsExpiredRegistrationWindow(t *testing.T) {
+	r := &fakeRepo{}
+	s := New(r)
+	principal := domain.Principal{Subject: "admin", Roles: []string{"admin"}}
+	event, _ := s.Create(context.Background(), principal, appInput(), "c")
+	r.event.RegistrationClosesAt = time.Now().UTC().Add(-time.Minute)
+	_, err := s.Transition(context.Background(), principal, event.ID, event.Version, domain.Published, approvedPublication(), "c")
+	p, ok := err.(*domain.ProblemError)
+	if !ok || p.Code != "EVENT_PUBLICATION_WINDOW_EXPIRED" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

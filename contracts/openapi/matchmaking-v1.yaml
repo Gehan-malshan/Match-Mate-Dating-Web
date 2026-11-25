@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: MatchMate Matchmaking API
+  version: 1.0.0
+  description: Deterministic, explainable, non-ML event matchmaking prototype. Administrator responses contain participant codes and internal eligibility summaries; member responses expose only the authenticated member's published match. Matching-run management requires the admin role.
+servers: [{url: /api/v1}]
+security: [{bearerAuth: []}]
+paths:
+  /events/{eventId}/matching-runs:
+    parameters: [{$ref: "#/components/parameters/EventId"}]
+    get:
+      summary: List matching runs for an administrator-managed event
+      responses: {"200": {description: Matching runs}, "401": {$ref: "#/components/responses/Problem"}, "403": {$ref: "#/components/responses/Problem"}}
+    post:
+      summary: Generate a deterministic matching run from immutable fixture snapshots
+      parameters: [{$ref: "#/components/parameters/IdempotencyKey"}]
+      responses: {"201": {description: Generated run, content: {application/json: {schema: {$ref: "#/components/schemas/Run"}}}}, "409": {$ref: "#/components/responses/Problem"}, "422": {$ref: "#/components/responses/Problem"}}
+  /matching-runs/{runId}:
+    parameters: [{$ref: "#/components/parameters/RunId"}]
+    get:
+      summary: Read administrator-only run details, candidates, scores, explanations, selections and unmatched reasons
+      responses: {"200": {description: Matching run, content: {application/json: {schema: {$ref: "#/components/schemas/Run"}}}}, "404": {$ref: "#/components/responses/Problem"}}
+  /matching-runs/{runId}/review:
+    parameters: [{$ref: "#/components/parameters/RunId"}]
+    post:
+      summary: Move a generated run under administrator review
+      requestBody: {$ref: "#/components/requestBodies/VersionCommand"}
+      responses: {"200": {description: Updated run}, "409": {$ref: "#/components/responses/Problem"}}
+  /matching-runs/{runId}/overrides:
+    parameters: [{$ref: "#/components/parameters/RunId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Replace one selected pair without bypassing hard eligibility or threshold rules
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/OverrideInput"}}}}
+      responses: {"200": {description: Updated run}, "409": {$ref: "#/components/responses/Problem"}, "422": {$ref: "#/components/responses/Problem"}}
+  /matching-runs/{runId}/lock:
+    parameters: [{$ref: "#/components/parameters/RunId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Revalidate hard eligibility and immutably lock reviewed selections
+      requestBody: {$ref: "#/components/requestBodies/VersionCommand"}
+      responses: {"200": {description: Locked run}, "409": {$ref: "#/components/responses/Problem"}}
+  /matching-runs/{runId}/publish:
+    parameters: [{$ref: "#/components/parameters/RunId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Publish locked pairings to participant-safe member queries
+      requestBody: {$ref: "#/components/requestBodies/VersionCommand"}
+      responses: {"200": {description: Published run}, "409": {$ref: "#/components/responses/Problem"}}
+  /matches/mine:
+    get:
+      summary: List only the authenticated member's published matches and safe generalized explanations
+      responses: {"200": {description: Member-safe matches}, "401": {$ref: "#/components/responses/Problem"}}
+  /matches/{matchId}/response:
+    parameters: [{$ref: "#/components/parameters/MatchId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Record an INTERESTED or PASS response by a published pairing participant
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [response,questionVersion], properties: {response: {type: string, enum: [INTERESTED,PASS]}, questionVersion: {type: string}}}}}}
+      responses: {"200": {description: Recorded}, "409": {$ref: "#/components/responses/Problem"}}
+  /matches/{matchId}/reveal-consent:
+    parameters: [{$ref: "#/components/parameters/MatchId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Grant or revoke reveal consent after mutual interest
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [decision,policyVersion], properties: {decision: {type: string, enum: [GRANTED,REVOKED]}, policyVersion: {type: string}}}}}}
+      responses: {"200": {description: Recorded}, "409": {$ref: "#/components/responses/Problem"}}
+  /matches/{matchId}/feedback:
+    parameters: [{$ref: "#/components/parameters/MatchId"}, {$ref: "#/components/parameters/IdempotencyKey"}]
+    post:
+      summary: Record structured feedback without free-text PII
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [comfortRating,qualityRating,safetyConcern], properties: {comfortRating: {type: integer, minimum: 1, maximum: 5}, qualityRating: {type: integer, minimum: 1, maximum: 5}, safetyConcern: {type: boolean}}}}}}
+      responses: {"200": {description: Recorded or equivalent replay accepted}, "409": {$ref: "#/components/responses/Problem"}, "422": {$ref: "#/components/responses/Problem"}}
+components:
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  parameters:
+    EventId: {name: eventId, in: path, required: true, schema: {type: string, format: uuid}}
+    RunId: {name: runId, in: path, required: true, schema: {type: string, format: uuid}}
+    MatchId: {name: matchId, in: path, required: true, schema: {type: string, format: uuid}}
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8, maxLength: 100}}
+  requestBodies:
+    VersionCommand: {required: true, content: {application/json: {schema: {type: object, required: [expectedVersion], properties: {expectedVersion: {type: integer, minimum: 1}}}}}}
+  responses:
+    Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: "#/components/schemas/Problem"}}}}
+  schemas:
+    OverrideInput: {type: object, required: [expectedVersion,participantA,participantB,reason], properties: {expectedVersion: {type: integer}, removeSelectionId: {type: string, format: uuid}, participantA: {type: string, format: uuid}, participantB: {type: string, format: uuid}, reason: {type: string, minLength: 3, maxLength: 500}}}
+    Pairing: {type: object, properties: {pairingId: {type: string, format: uuid}, participantA: {type: string, format: uuid}, participantB: {type: string, format: uuid}, participantACode: {type: string}, participantBCode: {type: string}, score: {type: integer, minimum: 0, maximum: 100}, safeReasons: {type: array, items: {type: string}}, source: {type: string, enum: [ALGORITHM,OVERRIDE]}}}
+    Candidate: {type: object, properties: {participantA: {type: string}, participantB: {type: string}, eligible: {type: boolean}, rejectionCodes: {type: array, items: {type: string}}, components: {type: object, additionalProperties: {type: integer}}, totalScore: {type: integer}, safeReasons: {type: array, items: {type: string}}}}
+    Run: {type: object, required: [runId,eventId,runVersion,version,status,rulesetVersion,optimizerVersion,participantCount,eligiblePairCount], properties: {runId: {type: string, format: uuid}, eventId: {type: string, format: uuid}, runVersion: {type: integer}, version: {type: integer}, status: {type: string, enum: [GENERATED,UNDER_REVIEW,LOCKED,PUBLISHED,INVALIDATED]}, rulesetVersion: {type: string}, optimizerVersion: {type: string}, tieBreakPolicy: {type: string}, participantCount: {type: integer}, eligiblePairCount: {type: integer}, suggestions: {type: array, items: {$ref: "#/components/schemas/Pairing"}}, selections: {type: array, items: {$ref: "#/components/schemas/Pairing"}}, candidates: {type: array, items: {$ref: "#/components/schemas/Candidate"}}}}
+    MemberMatch: {type: object, properties: {matchId: {type: string, format: uuid}, eventId: {type: string, format: uuid}, partnerCode: {type: string}, compatibilityScore: {type: integer}, safeReasons: {type: array, items: {type: string}}, myResponse: {type: string}, mutualInterest: {type: boolean}, myRevealConsent: {type: string}, bothRevealConsented: {type: boolean}}}
+    Problem: {type: object, required: [type,title,status,code,detail,instance,traceId], properties: {type: {type: string}, title: {type: string}, status: {type: integer}, code: {type: string}, detail: {type: string}, instance: {type: string}, traceId: {type: string}, fieldErrors: {type: object, additionalProperties: {type: string}}}}

@@ -44,35 +44,41 @@ func main() {
 	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=$1)`, migrationVersion).Scan(&applied); err != nil {
 		panic(err)
 	}
-	if applied {
-		if err = tx.Commit(ctx); err != nil {
+	if !applied {
+		existing, err := existingVersionOneTables(ctx, tx)
+		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("account-service migration %d already applied\n", migrationVersion)
-		return
-	}
-
-	existing, err := existingVersionOneTables(ctx, tx)
-	if err != nil {
-		panic(err)
-	}
-	switch {
-	case existing == 0:
-		if _, err = tx.Exec(ctx, string(migrations.Up)); err != nil {
+		switch {
+		case existing == 0:
+			if _, err = tx.Exec(ctx, migrations.Up); err != nil {
+				panic(err)
+			}
+		case existing == len(versionOneTables):
+			fmt.Println("existing account schema detected; recording migration baseline")
+		default:
+			panic(errors.New("partial account schema detected; restore/reset the development database before migrating"))
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO schema_migration(version,applied_at) VALUES($1,now())`, migrationVersion); err != nil {
 			panic(err)
 		}
-	case existing == len(versionOneTables):
-		fmt.Println("existing account schema detected; recording migration baseline")
-	default:
-		panic(errors.New("partial account schema detected; restore/reset the development database before migrating"))
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO schema_migration(version,applied_at) VALUES($1,now())`, migrationVersion); err != nil {
+	var securityApplied bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migration WHERE version=2)`).Scan(&securityApplied); err != nil {
 		panic(err)
+	}
+	if !securityApplied {
+		if _, err = tx.Exec(ctx, migrations.SecurityUp); err != nil {
+			panic(err)
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO schema_migration(version,applied_at) VALUES(2,now())`); err != nil {
+			panic(err)
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		panic(err)
 	}
-	fmt.Printf("account-service migration %d applied\n", migrationVersion)
+	fmt.Println("account-service migrations through version 2 applied")
 }
 
 func existingVersionOneTables(ctx context.Context, tx pgx.Tx) (int, error) {

@@ -1,18 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
-import { ApiProblem, login } from '../lib/account-api'
+import { ApiProblem, getMe, login, refresh } from '../lib/account-api'
 
 export function LoginPage() {
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search)
+    const googleError = query.get('googleError')
+    if (googleError) {
+      setMessage(googleError === 'GOOGLE_ACCOUNT_NOT_FOUND' ? 'Create and verify your MatchMate profile before using Google sign in.' : 'Google sign in could not be completed. Please try again.')
+      return
+    }
+    if (query.get('google') !== 'success') return
+    void (async () => {
+      try {
+        if (!await refresh()) throw new Error('Google session was not created')
+        const me = await getMe()
+        await navigate({ to: me.account.roles.includes('admin') ? '/admin' : '/app/profile' })
+      } catch {
+        setMessage('Google sign in finished, but the session could not be restored. Please try again.')
+      }
+    })()
+  }, [navigate])
   const form = useForm({
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: '', password: '', totpCode: '' },
     onSubmit: async ({ value }) => {
       setMessage('')
       try {
-        await login(value.email, value.password)
+        const { me, roles } = await login(value.email, value.password, value.totpCode)
+        if (roles.length === 1 && roles[0] === 'appeal') {
+          await navigate({ to: '/appeal' })
+          return
+        }
+        if (!me) throw new Error('Account details are unavailable')
+        if (me.account.roles.includes('admin')) {
+          await navigate({ to: '/admin' })
+          return
+        }
         await navigate({ to: '/app/profile' })
       } catch (error) {
         setMessage((error as ApiProblem).detail ?? 'Sign in failed. Please try again.')
@@ -68,14 +96,23 @@ export function LoginPage() {
               )}
             </form.Field>
 
+            <form.Field name="totpCode">{field=><label className="login-field"><span>Administrator authenticator code (if enabled)</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" value={field.state.value} onChange={event=>field.handleChange(event.target.value)} /></label>}</form.Field>
+
             <button className="login-submit" type="submit">Continue your journey <span aria-hidden="true">→</span></button>
           </form>
 
           {message && <p className="login-message" role="alert">{message}</p>}
 
           <div className="login-divider"><span>Private by design</span></div>
+          <button className="login-google" type="button" onClick={() => {
+            const graphqlURL = import.meta.env.VITE_GRAPHQL_API_URL ?? 'http://localhost:8080/graphql'
+            window.location.assign(new URL('/auth/google/start', graphqlURL).toString())
+          }}>
+            <span aria-hidden="true">G</span> Continue with Google
+          </button>
           <p className="login-privacy-note">Your email, date of birth, and matching preferences stay private.</p>
           <p className="login-register">New to MatchMate? <Link to="/register">Create your private profile</Link></p>
+          <p className="login-register"><Link to="/forgot-password">Forgot password?</Link> · <Link to="/verify-email">Resend verification email</Link></p>
         </div>
 
         <footer className="login-footer">

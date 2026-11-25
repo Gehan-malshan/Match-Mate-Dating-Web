@@ -6,13 +6,15 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-api ./cmd/api && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-migrate ./cmd/migrate && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-seed-dev ./cmd/seed-dev && \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-outbox ./cmd/outbox-relay
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-outbox ./cmd/outbox-relay && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/account-admin-mfa ./cmd/admin-mfa
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/account-api /account-api
 COPY --from=build /out/account-migrate /account-migrate
 COPY --from=build /out/account-seed-dev /account-seed-dev
 COPY --from=build /out/account-outbox /account-outbox
+COPY --from=build /out/account-admin-mfa /account-admin-mfa
 EXPOSE 8081
 USER nonroot:nonroot
 ENTRYPOINT ["/account-api"]

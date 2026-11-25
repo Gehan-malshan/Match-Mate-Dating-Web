@@ -1,5 +1,17 @@
 # MatchMate Implementation Guide
 
+The Account hardening slice adds verification/recovery delivery, administrator TOTP, durable security rate windows, JWT overlap rotation, and Account-owned deletion minimization. Migration 2 and selected concurrency/transition tests passed against a disposable PostgreSQL 17 instance. It remains **in progress** until real SMTP, browser, multi-replica, and cross-service privacy tests pass and the retention/MFA recovery policies are approved. See ADR-0003 and `docs/runbooks/account-security.md`.
+
+Event deletion (before → after): Cancellation previously left a cancelled card in the only admin event list, with no way to remove it. Now administrators can Delete a cancelled or draft event into a recoverable archive and use Show deleted → Restore. Published/open events require cancellation before Delete. Booking references remain intact; restoring visibility never reverses cancellation. Event audit history is not retained.
+
+Admin registrations navigation (before → after): Previously an administrator had to open a single event card and could only see that event's booking page. Now the sidebar has a dedicated Registrations section with a bounded newest-first feed across all events, an event filter, and per-event deep links from cards. Booking remains the source of booking, venue collection, and check-in state; Account alone supplies nickname/email through an admin-only lookup.
+
+Event image slice: Admin chooses an optional photo in draft creation/editing; browser prepares a bounded JPEG, Event stores a validated, metadata-stripped copy, and public pages show it only after publication. Saving and image upload are separate calls; an upload error leaves the draft intact for retry. The versioned rights/moderation/safety procedure and browser E2E are implemented; edge abuse controls and organization-specific legal/safety owner sign-off remain deployment gates. See [ADR-0002](../adr/0002-event-image-storage.md) and [ADR-0007](../adr/0007-event-publication-approval.md).
+
+Current payment-choice slice: Event draft editor supports venue, online, or both; Booking validates and snapshots the choice, and venue reservations consume confirmed capacity without PayHere. The member UI shows payment due at entrance. Staff can record collection and check-in in the admin registrations table; confirmed venue reservations have no cancellation option. Before a payment-free production launch, still implement a separate deployment topology/feature gates, real PostgreSQL capacity and browser E2E evidence, external terminal/cash reconciliation policy, and privacy/security operational checks. See [ADR-0001](../adr/0001-event-payment-choice.md) and [ADR-0006](../adr/0006-venue-collection-and-checkin.md).
+
+Event production review (before → after): Publication previously depended on administrator access without a recorded rights, content, or safety decision, and lifecycle coverage stopped at API/component tests. Publishing now requires the `event-publication-v1` rights, moderation, and event-safety confirmations, retains the approver/time/version in Event data, and runs a Playwright browser journey for create, image upload, publish, cancel, delete/restore, and registrations. See [ADR-0007](../adr/0007-event-publication-approval.md).
+
 This guide defines the required development sequence, dependencies, deliverables, and completion criteria. It prevents separate agents or teams from building incompatible services in isolation.
 
 ## 1. Delivery strategy
@@ -154,13 +166,13 @@ Organizers can manage events and members can discover eligible published events.
 
 - A published/open event is discoverable by an eligible member.
 - Only assigned organizers/admins can mutate it.
-- Event states and changes are auditable and versioned.
+- Event states and changes are versioned; the Event service does not retain an audit trail.
 
 ## 7. Phase 3 — Booking and capacity
 
 ### Business outcome
 
-A member can reserve an available ticket for a limited time without overselling the event.
+A member can reserve a confirmed pay-at-venue seat immediately, or an online-payment hold for a limited time, without overselling the event.
 
 ### Backend deliverables
 
@@ -282,6 +294,7 @@ Members receive the right event information, complete structured responses, and 
 ### Deliverables
 
 - Notification templates and delivery workers for registration, booking, payment, event reminder/change, pairing publication, and approved response outcomes.
+- Authenticated in-app notification feed, unread/read controls, member navigation bell/history, and accessible popup updates.
 - Member match/event surface with policy-limited information.
 - Continue/switch/interest response uniqueness and deadline rules.
 - Consent recording and reveal policy implementation.
@@ -389,11 +402,11 @@ When implementation starts, maintain this table in the same pull request as phas
 |---|---|---|---|---|
 | 0 Foundation | In progress | Project team | Root Bun workspace and tested `frontend/apps/web` public landing slice | Product/policy decisions and contracts |
 | 1 Account/Profile | In review | Project team | Go API/migration/outbox relay, PostgreSQL schema, v1 contracts, web registration/login/profile routes, unit tests | Production email delivery, rate-limit/gateway policy, integration/E2E/security evidence |
-| 2 Event | Not started | Unassigned | — | Event lifecycle/capacity policy |
-| 3 Booking | Not started | Unassigned | — | Hold/cancel/waitlist policy |
-| 4 Payment | Not started | Unassigned | — | PayHere/refund/reconciliation policy |
-| 5 Matchmaking | Not started | Unassigned | — | Questionnaire/groups/weights/rounds |
-| 6 Interaction/Notification | Not started | Unassigned | — | Reveal/response/channel policy |
-| 7 Production hardening | Not started | Unassigned | — | Hosting/SLO/compliance/operations |
+| 2 Event | In progress | Project team | Go API/migration, scoped lifecycle/discovery, JWK auth, outbox relay, v1 contracts, member/admin UI, unit/component harness/smoke script | Policy history/Booking validation, later states, live component/browser/failure evidence |
+| 3 Booking | In progress | Project team | Go API/domain, PostgreSQL capacity/booking migration, Event price snapshot adapter, expiry worker, Payment inbox consumer, outbox relay, v1 contracts and unit tests | Cancellation/waitlist/attendance policy; component/contention/failure evidence |
+| 4 Payment | In progress | Project team | Go API/domain/provider adapter, PostgreSQL migration, initiation/callback/status v1 contracts, invalid callback rejection, serialized checkout initiation, audited read-only admin review queue, unit and disposable-schema PostgreSQL component tests, outbox relay, pending reconciliation classification, Booking snapshot/consumer integration, sandbox/live runbook | No-refunds policy publication and exception process; provider retrieval/automatic resolution, RabbitMQ failure evidence, PayHere sandbox/live evidence, gateway rate limits and observability |
+| 5 Matchmaking | In progress | Project team | Deterministic Go engine, PostgreSQL migration, `prototype-v1` fixtures, admin-only lifecycle API/UI, member APIs, v1 contracts, optimizer and admin-client tests | Production questionnaire/groups/rounds approval, Booking/Moderation consumers, relay/performance/concurrency evidence |
+| 6 Interaction/Notification | In progress | Project team | Notification Go API/migrations, owner-scoped in-app feed/read state, member bell/history/popup UI, PostgreSQL inbox/templates/deliveries/attempts/suppression, Account/Booking RabbitMQ consumer, retry worker, development sink, OpenAPI/AsyncAPI, unit/component harness, Compose/runbook | Real email provider credentials/contact resolution, channel/preference/reveal policy, remaining recipient projections, failure/production evidence |
+| 7 Production hardening | In progress | Project team | Moderation Go API/database, action/appeal workflow, expiry/outbox, private effective-safety reads from Account/Booking/Matchmaking/Notification, appeal-only suspended sessions and browser appeal route, Booking entry eligibility, Notification send/feed suppression, focused race/reversal tests, disposable PostgreSQL component coverage | Strict cross-service race resolution, existing paid-booking policy, moderator browser UI, RabbitMQ failure/load evidence, approved safety/retention/SLA policy, hosting/SLO/compliance/operations |
 
 Allowed status values are `Not started`, `In progress`, `Blocked`, `In review`, and `Complete`. A phase is `Complete` only when its exit criteria and evidence are present.

@@ -1,0 +1,275 @@
+package postgres
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"github.com/gehan-malshan/matchmate/event-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/event-service/internal/store"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
+)
+
+type Repository struct{ pool *pgxpool.Pool }
+
+func New(p *pgxpool.Pool) *Repository                { return &Repository{pool: p} }
+func (r *Repository) Ping(ctx context.Context) error { return r.pool.Ping(ctx) }
+func (r *Repository) Create(ctx context.Context, e domain.Event, f domain.Fact) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return e, err
+	}
+	defer tx.Rollback(ctx)
+	_, err = tx.Exec(ctx, `INSERT INTO event(event_id,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::numeric,$13,$14,$15,$16,$17,$18,$19,$20,$21)`, e.ID, e.OrganizerID, e.Name, e.Description, e.VenueName, e.BroadLocation, e.TimeZone, e.StartsAt, e.EndsAt, e.RegistrationOpensAt, e.RegistrationClosesAt, e.Price, e.Currency, e.ConfiguredCapacity, e.CapacityPolicyVersion, e.MatchingRulesetVersion, e.Status, e.Version, e.CreatedAt, e.UpdatedAt, e.PaymentOptions)
+	if err != nil {
+		return e, err
+	}
+	if err = insertFact(ctx, tx, f, e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+
+const eventColumns = `event_id::text,organizer_id,name,description,venue_name,broad_location,venue_time_zone,starts_at,ends_at,registration_opens_at,registration_closes_at,price::text,currency,configured_capacity,capacity_policy_version,matching_ruleset_version,status,version,created_at,updated_at,payment_options,image_version,archived_at,COALESCE(publication_review_version,''),COALESCE(publication_reviewed_by,''),publication_reviewed_at`
+const selectEvent = `SELECT ` + eventColumns + ` FROM event`
+
+type row interface{ Scan(...any) error }
+
+func scan(q row) (domain.Event, error) {
+	var e domain.Event
+	err := q.Scan(&e.ID, &e.OrganizerID, &e.Name, &e.Description, &e.VenueName, &e.BroadLocation, &e.TimeZone, &e.StartsAt, &e.EndsAt, &e.RegistrationOpensAt, &e.RegistrationClosesAt, &e.Price, &e.Currency, &e.ConfiguredCapacity, &e.CapacityPolicyVersion, &e.MatchingRulesetVersion, &e.Status, &e.Version, &e.CreatedAt, &e.UpdatedAt, &e.PaymentOptions, &e.ImageVersion, &e.ArchivedAt, &e.PublicationReviewVersion, &e.PublicationReviewedBy, &e.PublicationReviewedAt)
+	return e, err
+}
+func (r *Repository) Get(ctx context.Context, id string) (domain.Event, error) {
+	e, err := scan(r.pool.QueryRow(ctx, selectEvent+` WHERE event_id=$1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = store.ErrNotFound
+	}
+	return e, err
+}
+func (r *Repository) SaveImage(ctx context.Context, id string, data []byte) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	defer tx.Rollback(ctx)
+	var status domain.Status
+	err = tx.QueryRow(ctx, `SELECT status FROM event WHERE event_id=$1 AND archived_at IS NULL FOR UPDATE`, id).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Event{}, store.ErrNotFound
+	}
+	if err != nil {
+		return domain.Event{}, err
+	}
+	if status != domain.Draft {
+		return domain.Event{}, store.ErrConflict
+	}
+	now := time.Now().UTC()
+	_, err = tx.Exec(ctx, `INSERT INTO event_image(event_id,content_type,image_bytes,updated_at) VALUES($1,'image/jpeg',$2,$3) ON CONFLICT(event_id) DO UPDATE SET image_bytes=excluded.image_bytes,updated_at=excluded.updated_at`, id, data, now)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET image_version=image_version+1,updated_at=$2 WHERE event_id=$1 RETURNING `+eventColumns, id, now))
+	if err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+func (r *Repository) PublicImage(ctx context.Context, id string) ([]byte, error) {
+	var data []byte
+	err := r.pool.QueryRow(ctx, `SELECT i.image_bytes FROM event_image i JOIN event e ON e.event_id=i.event_id WHERE e.event_id=$1 AND e.archived_at IS NULL AND e.status IN('PUBLISHED','REGISTRATION_OPEN','REGISTRATION_CLOSED')`, id).Scan(&data)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, store.ErrNotFound
+	}
+	return data, err
+}
+func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInput, f domain.Fact) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	defer tx.Rollback(ctx)
+	now := time.Now().UTC()
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET organizer_id=$3,name=$4,description=$5,venue_name=$6,broad_location=$7,venue_time_zone=$8,starts_at=$9,ends_at=$10,registration_opens_at=$11,registration_closes_at=$12,price=$13::numeric,currency=$14,configured_capacity=$15,capacity_policy_version=CASE WHEN configured_capacity<>$15 THEN capacity_policy_version+1 ELSE capacity_policy_version END,matching_ruleset_version=$16,version=version+1,updated_at=$17,payment_options=$18 WHERE event_id=$1 AND version=$2 AND archived_at IS NULL RETURNING `+eventColumns, id, in.ExpectedVersion, in.OrganizerID, in.Name, in.Description, in.VenueName, in.BroadLocation, in.TimeZone, in.StartsAt.UTC(), in.EndsAt.UTC(), in.RegistrationOpensAt.UTC(), in.RegistrationClosesAt.UTC(), in.Price, in.Currency, in.ConfiguredCapacity, in.MatchingRulesetVersion, now, in.PaymentOptions))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return e, store.ErrConflict
+	}
+	if err != nil {
+		return e, err
+	}
+	f.AggregateID = e.ID
+	f.Payload = map[string]any{"eventId": e.ID, "version": e.Version}
+	if err = insertFact(ctx, tx, f, e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+func (r *Repository) Transition(ctx context.Context, id string, expected int64, to domain.Status, approval *domain.PublicationApproval, f domain.Fact) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	defer tx.Rollback(ctx)
+	now := time.Now().UTC()
+	var reviewVersion, reviewedBy any
+	var reviewedAt *time.Time
+	if to == domain.Published && approval != nil {
+		reviewVersion, reviewedBy, reviewedAt = approval.ReviewVersion, f.ActorID, &now
+	}
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET status=$3,version=version+1,updated_at=$4,publication_review_version=COALESCE($5,publication_review_version),publication_reviewed_by=COALESCE($6,publication_reviewed_by),publication_reviewed_at=COALESCE($7,publication_reviewed_at) WHERE event_id=$1 AND version=$2 AND archived_at IS NULL RETURNING `+eventColumns, id, expected, to, now, reviewVersion, reviewedBy, reviewedAt))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return e, store.ErrConflict
+	}
+	if err != nil {
+		return e, err
+	}
+	f.AggregateID = e.ID
+	f.Payload = map[string]any{"eventId": e.ID, "status": e.Status, "version": e.Version}
+	if to == domain.Published {
+		f.Payload["publicationReviewVersion"] = e.PublicationReviewVersion
+	}
+	if err = insertFact(ctx, tx, f, e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+func (r *Repository) SetArchived(ctx context.Context, id string, expected int64, archive bool, f domain.Fact) (domain.Event, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Event{}, err
+	}
+	defer tx.Rollback(ctx)
+	var status domain.Status
+	var version int64
+	var archivedAt *time.Time
+	err = tx.QueryRow(ctx, `SELECT status,version,archived_at FROM event WHERE event_id=$1 FOR UPDATE`, id).Scan(&status, &version, &archivedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Event{}, store.ErrNotFound
+	}
+	if err != nil {
+		return domain.Event{}, err
+	}
+	if version != expected || (archivedAt != nil) == archive || (archive && status != domain.Draft && status != domain.Cancelled) {
+		return domain.Event{}, store.ErrConflict
+	}
+	now := time.Now().UTC()
+	var nextArchivedAt *time.Time
+	if archive {
+		nextArchivedAt = &now
+	}
+	e, err := scan(tx.QueryRow(ctx, `UPDATE event SET archived_at=$2,version=version+1,updated_at=$3 WHERE event_id=$1 RETURNING `+eventColumns, id, nextArchivedAt, now))
+	if err != nil {
+		return e, err
+	}
+	f.AggregateID = id
+	f.Payload = map[string]any{"eventId": id, "status": status, "version": e.Version, "archived": archive}
+	if err = insertFact(ctx, tx, f, e); err != nil {
+		return e, err
+	}
+	return e, tx.Commit(ctx)
+}
+func (r *Repository) ListDiscoverable(ctx context.Context, cursor string, limit int, now time.Time) (domain.Page, error) {
+	cursorTime := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+	cursorID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	if cursor != "" {
+		b, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil {
+			return domain.Page{}, &domain.ProblemError{Status: 422, Code: "EVENT_CURSOR_INVALID", Detail: "Cursor is invalid"}
+		}
+		var c struct {
+			T  time.Time `json:"t"`
+			ID string    `json:"id"`
+		}
+		if json.Unmarshal(b, &c) != nil || c.ID == "" {
+			return domain.Page{}, &domain.ProblemError{Status: 422, Code: "EVENT_CURSOR_INVALID", Detail: "Cursor is invalid"}
+		}
+		cursorTime, cursorID = c.T, c.ID
+	}
+	rows, err := r.pool.Query(ctx, selectEvent+` WHERE status IN ('PUBLISHED','REGISTRATION_OPEN','REGISTRATION_CLOSED') AND starts_at>$1 AND (starts_at,event_id)<($2,$3::uuid) ORDER BY starts_at DESC,event_id DESC LIMIT $4`, now, cursorTime, cursorID, limit+1)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	defer rows.Close()
+	p := domain.Page{Items: []domain.Event{}, Limit: limit}
+	for rows.Next() {
+		e, er := scan(rows)
+		if er != nil {
+			return p, er
+		}
+		p.Items = append(p.Items, e)
+	}
+	if len(p.Items) > limit {
+		last := p.Items[limit-1]
+		raw, _ := json.Marshal(map[string]any{"t": last.StartsAt, "id": last.ID})
+		p.NextCursor = base64.RawURLEncoding.EncodeToString(raw)
+		p.Items = p.Items[:limit]
+	}
+	return p, rows.Err()
+}
+func (r *Repository) ListManaged(ctx context.Context, organizer string, isAdmin, archived bool, cursor string, limit int) (domain.Page, error) {
+	cursorTime := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+	cursorID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	if cursor != "" {
+		b, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil {
+			return domain.Page{}, &domain.ProblemError{Status: 422, Code: "EVENT_CURSOR_INVALID", Detail: "Cursor is invalid"}
+		}
+		var c struct {
+			T  time.Time `json:"t"`
+			ID string    `json:"id"`
+		}
+		if json.Unmarshal(b, &c) != nil || c.ID == "" {
+			return domain.Page{}, &domain.ProblemError{Status: 422, Code: "EVENT_CURSOR_INVALID", Detail: "Cursor is invalid"}
+		}
+		cursorTime, cursorID = c.T, c.ID
+	}
+	rows, err := r.pool.Query(ctx, selectEvent+` WHERE ($1 OR organizer_id=$2) AND (archived_at IS NOT NULL)=$3 AND (updated_at,event_id)<($4,$5::uuid) ORDER BY updated_at DESC,event_id DESC LIMIT $6`, isAdmin, organizer, archived, cursorTime, cursorID, limit+1)
+	if err != nil {
+		return domain.Page{}, err
+	}
+	defer rows.Close()
+	p := domain.Page{Items: []domain.Event{}, Limit: limit}
+	for rows.Next() {
+		e, er := scan(rows)
+		if er != nil {
+			return p, er
+		}
+		p.Items = append(p.Items, e)
+	}
+	if len(p.Items) > limit {
+		last := p.Items[limit-1]
+		raw, _ := json.Marshal(map[string]any{"t": last.UpdatedAt, "id": last.ID})
+		p.NextCursor = base64.RawURLEncoding.EncodeToString(raw)
+		p.Items = p.Items[:limit]
+	}
+	return p, rows.Err()
+}
+func insertFact(ctx context.Context, tx pgx.Tx, f domain.Fact, e domain.Event) error {
+	payload, _ := json.Marshal(f.Payload)
+	_, err := tx.Exec(ctx, `INSERT INTO outbox(event_id,event_type,schema_version,occurred_at,aggregate_id,correlation_id,actor_id,routing_key,payload)VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, f.EventID, f.EventType, f.SchemaVersion, f.OccurredAt, e.ID, f.CorrelationID, f.ActorID, "event."+f.EventType, payload)
+	return err
+}
+func (r *Repository) ClaimOutbox(ctx context.Context, limit int) ([]store.OutboxRecord, error) {
+	rows, err := r.pool.Query(ctx, `WITH picked AS (SELECT event_id FROM outbox WHERE published_at IS NULL AND (claimed_at IS NULL OR claimed_at<now()-interval '1 minute') ORDER BY occurred_at LIMIT $1 FOR UPDATE SKIP LOCKED) UPDATE outbox o SET claimed_at=now(),attempts=attempts+1 FROM picked WHERE o.event_id=picked.event_id RETURNING o.event_id::text,o.routing_key,jsonb_build_object('eventId',o.event_id,'eventType',o.event_type,'schemaVersion',o.schema_version,'occurredAt',o.occurred_at,'aggregateId',o.aggregate_id,'correlationId',o.correlation_id,'causationId',o.causation_id,'actorId',o.actor_id,'payload',o.payload)::text`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []store.OutboxRecord{}
+	for rows.Next() {
+		var v store.OutboxRecord
+		var body string
+		if err = rows.Scan(&v.ID, &v.RoutingKey, &body); err != nil {
+			return nil, err
+		}
+		v.Body = []byte(body)
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+func (r *Repository) MarkOutboxPublished(ctx context.Context, id string, at time.Time) error {
+	_, err := r.pool.Exec(ctx, `UPDATE outbox SET published_at=$2,claimed_at=NULL WHERE event_id=$1`, id, at)
+	return err
+}

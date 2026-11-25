@@ -3,19 +3,37 @@ info: {title: MatchMate Account and Profile API, version: 1.0.0}
 servers: [{url: http://localhost:8081}]
 security: [{bearerAuth: []}]
 paths:
+  /api/v1/admin/member-identities:
+    post:
+      operationId: adminMemberIdentities
+      description: Admin-only batch lookup for event registrations; returns only accountId, nickname and email.
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [accountIds], properties: {accountIds: {type: array, maxItems: 50, items: {type: string, format: uuid}}}}}}}
+      responses:
+        '200': {description: Restricted member identities, content: {application/json: {schema: {type: object, required: [items], properties: {items: {type: array, items: {type: object}}}}}}}
+        '403': {$ref: '#/components/responses/Problem'}
   /api/v1/auth/register:
     post: {security: [], operationId: register, requestBody: {$ref: '#/components/requestBodies/Register'}, responses: {'201': {description: Private pending profile created, content: {application/json: {schema: {$ref: '#/components/schemas/Registration'}}}}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/verify-email:
     post: {security: [], operationId: verifyEmail, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token], properties: {token: {type: string}}}}}}, responses: {'200': {description: Verified}, '400': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/resend-verification:
+    post: {security: [], operationId: resendVerification, description: Generic response; sends a replacement single-use link only to an eligible pending account., requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, responses: {'204': {description: Request accepted}, '429': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/request-password-reset:
+    post: {security: [], operationId: requestPasswordReset, description: Generic response to avoid account enumeration; issues a single-use 30-minute link only for an eligible account., requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, responses: {'204': {description: Request accepted}, '429': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/reset-password:
+    post: {security: [], operationId: resetPassword, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [token,password], properties: {token: {type: string}, password: {type: string, minLength: 12, maxLength: 128}}}}}}, responses: {'204': {description: Password changed and sessions revoked}, '400': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/login:
-    post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}}}
+    post: {security: [], operationId: login, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [email,password], properties: {email: {type: string, format: email}, password: {type: string, format: password}, totpCode: {type: string, pattern: '^[0-9]{6}$'}}}}}}, responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '429': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/auth/google/start:
+    get: {security: [], operationId: startGoogleLogin, description: Browser-only OAuth start endpoint. The GraphQL gateway exposes it as /auth/google/start., responses: {'302': {description: Redirect to Google authorization}}}
+  /api/v1/auth/google/callback:
+    get: {security: [], operationId: completeGoogleLogin, description: Browser-only OAuth callback. It validates state, exchanges the authorization code, creates a MatchMate session for an existing verified account, and redirects to the approved frontend login URL., responses: {'302': {description: Redirect to frontend with Google login result}}}
   /api/v1/auth/refresh:
     post: {security: [], operationId: refresh, description: Rotates the HttpOnly refresh cookie and returns a short-lived access token., responses: {'200': {$ref: '#/components/responses/Token'}, '401': {$ref: '#/components/responses/Problem'}}}
   /api/v1/auth/logout:
     post: {security: [], operationId: logout, responses: {'204': {description: Session revoked}}}
   /api/v1/users/me:
     get: {operationId: getMe, responses: {'200': {description: Private account aggregate, content: {application/json: {schema: {$ref: '#/components/schemas/Me'}}}}, '401': {$ref: '#/components/responses/Problem'}}}
-    delete: {operationId: deactivateMe, responses: {'204': {description: Account deactivated and sessions revoked}}}
+    delete: {operationId: deleteMyAccount, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [password], properties: {password: {type: string, format: password}}}}}}, responses: {'204': {description: Account-owned profile data and credentials erased; account pseudonymized; sessions revoked}, '401': {$ref: '#/components/responses/Problem'}}}
   /api/v1/users/me/profile:
     patch: {operationId: updateProfile, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ProfilePatch'}}}}, responses: {'200': {description: Updated}, '409': {$ref: '#/components/responses/Problem'}, '422': {$ref: '#/components/responses/Problem'}}}
   /api/v1/users/me/matching-preferences:
@@ -30,15 +48,17 @@ paths:
     delete: {operationId: unblockMember, parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'204': {description: Block removed}}}
   /api/v1/admin/profiles/{accountId}/decision:
     post: {operationId: decideProfile, description: Requires moderator or admin role., parameters: [{$ref: '#/components/parameters/AccountId'}], requestBody: {required: true, content: {application/json: {schema: {type: object, required: [decision,reason], properties: {decision: {enum: [APPROVED,HIDDEN]}, reason: {type: string}}}}}}, responses: {'204': {description: Audited decision applied}, '403': {$ref: '#/components/responses/Problem'}}}
+  /api/v1/internal/notification-recipients/{accountId}:
+    get: {security: [{internalServiceToken: []}], operationId: resolveNotificationRecipient, description: Private service-to-service endpoint. It returns a verified active member email only for Notification SMTP delivery; never expose it to browsers., parameters: [{$ref: '#/components/parameters/AccountId'}], responses: {'200': {description: Runtime-only email destination, content: {application/json: {schema: {type: object, required: [email], properties: {email: {type: string, format: email}}}}}}, '401': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}}}
   /.well-known/jwks.json:
     get: {security: [], operationId: jwks, responses: {'200': {description: Public ES256 keys}}}
 components:
-  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}}
+  securitySchemes: {bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}, internalServiceToken: {type: apiKey, in: header, name: X-MatchMate-Internal-Token}}
   parameters: {AccountId: {name: accountId, in: path, required: true, schema: {type: string, format: uuid}}}
   requestBodies: {Register: {required: true, content: {application/json: {schema: {type: object, required: [email,password,nickname,dateOfBirth,consentVersion], properties: {email: {type: string, format: email}, password: {type: string, minLength: 12, maxLength: 128}, nickname: {type: string}, dateOfBirth: {type: string, format: date}, consentVersion: {type: string}}}}}}}
   responses:
     Problem: {description: Problem details, content: {application/problem+json: {schema: {$ref: '#/components/schemas/Problem'}}}}
-    Token: {description: Access token issued; refresh token is an HttpOnly cookie., content: {application/json: {schema: {type: object, properties: {accessToken: {type: string}, accessExpiresAt: {type: string, format: date-time}}}}}}
+    Token: {description: Access token issued; refresh token is an HttpOnly cookie. Suspended users receive only the appeal role., content: {application/json: {schema: {type: object, required: [accessToken,accessExpiresAt,roles], properties: {accessToken: {type: string}, accessExpiresAt: {type: string, format: date-time}, roles: {type: array, items: {type: string}}}}}}}
   schemas:
     Registration: {type: object, properties: {me: {$ref: '#/components/schemas/Me'}, verificationToken: {type: string, description: Development only}}}
     Me: {type: object, properties: {account: {$ref: '#/components/schemas/Account'}, profile: {$ref: '#/components/schemas/Profile'}, preferences: {$ref: '#/components/schemas/Preferences'}}}

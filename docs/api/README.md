@@ -1,20 +1,39 @@
 # MatchMate API Conventions
 
-Versioned OpenAPI files under `contracts/openapi/` are authoritative. This guide defines conventions shared by all services.
+Booking administrator mutations `collectVenuePayment` and `checkInBooking` forward to Booking-owned REST commands with `Idempotency-Key`. Venue collection accepts only `CASH` or `CARD_AT_VENUE`; amount and currency come from the booking price snapshot. Venue check-in requires recorded collection and current moderation eligibility. Confirmed venue reservations cannot be cancelled. See Booking OpenAPI and ADR-0006.
+
+Event `transitionEvent` accepts `publicationApproval` for the `publish` action. All three booleans must be true and `reviewVersion` must equal `event-publication-v1`; Event Service repeats the administrator check and returns `EVENT_PUBLICATION_REVIEW_REQUIRED` for missing or stale approvals. Other lifecycle actions omit the object. See Event OpenAPI and ADR-0007.
+
+Suspended members who sign in with a password receive an Account token response with `roles: ["appeal"]`. GraphQL `login` and `refreshSession` return that role and omit `me`; the browser directs these sessions to `/appeal`. `myModerationActions` and `appealModerationAction` forward owner-scoped requests to Moderation. The gateway never substitutes a normal Account profile for an appeal session. Moderation verifies the bearer token and action ownership. A reversed action takes effect on the next login or refresh.
+
+Administrator registration queries include `entryEligible`, calculated by Booking from current confirmed state and event-scoped safety restrictions. It is a point-in-time decision; operators refresh before admission. A confirmed booking with `entryEligible: false` is not an entry credential.
+
+GraphQL mutations now include `resendVerification(email:)`, `requestPasswordReset(email:)`, `resetPassword(token:,password:)`, and `deleteMyAccount(password:)`. `login` accepts an optional `totpCode`. Account REST endpoints and Notification's private security-email endpoint are defined in their v1 OpenAPI contracts. Password reset and deletion revoke sessions; recovery requests return a generic acceptance response for unknown or ineligible accounts.
+
+Event REST now supports admin-only `PUT /api/v1/events/{eventId}/image` with a bounded base64 JPEG and public-after-publication `GET` on the same path. GraphQL offers admin-only `uploadEventImage`; public Event includes `imageVersion`. The gateway's `GET /media/events/{eventId}` is a read-only byte route, not a general service proxy. It returns 404 for drafts or absent images. Browser clients must not request raw bytes through GraphQL.
+
+Event `paymentOptions` is `ONLINE`, `AT_VENUE`, or `BOTH`; old Event create requests default to `ONLINE` and old draft updates preserve the current value. Booking create accepts optional `paymentMethod` (`ONLINE` or `AT_VENUE`). Omission remains valid only for online-only legacy events. Booking returns its immutable method. A venue booking is `CONFIRMED` immediately but payment is due at the entrance; Payment initiation is not valid for it. See the GraphQL SDL and Event/Booking OpenAPI contracts.
+
+The browser-facing GraphQL SDL at `services/graphql-gateway/graph/schema.graphqls` and versioned internal-service OpenAPI files under `contracts/openapi/` are authoritative for their respective boundaries.
+
+Payment REST now provides administrator-only `GET /api/v1/payments/reconciliation?limit=25&cursor=...` for read-only manual review. It returns open pending-result, callback-mismatch, conflicting-provider-result, and verified unknown-order items without payment contact/card details. This endpoint is for operators; the browser member checkout remains GraphQL. Invalid callback signatures/merchant data return `400` before payment state changes. The no-automatic-refunds policy exposes no refund command.
 
 ## Public edge
 
-- Canonical base path: `/api/v1`.
-- Clients call the API Gateway, not service-private addresses.
+- Browser endpoint: `/graphql`; internal service base path: `/api/v1`.
+- Browser clients call the GraphQL BFF, not service-private addresses.
 - JSON request/response bodies use consistent lower camel-case fields.
 - UTC ISO-8601 timestamps; fixed-precision decimal money represented without floating-point ambiguity and with explicit ISO 4217 currency.
 - Cursor pagination for mutable collections: `items`, `nextCursor`, and `limit`.
 - Query filters are bounded, validated, and documented.
+- GraphQL queries use variables for caller input, bounded pagination, request-size limits, complexity/depth controls, and production introspection/explorer policy.
 
 ## Authentication and identity
 
 - `Authorization: Bearer <access-token>` for authenticated member/operator APIs unless an accepted transport decision changes it.
 - Self-service uses `/users/me` and token subject, not caller-selected user ID.
+- Notification self-service similarly derives the recipient from the token subject; list/read commands never accept an account ID and conceal another member's item as not found.
+- Moderation `reports/mine` derives ownership from the token subject and omits reporter identity, evidence, and private notes. Case, assignment, investigation/dismissal status, action, and appeal-decision endpoints require moderator/admin roles; restricted case reads are audited and appeals are bound to the affected authenticated account.
 - Every endpoint documents allowed roles/scopes, ownership, event scope, state restrictions, and sensitive fields.
 - Provider callbacks use provider verification, request controls, and replay protection—not member JWT.
 
@@ -59,7 +78,7 @@ Do not expose stack traces, SQL/provider details, private rejection reasons, or 
 - Add optional fields and endpoints compatibly within v1.
 - Do not change field meaning/type, remove values, make optional fields required, or reuse error/event codes silently.
 - Breaking behavior requires a new major version, migration window, deprecation date, telemetry, and change record.
-- Generate frontend clients from reviewed OpenAPI and compile them in CI.
+- Generate GraphQL server bindings and frontend operation types from reviewed contracts and compile them in CI. OpenAPI remains required for service contracts.
 
 ## API change checklist
 
@@ -68,4 +87,3 @@ Do not expose stack traces, SQL/provider details, private rejection reasons, or 
 - [ ] Handler and generated-client contract tests pass.
 - [ ] Security/privacy/rate-limit/audit behavior tested.
 - [ ] Service README, canonical docs, and before/after change history updated.
-

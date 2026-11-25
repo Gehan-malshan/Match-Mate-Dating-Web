@@ -2,10 +2,15 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,12 +24,13 @@ import (
 )
 
 type Server struct {
-	app     *application.Service
-	cfg     config.Config
-	log     *slog.Logger
-	mux     *http.ServeMux
-	limits  map[string]rateWindow
-	limitMu sync.Mutex
+	app            *application.Service
+	cfg            config.Config
+	log            *slog.Logger
+	mux            *http.ServeMux
+	limits         map[string]rateWindow
+	limitMu        sync.Mutex
+	lastLimitSweep time.Time
 }
 type rateWindow struct {
 	Started time.Time
@@ -50,19 +56,159 @@ func (s *Server) routes() {
 	})
 	s.mux.HandleFunc("GET /.well-known/jwks.json", func(w http.ResponseWriter, r *http.Request) { write(w, 200, s.app.JWK()) })
 	s.mux.Handle("POST /api/v1/auth/register", s.authLimited(http.HandlerFunc(s.register)))
-	s.mux.HandleFunc("POST /api/v1/auth/verify-email", s.verify)
+	s.mux.Handle("POST /api/v1/auth/verify-email", s.authLimited(http.HandlerFunc(s.verify)))
+	s.mux.Handle("POST /api/v1/auth/resend-verification", s.authLimited(http.HandlerFunc(s.resendVerification)))
+	s.mux.Handle("POST /api/v1/auth/request-password-reset", s.authLimited(http.HandlerFunc(s.requestPasswordReset)))
+	s.mux.Handle("POST /api/v1/auth/reset-password", s.authLimited(http.HandlerFunc(s.resetPassword)))
 	s.mux.Handle("POST /api/v1/auth/login", s.authLimited(http.HandlerFunc(s.login)))
+	s.mux.Handle("GET /api/v1/auth/google/start", s.authLimited(http.HandlerFunc(s.googleStart)))
+	s.mux.Handle("GET /api/v1/auth/google/callback", s.authLimited(http.HandlerFunc(s.googleCallback)))
 	s.mux.Handle("POST /api/v1/auth/refresh", s.authLimited(http.HandlerFunc(s.refresh)))
 	s.mux.HandleFunc("POST /api/v1/auth/logout", s.logout)
 	s.mux.Handle("GET /api/v1/users/me", s.protected(http.HandlerFunc(s.me)))
 	s.mux.Handle("PATCH /api/v1/users/me/profile", s.protected(http.HandlerFunc(s.updateProfile)))
 	s.mux.Handle("PUT /api/v1/users/me/matching-preferences", s.protected(http.HandlerFunc(s.preferences)))
 	s.mux.Handle("DELETE /api/v1/users/me", s.protected(http.HandlerFunc(s.deactivate)))
-	s.mux.Handle("GET /api/v1/community/profiles", s.protected(http.HandlerFunc(s.community)))
-	s.mux.Handle("GET /api/v1/community/profiles/{accountId}", s.protected(http.HandlerFunc(s.communityOne)))
+	s.mux.Handle("GET /api/v1/community/profiles", s.protected(s.discoveryLimited(http.HandlerFunc(s.community))))
+	s.mux.Handle("GET /api/v1/community/profiles/{accountId}", s.protected(s.discoveryLimited(http.HandlerFunc(s.communityOne))))
 	s.mux.Handle("POST /api/v1/users/me/blocks", s.protected(http.HandlerFunc(s.block)))
 	s.mux.Handle("DELETE /api/v1/users/me/blocks/{accountId}", s.protected(http.HandlerFunc(s.unblock)))
 	s.mux.Handle("POST /api/v1/admin/profiles/{accountId}/decision", s.protected(s.roles("moderator", "admin", http.HandlerFunc(s.moderate))))
+	s.mux.Handle("POST /api/v1/admin/member-identities", s.protected(s.roles("admin", "admin", http.HandlerFunc(s.adminMemberIdentities))))
+	s.mux.HandleFunc("GET /api/v1/internal/notification-recipients/{accountId}", s.notificationRecipient)
+}
+
+type googleTokenResponse struct {
+	AccessToken string `json:"access_token"`
+}
+type googleUserInfo struct {
+	Subject       string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+}
+
+func (s *Server) googleConfigured() bool {
+	return s.cfg.GoogleClientID != "" && s.cfg.GoogleClientSecret != "" && s.cfg.GoogleRedirectURL != ""
+}
+
+func (s *Server) googleStart(w http.ResponseWriter, r *http.Request) {
+	if !s.googleConfigured() {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_NOT_CONFIGURED")
+		return
+	}
+	state, err := randomState()
+	if err != nil {
+		problem(w, r, 500, "INTERNAL_ERROR", "Could not start Google sign in", nil)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "matchmate_google_state", Value: state, Path: "/api/v1/auth/google", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: 600})
+	query := url.Values{"client_id": {s.cfg.GoogleClientID}, "redirect_uri": {s.cfg.GoogleRedirectURL}, "response_type": {"code"}, "scope": {"openid email profile"}, "state": {state}, "prompt": {"select_account"}}
+	http.Redirect(w, r, "https://accounts.google.com/o/oauth2/v2/auth?"+query.Encode(), http.StatusFound)
+}
+
+func (s *Server) googleCallback(w http.ResponseWriter, r *http.Request) {
+	if !s.googleConfigured() {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_NOT_CONFIGURED")
+		return
+	}
+	cookie, err := r.Cookie("matchmate_google_state")
+	if err != nil || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(r.URL.Query().Get("state"))) != 1 {
+		s.googleFailure(w, r, "GOOGLE_STATE_INVALID")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "matchmate_google_state", Value: "", Path: "/api/v1/auth/google", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	if r.URL.Query().Get("error") != "" {
+		s.googleFailure(w, r, "GOOGLE_LOGIN_CANCELLED")
+		return
+	}
+	user, err := s.googleUser(r.Context(), r.URL.Query().Get("code"))
+	if err != nil || !user.EmailVerified || user.Email == "" || user.Subject == "" {
+		s.googleFailure(w, r, "GOOGLE_IDENTITY_INVALID")
+		return
+	}
+	pair, err := s.app.LoginWithGoogle(r.Context(), user.Email)
+	if err != nil {
+		var p *domain.ProblemError
+		if errors.As(err, &p) {
+			s.googleFailure(w, r, p.Code)
+			return
+		}
+		s.googleFailure(w, r, "GOOGLE_LOGIN_FAILED")
+		return
+	}
+	s.setSession(w, pair)
+	http.Redirect(w, r, s.cfg.GoogleSuccessRedirectURL, http.StatusFound)
+}
+
+func (s *Server) googleUser(ctx context.Context, code string) (googleUserInfo, error) {
+	if strings.TrimSpace(code) == "" {
+		return googleUserInfo{}, errors.New("authorization code is required")
+	}
+	form := url.Values{"code": {code}, "client_id": {s.cfg.GoogleClientID}, "client_secret": {s.cfg.GoogleClientSecret}, "redirect_uri": {s.cfg.GoogleRedirectURL}, "grant_type": {"authorization_code"}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://oauth2.googleapis.com/token", strings.NewReader(form.Encode()))
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(req)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return googleUserInfo{}, errors.New("google token exchange failed")
+	}
+	var token googleTokenResponse
+	if err = json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&token); err != nil || token.AccessToken == "" {
+		return googleUserInfo{}, errors.New("google token response invalid")
+	}
+	profileRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://openidconnect.googleapis.com/v1/userinfo", nil)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	profileRequest.Header.Set("Authorization", "Bearer "+token.AccessToken)
+	profile, err := client.Do(profileRequest)
+	if err != nil {
+		return googleUserInfo{}, err
+	}
+	defer profile.Body.Close()
+	if profile.StatusCode != http.StatusOK {
+		return googleUserInfo{}, errors.New("google userinfo request failed")
+	}
+	var user googleUserInfo
+	if err = json.NewDecoder(io.LimitReader(profile.Body, 1<<20)).Decode(&user); err != nil {
+		return googleUserInfo{}, err
+	}
+	return user, nil
+}
+
+func (s *Server) googleFailure(w http.ResponseWriter, r *http.Request, code string) {
+	separator := "?"
+	if strings.Contains(s.cfg.GoogleSuccessRedirectURL, "?") {
+		separator = "&"
+	}
+	http.Redirect(w, r, s.cfg.GoogleSuccessRedirectURL+separator+"googleError="+url.QueryEscape(code), http.StatusFound)
+}
+
+func randomState() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
+
+func (s *Server) notificationRecipient(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.InternalServiceToken == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-MatchMate-Internal-Token")), []byte(s.cfg.InternalServiceToken)) != 1 {
+		problem(w, r, 401, "INTERNAL_AUTH_REQUIRED", "Internal service authorization is required", nil)
+		return
+	}
+	a, err := s.app.NotificationRecipient(r.Context(), r.PathValue("accountId"))
+	if handle(w, r, err) {
+		return
+	}
+	write(w, 200, map[string]string{"email": a.Email})
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
@@ -89,20 +235,58 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, v)
 }
-func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+func (s *Server) resendVerification(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Email    string `json:"email"`
+		Email string `json:"email"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if handle(w, r, s.app.ResendVerification(r.Context(), in.Email)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if handle(w, r, s.app.RequestPasswordReset(r.Context(), in.Email)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) resetPassword(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token    string `json:"token"`
 		Password string `json:"password"`
 	}
 	if !decode(w, r, &in) {
 		return
 	}
-	v, err := s.app.Login(r.Context(), in.Email, in.Password)
+	if handle(w, r, s.app.ResetPassword(r.Context(), in.Token, in.Password)) {
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		TotpCode string `json:"totpCode"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	v, err := s.app.Login(r.Context(), in.Email, in.Password, in.TotpCode)
 	if handle(w, r, err) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {
@@ -120,7 +304,7 @@ func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.setSession(w, v)
-	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt})
+	write(w, 200, map[string]any{"accessToken": v.AccessToken, "accessExpiresAt": v.AccessExpiresAt, "roles": v.Roles})
 }
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if !s.trustedOrigin(r) {
@@ -164,7 +348,17 @@ func (s *Server) preferences(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, v)
 }
 func (s *Server) deactivate(w http.ResponseWriter, r *http.Request) {
-	if err := s.app.Deactivate(r.Context(), principal(r).Subject, correlation(r)); handle(w, r, err) {
+	if !s.trustedOrigin(r) {
+		problem(w, r, 403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed", nil)
+		return
+	}
+	var in struct {
+		Password string `json:"password"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := s.app.DeleteAccount(r.Context(), principal(r).Subject, in.Password, correlation(r)); handle(w, r, err) {
 		return
 	}
 	s.clearSession(w)
@@ -216,6 +410,20 @@ func (s *Server) moderate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(204)
 }
+func (s *Server) adminMemberIdentities(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		AccountIDs []string `json:"accountIds"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	items, err := s.app.AdminMemberIdentities(r.Context(), in.AccountIDs)
+	if handle(w, r, err) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	write(w, 200, map[string]any{"items": items})
+}
 
 func (s *Server) protected(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -228,11 +436,37 @@ func (s *Server) protected(next http.Handler) http.Handler {
 		if handle(w, r, err) {
 			return
 		}
+		if len(c.Roles) == 1 && c.Roles[0] == "appeal" {
+			problem(w, r, 403, "APPEAL_ONLY", "This session may be used only for a moderation appeal", nil)
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, c)))
+	})
+}
+func (s *Server) discoveryLimited(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		allowed, err := s.app.AllowDiscovery(r.Context(), principal(r).Subject)
+		if err != nil {
+			problem(w, r, 503, "RATE_LIMIT_UNAVAILABLE", "Discovery is temporarily unavailable", nil)
+			return
+		}
+		if !allowed {
+			w.Header().Set("Retry-After", "60")
+			problem(w, r, 429, "RATE_LIMITED", "Too many discovery requests", nil)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 func (s *Server) authLimited(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Behind the production GraphQL gateway RemoteAddr is the gateway, not
+		// the member. Per-identity PostgreSQL limits apply in Account; the
+		// production edge must apply trusted client-IP limits.
+		if s.cfg.Environment == "production" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		host := r.RemoteAddr
 		if i := strings.LastIndex(host, ":"); i > 0 {
 			host = host[:i]
@@ -240,6 +474,14 @@ func (s *Server) authLimited(next http.Handler) http.Handler {
 		key := host + "|" + r.URL.Path
 		now := time.Now()
 		s.limitMu.Lock()
+		if now.Sub(s.lastLimitSweep) >= time.Minute {
+			for bucket, value := range s.limits {
+				if now.Sub(value.Started) > 2*time.Minute {
+					delete(s.limits, bucket)
+				}
+			}
+			s.lastLimitSweep = now
+		}
 		window := s.limits[key]
 		if window.Started.IsZero() || now.Sub(window.Started) >= time.Minute {
 			window = rateWindow{Started: now}

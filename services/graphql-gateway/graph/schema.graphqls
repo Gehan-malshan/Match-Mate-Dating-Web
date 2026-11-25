@@ -1,0 +1,96 @@
+scalar JSON
+
+type Account { id: ID!, email: String!, status: String!, verification: String!, roles: [String!]! }
+type Profile { accountID: ID!, nickname: String!, dateOfBirth: String!, broadLocation: String!, bio: String!, visibility: String!, approval: String!, interests: [String!]!, version: Int! }
+type MatchingPreferences { minAge: Int!, maxAge: Int!, intentions: [String!]!, interestedIn: [String!]!, languages: [String!]!, dealBreakers: [String!]! }
+type Me { account: Account!, profile: Profile!, preferences: MatchingPreferences }
+type AuthPayload { accessToken: String!, roles: [String!]!, me: Me }
+type ModerationAction { actionId: ID!, actionClass: String!, scope: String!, effectiveAt: String!, expiresAt: String }
+type ModerationActionPage { items: [ModerationAction!]! }
+type ModerationAppeal { appealId: ID!, actionId: ID!, state: String! }
+type RegistrationPayload { me: Me!, verificationToken: String }
+
+type CommunityProfile { profileId: ID!, nickname: String!, ageBand: String!, broadLocation: String!, bio: String!, interests: [String!]! }
+type CommunityPage { items: [CommunityProfile!]!, nextCursor: String }
+
+type Event { eventId: ID!, organizerId: ID, name: String!, description: String!, venueName: String, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String!, imageVersion: Int!, configuredCapacity: Int!, capacityPolicyVersion: Int, matchingRulesetVersion: String!, status: String!, version: Int!, archivedAt: String }
+type EventPage { items: [Event!]!, nextCursor: String, limit: Int! }
+
+type Booking { bookingId: ID!, eventId: ID!, state: String!, paymentMethod: String!, amount: String!, currency: String!, policyVersion: Int!, expiresAt: String!, version: Int!, createdAt: String!, confirmedAt: String, cancelledAt: String, venueCollectedAt: String, venueCollectionMethod: String, checkedInAt: String }
+type BookingPage { items: [Booking!]! }
+type EventRegistration { bookingId: ID!, accountId: ID!, nickname: String!, email: String!, eventId: ID!, state: String!, entryEligible: Boolean!, paymentMethod: String!, amount: String!, currency: String!, createdAt: String!, confirmedAt: String, venueCollectedAt: String, venueCollectionMethod: String, checkedInAt: String }
+type EventRegistrationPage { items: [EventRegistration!]!, hasMore: Boolean! }
+type Payment { paymentId: ID!, bookingId: ID!, orderId: String!, amount: String!, currency: String!, provider: String!, state: String!, version: Int!, createdAt: String!, updatedAt: String!, completedAt: String }
+type Checkout { payment: Payment!, actionUrl: String!, fields: JSON! }
+
+type Notification { notificationId: ID!, sourceEventType: String!, category: String!, title: String!, message: String!, actionPath: String!, readAt: String, createdAt: String! }
+type NotificationPage { items: [Notification!]!, nextCursor: String, unreadCount: Int! }
+type UnreadCount { unreadCount: Int! }
+type UpdatedCount { updatedCount: Int! }
+type OperationResult { success: Boolean! }
+
+type Pairing { pairingId: ID, participantA: ID!, participantB: ID!, participantACode: String, participantBCode: String, score: Float!, safeReasons: [String!]!, source: String }
+type Candidate { participantA: ID!, participantB: ID!, eligible: Boolean!, rejectionCodes: [String!], components: JSON, totalScore: Float, safeReasons: [String!] }
+type Unmatched { participantId: ID!, participantCode: String, reason: String! }
+type MatchingRun { runId: ID!, eventId: ID!, runVersion: Int!, version: Int!, status: String!, rulesetVersion: String!, optimizerVersion: String!, tieBreakPolicy: String!, participantCount: Int!, eligiblePairCount: Int!, createdBy: ID!, createdAt: String!, updatedAt: String!, suggestions: [Pairing!], selections: [Pairing!], unmatched: [Unmatched!], candidates: [Candidate!] }
+type MatchingRunPage { items: [MatchingRun!]! }
+
+input RegisterInput { email: String!, password: String!, nickname: String!, dateOfBirth: String!, consentVersion: String! }
+input ProfileInput { nickname: String, broadLocation: String, bio: String, visibility: String, interests: [String!], expectedVersion: Int! }
+input PreferencesInput { minAge: Int, maxAge: Int, intentions: [String!], interestedIn: [String!], languages: [String!], dealBreakers: [String!] }
+input CheckoutCustomerInput { bookingId: ID!, firstName: String!, lastName: String!, email: String!, phone: String!, address: String!, city: String!, country: String! }
+input EventInput { organizerId: ID!, name: String!, description: String!, venueName: String!, broadLocation: String!, timeZone: String!, startsAt: String!, endsAt: String!, registrationOpensAt: String!, registrationClosesAt: String!, price: String!, currency: String!, paymentOptions: String, configuredCapacity: Int!, matchingRulesetVersion: String! }
+input EventPublicationApprovalInput { imageRightsConfirmed: Boolean!, imageModerationConfirmed: Boolean!, eventSafetyConfirmed: Boolean!, reviewVersion: String! }
+input PairingOverrideInput { removeSelectionId: ID!, participantA: ID!, participantB: ID!, reason: String! }
+
+type Query {
+  me: Me!
+  myModerationActions: ModerationActionPage!
+  communityProfiles(limit: Int = 8, cursor: String): CommunityPage!
+  communityProfile(profileId: ID!): CommunityProfile!
+  events(limit: Int = 12, cursor: String): EventPage!
+  event(eventId: ID!): Event!
+  bookings: BookingPage!
+  eventRegistrations(eventId: ID!, limit: Int = 25, offset: Int = 0): EventRegistrationPage!
+  adminRegistrations(limit: Int = 25, offset: Int = 0): EventRegistrationPage!
+  payment(bookingId: ID!): Payment!
+  notifications(limit: Int = 20, cursor: String): NotificationPage!
+  unreadNotificationCount: UnreadCount!
+  managedEvents(limit: Int = 100, archived: Boolean = false): EventPage!
+  matchingRuns(eventId: ID!): MatchingRunPage!
+  matchingRun(runId: ID!): MatchingRun!
+}
+
+type Mutation {
+  register(input: RegisterInput!): RegistrationPayload!
+  verifyEmail(token: String!): OperationResult!
+  resendVerification(email: String!): OperationResult!
+  requestPasswordReset(email: String!): OperationResult!
+  resetPassword(token: String!, password: String!): OperationResult!
+  deleteMyAccount(password: String!): OperationResult!
+  login(email: String!, password: String!, totpCode: String): AuthPayload!
+  appealModerationAction(actionId: ID!, reason: String!): ModerationAppeal!
+  refreshSession: AuthPayload!
+  logout: OperationResult!
+  updateProfile(input: ProfileInput!): Profile!
+  updatePreferences(input: PreferencesInput!): MatchingPreferences!
+  blockMember(accountId: ID!): OperationResult!
+  createBooking(eventId: ID!, paymentMethod: String, idempotencyKey: String!): Booking!
+  cancelBooking(bookingId: ID!, idempotencyKey: String!): Booking!
+  collectVenuePayment(bookingId: ID!, method: String!, idempotencyKey: String!): Booking!
+  checkInBooking(bookingId: ID!, idempotencyKey: String!): Booking!
+  initiatePayment(input: CheckoutCustomerInput!, idempotencyKey: String!): Checkout!
+  markNotificationRead(notificationId: ID!): OperationResult!
+  markAllNotificationsRead: UpdatedCount!
+  createEvent(input: EventInput!): Event!
+  uploadEventImage(eventId: ID!, imageBase64: String!): Event!
+  updateEvent(eventId: ID!, input: EventInput!, expectedVersion: Int!): Event!
+  transitionEvent(eventId: ID!, action: String!, expectedVersion: Int!, publicationApproval: EventPublicationApprovalInput): Event!
+  archiveEvent(eventId: ID!, expectedVersion: Int!): Event!
+  restoreEvent(eventId: ID!, expectedVersion: Int!): Event!
+  generateMatchingRun(eventId: ID!, idempotencyKey: String!): MatchingRun!
+  reviewMatchingRun(runId: ID!, expectedVersion: Int!): MatchingRun!
+  lockMatchingRun(runId: ID!, expectedVersion: Int!, idempotencyKey: String!): MatchingRun!
+  publishMatchingRun(runId: ID!, expectedVersion: Int!, idempotencyKey: String!): MatchingRun!
+  overridePairing(runId: ID!, expectedVersion: Int!, input: PairingOverrideInput!, idempotencyKey: String!): MatchingRun!
+}

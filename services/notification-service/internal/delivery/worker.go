@@ -1,0 +1,112 @@
+package delivery
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"time"
+
+	"github.com/gehan-malshan/matchmate/notification-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/provider"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/safety"
+	"github.com/gehan-malshan/matchmate/notification-service/internal/store/postgres"
+)
+
+type Worker struct {
+	repository Repository
+	sender     provider.Sender
+	resolver   RecipientResolver
+	log        *slog.Logger
+	lease      time.Duration
+	retryBase  time.Duration
+	now        func() time.Time
+	safety     interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+}
+
+func (w *Worker) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	w.safety = client
+}
+
+// RecipientResolver resolves a verified delivery destination only at send time.
+// The Notification database continues to store account IDs, not email addresses.
+type RecipientResolver interface {
+	Resolve(context.Context, string) (string, error)
+}
+
+type Repository interface {
+	ClaimDue(context.Context, time.Time, time.Duration) (domain.Delivery, bool, error)
+	CompleteAttempt(context.Context, domain.Delivery, postgres.AttemptResult) (domain.DeliveryState, error)
+}
+
+func NewWorker(repository Repository, sender provider.Sender, resolver RecipientResolver, log *slog.Logger, lease, retryBase time.Duration) *Worker {
+	return &Worker{repository: repository, sender: sender, resolver: resolver, log: log, lease: lease, retryBase: retryBase, now: time.Now}
+}
+
+func (w *Worker) RunOnce(ctx context.Context) (bool, error) {
+	started := w.now().UTC()
+	delivery, found, err := w.repository.ClaimDue(ctx, started, w.lease)
+	if err != nil || !found {
+		return found, err
+	}
+
+	result := postgres.AttemptResult{StartedAt: started, CompletedAt: w.now().UTC()}
+	if w.safety != nil {
+		decision, checkErr := w.safety.Check(ctx, delivery.RecipientAccountID, delivery.EventID)
+		if checkErr != nil {
+			result.ErrorCode = "SAFETY_UNAVAILABLE"
+		} else if decision.Suspended || (delivery.Template.Category == "BOOKING" && (delivery.EventID == "" || decision.EventExcluded)) {
+			result.Suppressed, result.ErrorCode = true, "SAFETY_RESTRICTED"
+		}
+	}
+	message, renderErr := domain.Render(delivery.Template, delivery.Variables)
+	if result.ErrorCode != "" {
+		// A failed safety lookup retries; a restriction suppresses delivery.
+	} else if renderErr != nil {
+		result.PermanentFailure = true
+		result.ErrorCode = "TEMPLATE_RENDER_INVALID"
+	} else {
+		recipient := ""
+		var sendErr error
+		if w.resolver != nil {
+			recipient, sendErr = w.resolver.Resolve(ctx, delivery.RecipientAccountID)
+		}
+		reference := ""
+		if sendErr == nil {
+			reference, sendErr = w.sender.Send(ctx, delivery, message, recipient)
+		}
+		result.CompletedAt = w.now().UTC()
+		result.ProviderReference = reference
+		if sendErr == nil {
+			result.Delivered = true
+		} else {
+			result.ErrorCode = "PROVIDER_UNAVAILABLE"
+			var failure *domain.SendFailure
+			if errors.As(sendErr, &failure) {
+				result.PermanentFailure = failure.Kind == domain.FailurePermanent
+				if failure.Code != "" {
+					result.ErrorCode = failure.Code
+				}
+			}
+		}
+	}
+	if !result.Delivered && !result.PermanentFailure && !result.Suppressed {
+		result.RetryAt = result.CompletedAt.Add(domain.RetryDelay(w.retryBase, delivery.AttemptCount))
+	}
+	state, err := w.repository.CompleteAttempt(ctx, delivery, result)
+	if err != nil {
+		return true, err
+	}
+	w.log.Info("notification_delivery_processed",
+		"delivery_id", delivery.ID,
+		"source_event_type", delivery.SourceEventType,
+		"template_key", delivery.Template.Key,
+		"attempt", delivery.AttemptCount,
+		"state", state,
+		"result_code", result.ErrorCode,
+	)
+	return true, nil
+}

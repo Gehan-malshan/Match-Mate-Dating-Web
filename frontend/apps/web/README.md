@@ -1,8 +1,16 @@
-# Member Web Application
+# Unified MatchMate Web Application
 
-The member-facing React and TanStack application will support registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event matches, responses, and feedback.
+Password sign-in with an Account-issued `appeal` role opens `/appeal`, where the member can list their active action summaries and submit a private review request. This route never loads the ordinary profile. The GraphQL gateway and Moderation enforce ownership; regular member/admin routes remain unavailable. After reversal, sign in again to restore the normal route.
+
+Account security routes include `/verify-email`, `/forgot-password`, and `/reset-password`. The shared login accepts an optional administrator authenticator code. The profile workspace offers password-confirmed account deletion. Security link pages use a `no-referrer` policy to reduce token leakage. Real email delivery requires SMTP configuration; the local development sink does not deliver recovery links. See `docs/runbooks/account-security.md`.
+
+Published events now use their Event-owned image on the landing preview, event catalogue, and detail hero when `imageVersion>0`. Existing stock artwork remains the fallback. The browser fetches public bytes from the GraphQL gateway's narrow media route; no Event Service address or image bytes are embedded in GraphQL lists.
+
+The single React and TanStack application supports role-separated member and administrator routes, registration, profile and preference management, safe community discovery, event discovery, ticket purchasing, event administration, deterministic matching operations, responses, and feedback.
 
 ## Implemented foundation and boundaries
+
+Members and administrators share `/login`. The backend-issued role directs administrators to `/admin`; the member and administrator route groups restore the rotating session and reject unauthorized navigation. Frontend guards are user-experience controls only—the GraphQL gateway and owning services enforce authorization again.
 
 - React + TypeScript.
 - Bun for package management, workspace dependency installation, and script execution.
@@ -10,19 +18,33 @@ The member-facing React and TanStack application will support registration, prof
 - TanStack Router for typed route/access structure.
 - TanStack Query for server state; backend services remain authoritative.
 - TanStack Form and Zod for accessible client validation; server validation is mandatory.
-- Shared presentation components from `frontend/packages/ui` and generated OpenAPI client helpers.
+- Shared GraphQL session/HTTP client from `frontend/packages/graphql-client`.
 
-The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the API Gateway over HTTPS.
+The web app never connects directly to databases, RabbitMQ, PayHere secrets, or private service addresses. It calls the GraphQL BFF over HTTPS.
 
 The repository uses one frontend lockfile: `bun.lock`. Do not add pnpm, npm, or Yarn lockfiles. Bun runs the checked-in Vite, ESLint, TypeScript, test, and build scripts; Bun's bundler is not the default frontend bundler unless a later ADR changes the Vite decision.
 
-Implemented routes include the redesigned public `/` landing page, `/register`, `/login`, and the authenticated `/app/profile` workspace. Registration uses TanStack Form and Zod before server-authoritative validation. The API client keeps access tokens in memory, sends refresh cookies only with credentialed requests, retries once after refresh, and never writes tokens or private profile data to browser storage. The profile workspace clearly separates the community allow-list from private matching preferences. Event inventory remains unavailable until its backend journey exists.
+Implemented routes include the redesigned public `/` landing page, `/register`, `/login`, the authenticated `/app/profile` workspace, `/app/bookings`, `/app/notifications`, authenticated `/community` and `/community/$profileId` discovery/detail routes, public `/events`, and `/events/$eventId` discovery/detail routes. Registration uses TanStack Form and Zod before server-authoritative validation. The API client keeps access tokens in memory, sends refresh cookies only with credentialed requests, retries once after refresh, and never writes tokens or private profile data to browser storage. The Midnight Chemistry profile workspace provides a community-safe preview, profile visibility and moderation state, editable introduction/interests, and a visually separate private matching blueprint. It intentionally omits unsupported avatar generation, credential changes, and unapproved lifestyle fields. Community discovery renders only the Account Service allow-list, excludes blocked relationships, provides a safe detail view, and exposes no chat or contact-sharing action. Event discovery shows only the Event Service public allow-list and clearly labels configured capacity as non-authoritative.
 
-The landing page uses minimal responsive navigation, a happy-couple hero, an image-led About section, a privacy/safety composition, a fully visible five-step journey, explainable preferences-to-rules-to-review matching, a truthful pre-launch event stage, and structured product/trust footer navigation. Distinct project-local imagery gives the hero, café conversation, event check-in, and rooftop-event chapters separate visual purposes. The working registration call-to-action links to `/register`; event actions continue to link only to confirmed announcement information.
+The landing page uses minimal responsive navigation, a happy-couple hero, an image-led About section, a privacy/safety composition, a fully visible five-step journey, a live public event preview in the middle of the page, explainable preferences-to-rules-to-review matching, and structured product/trust footer navigation. The preview uses the public Event Service GraphQL query, shows up to three published events, and links each card to a public event detail route. “View more events” opens the complete public catalogue. Visitors do not need to sign in to view event summaries or details; reserving a seat still follows the authenticated booking flow. The exact venue and attendee identities remain private. Empty, loading, and retryable service-error states are provided, and no mock inventory is presented as real events. Distinct project-local imagery gives the hero, café conversation, event check-in, and event cards separate visual purposes. The working registration call-to-action links to `/register`.
 
 GSAP and `@gsap/react` provide progressive entrance and scroll motion. Motion is presentation-only: the page remains complete without JavaScript-driven animation, and `prefers-reduced-motion: reduce` bypasses GSAP timelines and disables the marquee animation. Do not use motion to create pressure around consent, privacy, payment, or safety decisions.
 
 All new visual work must follow the canonical [Midnight Chemistry base design system](../../../docs/design/README.md). The landing page now implements its semantic dark surfaces, brand gradient, 12-column rhythm, tonal elevation, responsive gutters, approved logo, and motion rules. Future changes must preserve the varied composition and must not drift back toward repeated generic cards or unsupported product claims.
+
+## Booking and payment journey
+
+For `AT_VENUE` events the web app reserves a confirmed seat without checkout and displays the ticket amount due at the entrance. For `BOTH` events the member selects venue or PayHere online before booking. My bookings does not query Payment for venue reservations. A confirmed venue booking is not a paid ticket. Staff collection/check-in and a payment-free production deployment remain separate work.
+
+The member app now provides atomic seat reservation and PayHere checkout initiation on open event detail pages. Event detail loads the authenticated member's bookings and automatically reopens checkout for an existing `PENDING_PAYMENT` hold, so navigating away never forces a duplicate reservation. `/app/bookings` labels that route **Complete payment**, polls authoritative Booking and Payment state, shows pending, confirmed, failed, expired, cancelled, and review outcomes, and allows unpaid holds to be cancelled safely. Browser return parameters are never treated as payment confirmation.
+
+Booking and payment operations are GraphQL mutations at `VITE_GRAPHQL_API_URL`; the BFF calls Booking and Payment internally.
+
+## In-app notifications
+
+The member header includes an authenticated notification bell, unread badge, recent-items popover, and link to the paginated `/app/notifications` history. TanStack Query polls the owner-scoped Notification API every 10 seconds. Notifications that arrive after the initial successful load appear as dismissible, reduced-motion-safe popup toasts; existing unread history does not repeatedly pop up on reload. Opening an item or using mark-read/mark-all updates server-owned read state.
+
+The frontend never sends a recipient account ID: Notification derives ownership from the Account access-token subject forwarded by GraphQL. Real email is deliberately not represented as complete.
 
 ## Local commands
 
@@ -38,7 +60,7 @@ bun run build:web
 
 The development URL is `http://127.0.0.1:5173`; the production build is written to `frontend/apps/web/dist` and is ignored by Git.
 
-The Account API defaults to `http://localhost:8081/api/v1`. Override it with `VITE_ACCOUNT_API_URL` (see `.env.example`). The API must allow the exact Vite origin and use TLS/secure cookies in production.
+GraphQL defaults to `http://localhost:8080/graphql`. Override it with `VITE_GRAPHQL_API_URL` (see `.env.example`). The gateway must allow the exact Vite origin and use TLS/secure cookies in production.
 
 ## Brand assets
 

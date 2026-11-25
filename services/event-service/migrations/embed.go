@@ -1,0 +1,21 @@
+package migrations
+
+import _ "embed"
+
+//go:embed 000001_init.up.sql
+var Up string
+
+//go:embed 000002_payment_options.up.sql
+var PaymentOptionsUp string
+
+//go:embed 000003_event_image.up.sql
+var EventImageUp string
+
+//go:embed 000004_event_archive.up.sql
+var EventArchiveUp string
+
+//go:embed 000005_remove_event_audit.up.sql
+var RemoveEventAuditUp string
+
+//go:embed 000006_publication_review.up.sql
+var PublicationReviewUp string

@@ -1,5 +1,13 @@
 # MatchMate Data Architecture
 
+Booking migration 6 adds venue collection and check-in timestamps, staff IDs, collection method, and a separate staff-command idempotency table. The immutable booking amount/currency remains the collection amount. Do not drop these columns during rollback after real collection; preserve financial and attendance history. See ADR-0006.
+
+Account migration 2 adds `password_reset_token` (hashed one-use token, 30-minute expiry), `security_rate_window` (hashed bucket and atomic minute count), and `admin_totp` (AES-GCM encrypted secret, confirmation and last-used step). Password reset changes credential, increments token version, and revokes refresh sessions in one Account transaction. Member deletion pseudonymizes Account email and removes Account-owned profile/preference/credential/token rows; Account ID, minimal audit/consent/booking references remain until the cross-service retention policy is approved. See ADR-0003.
+
+Event migration 3 adds `event.image_version` and an Event-owned `event_image` table (`event_id`, content type, up to 1 MiB JPEG bytes, update time). The Event database backup now includes uploaded media. Draft replacement increments the image version; no image bytes appear in the Event outbox. Existing rows default to version zero. Dropping the table during rollback would destroy uploads and is not an approved recovery step.
+
+Event migration 2 adds `payment_options` (`ONLINE` default for existing rows). Booking migration 3 adds `payment_method` (`ONLINE` default). Event policy is draft-only under the current API; Booking method and price/currency are immutable snapshots. `AT_VENUE` creation increments `confirmed_count` rather than `held_count` atomically, while `ONLINE` retains the hold/expiry/payment-confirmation path. `CONFIRMED` for venue is a seat state; migration 6 separately records collection and check-in. Do not infer payment from the Booking state alone.
+
 This guide defines service data ownership, proposed schemas, constraints, consistency, migrations, retention, and recovery. Table names are proposed until service migrations are accepted; ownership and invariants are architecture decisions.
 
 ## 1. Non-negotiable ownership rules
@@ -21,7 +29,7 @@ This guide defines service data ownership, proposed schemas, constraints, consis
 | Account/Profile | Accounts, credentials, roles, sessions, verification, profile, preferences, visibility, interests, blocks | Email uniqueness, credential/session security, source profile/preferences, account/block status |
 | Event | Event, location, schedule, price, configured capacity/policy, organizer, lifecycle | Event state, configured limits, price definition, registration window |
 | Booking | Booking, hold, allocation, price/policy snapshot, attendance, inbox/outbox | No oversell, one active booking, hold expiry, confirmed participation |
-| Payment | Payment, provider callback, refund, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment/refund state |
+| Payment | Payment, provider callback, reconciliation, audit, inbox/outbox | Trusted amount/currency, callback uniqueness, payment state |
 | Matchmaking | Ruleset, snapshots, candidates, scores, runs, suggestions, overrides, locked pairs, responses, consent, feedback | Eligibility/scoring reproducibility, unique pairing/response, immutable run history |
 | Notification | Template, delivery, attempt, suppression/channel preference | Delivery idempotency, retry history, suppression |
 | Moderation | Report, case, evidence reference, action, appeal, safety audit | Enforcement state, restricted evidence/audit, appeal history |
@@ -55,6 +63,10 @@ Constraints and privacy:
 
 ## 4. Event database
 
+Event migration 6 adds `publication_review_version`, `publication_reviewed_by`, and `publication_reviewed_at` with an all-or-none constraint. They record the current event's publication approval without storing rights documents, venue contacts, or checklist evidence. Existing published rows remain null and require controlled review before production promotion. Do not remove populated review fields during rollback; forward-fix publication behavior and preserve evidence.
+
+The Event service owns `event`, `event_image`, and transactional `outbox` tables. Migration 5 drops the former `event_audit` table and permanently removes any records it contained; new databases do not create it. Separate location and policy-history tables remain planned; until they are introduced, broad/exact location fields and policy version references live on the aggregate. Booking still owns all consumed-capacity data.
+
 Suggested tables:
 
 | Table | Important fields/constraints |
@@ -74,14 +86,17 @@ Constraints:
 
 ## 5. Booking database
 
-Suggested tables:
+Booking migration 1 implements `booking`, `capacity_allocation`, `idempotency_record`, `inbox`, and `outbox`. Migration 2 adds the cancellation timestamp used by idempotent unpaid-hold cancellation. Migration 6 records venue collection and check-in on `booking` and creates `booking_staff_action` for staff-command idempotency. A partial unique index prevents more than one active account/event booking, and a conditional allocation update prevents held plus confirmed capacity from exceeding the immutable configured limit. Separate attendance/no-show tables remain proposed.
+
+Implemented tables and proposed extensions:
 
 | Table | Important fields/constraints |
 |---|---|
-| `booking` | ID, account/event scalar IDs, state, idempotency key, policy version, amount/currency snapshot, created/confirmed/cancelled/expired times, version |
-| `seat_hold` | booking unique, event, allocation category, expiry, released time |
+| `booking` (implemented) | ID, account/event scalar IDs, state, policy version, amount/currency snapshot, lifecycle times, venue collection method/actor/time, check-in actor/time, version |
+| `booking_staff_action` (implemented) | actor, operation, idempotency key, booking, request fingerprint, time |
+| `seat_hold` (proposed) | booking unique, event, allocation category, expiry, released time |
 | `capacity_allocation` | event/category unique, configured policy version, held count, confirmed count, version |
-| `attendance` | booking unique, check-in/no-show state, actor/time/audit |
+| `attendance` (proposed) | booking unique, no-show policy and additional attendance history |
 | `inbox` | unique event ID per consumer/handler |
 | `outbox` | booking facts |
 
@@ -96,13 +111,15 @@ Constraints:
 
 ## 6. Payment database
 
+Migration 1 implements `payment`, `provider_callback`, `payment_audit`, `idempotency_record`, `reconciliation_item`, `inbox`, and `outbox`. The current no-automatic-refunds policy has no refund table or command. Verified callback mismatches and conflicting results create open reconciliation items in the same transaction as state/audit/outbox changes; old pending-result items close when a final result arrives. The current migration is additive with no backfill; production rollback retains the isolated Payment database for financial evidence and uses forward recovery.
+
 Suggested tables:
 
 | Table | Important fields/constraints |
 |---|---|
 | `payment` | ID, booking unique active relation, order ID unique, amount/currency, state, provider, created/updated/completed time, version |
 | `provider_callback` | provider event/payment ID or fingerprint unique, order, received time, verification result, sanitized metadata hash/reference |
-| `refund` | payment, amount/currency, reason, state, provider reference, requested/completed times |
+| `refund` | Not implemented under the current no-refunds policy; any exception workflow needs a separate decision and migration. |
 | `reconciliation_item` | payment/order, discrepancy type, status, owner, notes/audit, resolution |
 | `payment_audit` | append-only state transition and verification decision metadata |
 | `inbox` / `outbox` | idempotent integration |
@@ -114,7 +131,7 @@ Constraints:
 - Valid duplicate callbacks do not republish completion.
 - Preserve immutable callback/audit evidence according to approved retention.
 - Do not store card data or provider credentials.
-- Refund cannot exceed captured amount minus completed refunds.
+- No refund ledger or endpoint exists under the current policy; provider disputes still require preserved evidence and manual review.
 
 ## 7. Matchmaking database
 
@@ -132,12 +149,17 @@ See [`../matchmaking/README.md`](../matchmaking/README.md) for algorithm behavio
 | `locked_pairing` | run/event/round, canonical pair, locked time; participant uniqueness enforced |
 | `match_response` | pairing, account, question/policy version, response, time; unique active response |
 | `reveal_consent` | pairing, account, policy version, decision/revocation, time |
+| `reveal_consent_history` | pairing, account, increasing decision version, grant/revoke decision, policy version, idempotency key, time; append-only |
 | `match_feedback` | pairing/account, structured ratings/flags, restricted free-text reference where approved |
 | `inbox` / `outbox` | idempotent integration |
 
 Rulesets and used snapshots are append-only. Never update history to make a new algorithm appear to have produced an old result.
 
+The implemented prototype adds `event_scope` and `participant_projection` as Matchmaking-owned read models plus `pairing_selection`, `locked_participant`, `audit_log`, and transactional `outbox`. Development seed writes fixture projections only; production writers will be inbox-deduplicated consumers of minimum-safe facts. No Matchmaking query joins another service database.
+
 ## 8. Notification database
+
+Migration 1 implements `notification_template`, `notification_delivery`, `notification_delivery_attempt`, `notification_preference`, `notification_suppression`, and `notification_inbox`. Migration 2 adds the member-owned `notification_feed_item` read projection and backfills existing non-suppressed deliveries. Migration 3 installs SMTP template variants. Migration 4 adds nullable `event_id` to delivery and a suppressed-attempt outcome so current event exclusion can stop pending sends and hide event-scoped feed items. Legacy booking deliveries without an event ID are conservatively suppressed when safety checking is enabled. The slice stores recipient account IDs and minimum source identifiers only; it does not replicate contact destinations, profiles, payment details, or safety evidence.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -146,11 +168,14 @@ Rulesets and used snapshots are append-only. Never update history to make a new 
 | `delivery_attempt` | delivery, attempt number, provider reference/status, sanitized error, timing |
 | `notification_preference` | account/channel/category, allowed/suppressed, source/time |
 | `suppression` | destination hash/account, reason, expiry/indefinite, audit |
-| `inbox` / `outbox` | event consumption and delivery facts |
+| `notification_feed_item` | delivery unique, recipient account, read time, creation time; no copied message body or provider diagnostics |
+| `inbox` / `outbox` | `notification_inbox` implements event consumption; a Notification outbox is deferred until safe delivery facts have an approved consumer |
 
-Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
+Delivery state is `PENDING`, `PROCESSING`, `RETRY_SCHEDULED`, `DELIVERED`, `SUPPRESSED`, `PERMANENTLY_FAILED`, or `DEAD_LETTERED`. In-app `read_at` is independent of provider delivery state. A unique business key prevents repeated event/template/recipient delivery, one feed row references one immutable delivery/template snapshot, worker leases recover abandoned processing, and every completed provider attempt is append-only. Member feed queries and updates always constrain both item and authenticated recipient account. Do not replicate full profiles or payment payloads. Resolve only approved recipient/channel data through a constrained mechanism and retention policy.
 
 ## 9. Moderation database
+
+Moderation migration 1 implements the first independently deployed schema. Reports store restricted descriptions and reporter IDs; owner history intentionally selects neither. Evidence is reference/integrity/retention metadata only. Actions and audit decisions are append-only; expiry and reversal change only effective state while preserving the original action. The service never joins another service database.
 
 | Table | Important fields/constraints |
 |---|---|
@@ -161,6 +186,8 @@ Do not replicate full profiles or payment payloads. Resolve only approved recipi
 | `appeal` | action/case, appellant, state, decision actor/reason/time |
 | `moderation_audit` | append-only privileged views and changes |
 | `outbox` | safe restriction/action facts only |
+
+Implemented table names are `report`, `moderation_case`, `evidence_reference`, `moderation_action`, `appeal`, `moderation_audit`, and `outbox`. Assignment moves an open case to triage; an audited command moves triage to investigation, then either an action or audited dismissal resolves it. A partial unique index prevents simultaneous equivalent active actions. Production retention, legal hold, evidence-object storage, and deletion/anonymization remain **OPEN QUESTION — Safety/Privacy owner**.
 
 Reporter identity and evidence are more restricted than general organizer data.
 
@@ -206,7 +233,7 @@ Indexes follow measured queries, but baseline candidates include:
 - Booking: account/event active unique, event/state, hold expiry, allocation event/category.
 - Payment: order unique, provider ID/fingerprint unique, booking, state/update time, reconciliation status.
 - Matchmaking: event/run version unique, run/status, canonical pair unique, participant locked lookup, response pairing/account.
-- Notification: state/scheduled time, business idempotency key, provider reference.
+- Notification: state/scheduled time, business idempotency key, provider reference, recipient/created feed pagination, and recipient unread partial index.
 - Moderation: target/state, severity/SLA, assigned owner, action target/effective state.
 
 Avoid indexing sensitive plaintext merely for convenience; evaluate encryption/search implications.
@@ -281,4 +308,3 @@ Before merging a data change, verify:
 - [ ] PII classification, encryption, logs/events, retention, and deletion are addressed.
 - [ ] Component, concurrency, and recovery tests are updated.
 - [ ] Service README, this guide, contracts, and change log are updated.
-

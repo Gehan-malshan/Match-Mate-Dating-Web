@@ -1,5 +1,19 @@
 # Account and Profile Service
 
+## Moderation enforcement
+
+Login and refresh responses include the issued `roles` list so the browser gateway can identify a restricted appeal session without requesting `/users/me`. This is an additive v1 field and mirrors the signed token roles.
+
+When `MODERATION_API_URL` and `MODERATION_SERVICE_TOKEN` are configured, Account reads current effective Moderation actions before password/Google sign-in, refresh, token authentication, public profile discovery, and notification-recipient resolution. A suspended member receives only an `appeal` role token after password sign-in; ordinary Account endpoints reject it, while Moderation's owner-scoped action list and appeal endpoint accept it. Google cannot issue an appeal token. Profile restriction hides community results immediately. Sensitive reads fail closed when Moderation is unavailable. Production requires both settings; see [ADR-0005](../../docs/adr/0005-authoritative-moderation-safety-reads.md).
+
+## Security lifecycle update (ADR-0003)
+
+Migration 2 adds hashed single-use password-reset tokens, PostgreSQL-backed security rate windows, and encrypted administrator TOTP records. Account sends raw verification/recovery links only through Notification's private transient SMTP endpoint; the token is never included in an event. The browser exposes `/verify-email`, `/forgot-password`, and `/reset-password`. Password reset revokes all sessions and increments token version. Administrator password login requires TOTP when `ADMIN_MFA_ENCRYPTION_KEY` is set; production requires it. Google login cannot bypass administrator MFA. Provision the first authenticator through `cmd/admin-mfa` as described in `docs/runbooks/account-security.md`.
+
+`DELETE /api/v1/users/me` now requires the current password and immediately pseudonymizes Account email, erases Account-owned profile and credentials, and revokes sessions. Cross-service records and backups follow an unresolved retention policy; see ADR-0003. This is a behavior change from the prior bearer-only deactivation call. The browser GraphQL mutation is `deleteMyAccount(password:)`.
+
+New configuration: `SECURITY_MAIL_URL`, `SECURITY_MAIL_TOKEN`, `ADMIN_MFA_ENCRYPTION_KEY`, and optional `JWT_PREVIOUS_PUBLIC_KEYS_JSON`. See the runbook for rollout order and limitations. Real SMTP credentials and live delivery evidence remain required for production.
+
 Owns registration, authentication, roles, sessions, account lifecycle, community-safe profiles, private matchmaking preferences, profile visibility, and member blocks.
 
 Implemented owned data includes accounts, credentials, consent records, roles, sessions, profiles, preferences, visibility settings, blocks, moderation audit records, and an event outbox.
@@ -25,6 +39,8 @@ Bookings, event capacity, event catalog, payments, matching scores/pairings, not
 POST   /api/v1/auth/register
 POST   /api/v1/auth/verify-email
 POST   /api/v1/auth/login
+GET    /api/v1/auth/google/start
+GET    /api/v1/auth/google/callback
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
 GET    /api/v1/users/me
@@ -35,9 +51,12 @@ GET    /api/v1/community/profiles/{profileId}
 POST   /api/v1/users/me/blocks
 DELETE /api/v1/users/me/blocks/{accountId}
 POST   /api/v1/admin/profiles/{accountId}/decision
+POST   /api/v1/admin/member-identities
 DELETE /api/v1/users/me
 GET    /.well-known/jwks.json
 ```
+
+The member-identities endpoint requires an admin bearer token and accepts at most 50 account IDs. It returns only account ID, nickname and email for the restricted event-registration view; public community visibility does not govern this operational lookup.
 
 Self-service identity comes from the access-token subject. Admin paths require explicit scopes and audit.
 
@@ -92,9 +111,13 @@ The executable vertical slice is in this directory. `cmd/api` serves REST, `cmd/
 
 Registration creates an adult-only, `PRIVATE`, `PENDING` profile and records the accepted consent policy version. Login requires a verified, active account. Passwords use Argon2id. ES256 access tokens expire after 10 minutes by default and contain subject, roles, and token version—not PII. A 256-bit opaque refresh token rotates in an `HttpOnly`, `SameSite=Lax` cookie; only its SHA-256 hash is stored. Reuse revokes the entire session family. Deactivation increments token version, revokes sessions, hides the profile, and emits a minimum-data event.
 
+Google sign-in is an optional second authentication method for an existing verified MatchMate account. The Account API performs the OAuth authorization-code exchange, validates Google-returned verified email identity through Google's user-info endpoint, protects the browser redirect with a one-time random state cookie, and issues the same MatchMate session as password login. It deliberately does not create a profile because registration must collect MatchMate's adult-age and consent data. Configure `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `GOOGLE_OAUTH_REDIRECT_URL` together to enable Google sign-in; leave all three empty to run local development without Google. The Compose default leaves all three empty, so optional OAuth does not block the rest of the services from starting. The browser reaches these endpoints only through the GraphQL gateway's `/auth/google/*` proxy.
+
+The private `GET /api/v1/internal/notification-recipients/{accountId}` endpoint is not public API. It accepts only the shared `X-MatchMate-Internal-Token`, returns only a verified active member's email, and exists exclusively for Notification's runtime SMTP delivery. It never exposes an email through GraphQL, community APIs, or RabbitMQ facts.
+
 The community projection is an explicit allow-list: profile ID, nickname, five-year age band, broad location, bio, and interests. It requires active + verified + approved + community-visible state and excludes blocks in either direction. Exact DOB, email, preferences, deal-breakers, credentials, and moderation data cannot be serialized by this DTO.
 
-Profile approval/hiding requires `moderator` or `admin` and creates an audit record. Full moderation case/evidence/appeal ownership remains in the future Moderation Service. Profile media and questionnaire answers are intentionally deferred until their policy and schema decisions are approved. Production verification-email delivery also remains an integration task: development may return a token only when `DEV_EXPOSE_VERIFICATION_TOKEN=true`; production must keep it false and connect an approved private delivery path without putting email addresses in public facts.
+Profile approval/hiding requires `moderator` or `admin` and creates an audit record. Full moderation case/evidence/appeal ownership remains in the future Moderation Service. Profile media and questionnaire answers are intentionally deferred until their policy and schema decisions are approved. Verification and recovery now use Notification's private transient SMTP endpoint. Development may return a verification token only when `DEV_EXPOSE_VERIFICATION_TOKEN=true`; production must keep it false. Real SMTP delivery, bounce handling, and operational evidence remain production gates.
 
 ## Run locally on Windows / PowerShell
 
@@ -123,7 +146,7 @@ $env:DEV_EXPOSE_VERIFICATION_TOKEN='true'
 go run ./cmd/api
 ```
 
-Run the relay in a second terminal with `go run ./cmd/outbox-relay`. Run the frontend from `frontend/apps/web` with `bun run dev`; it uses `http://localhost:8081/api/v1` unless `VITE_ACCOUNT_API_URL` overrides it.
+Run the relay in a second terminal with `go run ./cmd/outbox-relay`. The unified frontend uses the GraphQL gateway at `http://localhost:8080/graphql`; the gateway calls this service internally.
 
 ### Shared development logins
 
@@ -135,8 +158,12 @@ The development Compose command automatically runs the idempotent migration and 
 | `community@example.test` | Approved community-visible member |
 | `moderator@example.test` | Moderator API testing |
 | `suspended@example.test` | Suspended-account denial testing |
+| `organizer@example.test` | Event organizer UI/API testing |
+| `admin@example.test` | Administrator-only event creation and matchmaking management |
 
 These are public development fixtures, not secrets. Never copy them into staging or production, never add an authentication bypass for them, and never use real personal information in seed data. Re-running the command restores the known password/state and invalidates existing access tokens by incrementing token versions.
+
+The same seed creates six fictional, approved Community profiles with reserved `.test` identities. They have no credential rows and cannot log in; they exist only so every developer sees a useful Community directory after starting Docker.
 
 ## Configuration
 

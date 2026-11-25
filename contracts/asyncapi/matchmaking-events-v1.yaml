@@ -1,0 +1,28 @@
+asyncapi: 3.0.0
+info: {title: MatchMate Matchmaking Facts, version: 1.0.0}
+channels:
+  matchmakingFacts:
+    address: matchmate.events
+    messages: {fact: {$ref: "#/components/messages/MatchmakingFact"}}
+operations:
+  publishMatchmakingFact:
+    action: send
+    channel: {$ref: "#/channels/matchmakingFacts"}
+    summary: Transactionally persisted minimum-safe matchmaking lifecycle facts. Private scoring inputs and rejection details are never included.
+components:
+  messages:
+    MatchmakingFact:
+      payload:
+        type: object
+        additionalProperties: false
+        required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,causationId,actorId,payload]
+        properties:
+          eventId: {type: string, format: uuid}
+          eventType: {type: string, enum: [MatchingRunGenerated,PairingsLocked,PairingsPublished,MatchResponseRecorded,MutualInterestEstablished,RevealConsentGranted,RevealConsentRevoked,MatchFeedbackSubmitted]}
+          schemaVersion: {type: integer, const: 1}
+          occurredAt: {type: string, format: date-time}
+          aggregateId: {type: string}
+          correlationId: {type: string}
+          causationId: {type: string}
+          actorId: {type: string}
+          payload: {type: object, description: Event-specific minimum-safe payload; never includes questionnaire answers, deal-breakers, blocks, or exact locations.}

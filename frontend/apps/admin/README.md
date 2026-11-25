@@ -1,36 +1,32 @@
-# Organizer and Moderation Application
+# Administrator UI Source
 
-This React and TanStack application will provide event management, participant operations, pairing review and overrides, payment-support views, moderation queues, and audited administration tools.
+The Registrations table lets administrators record cash or external card collection for eligible venue bookings and check in confirmed eligible members. The table shows persisted collection and check-in timestamps after refresh. Collection is a staff record of the booking's immutable price, not a PayHere transaction. Confirmed venue reservations have no cancellation option.
 
-## Planned feature areas
+Publishing an event opens a required `event-publication-v1` review. The administrator must confirm image rights, image-content moderation, and the event safety plan. Event Service rejects bypassed or incomplete approvals and retains the approving account, UTC time, and review version. Follow `docs/runbooks/event-publication-safety.md`.
 
-- Organizer event creation, lifecycle, pricing, policy, and capacity configuration.
-- Event-scoped participant/booking/attendance operations.
-- Matching-run generation, score/reason inspection, override, lock, and publication.
-- Safe unmatched/eligibility summaries without exposing private preferences.
-- Moderation report/case/action/appeal workflow according to role.
-- Restricted support/finance payment reconciliation views.
-- Role/configuration/audit views for administrators.
+Registration rows now show current `entryEligible` from Booking through GraphQL. A confirmed booking with a safety exclusion appears as **Entry blocked**; staff must refresh before admitting a member. Historical booking and payment records remain visible to authorized administrators.
 
-## Security boundaries
+Event manager has **Delete** for draft/cancelled events (published or open events must first be cancelled). Delete requests confirmation, then archives the record; it is removed from the normal list without erasing bookings. **Show deleted** displays archived cards and **Restore** returns one to the managed list. Restoring a cancelled event does not reopen registration. Event audit history is not stored.
 
-- UI hides unauthorized actions, but each backend service performs authoritative checks.
-- Organizer access is event-scoped; organizer is not a global moderator, finance user, or administrator.
-- Use least-privilege routes and APIs for moderator, support, finance, and admin roles.
-- Require reason/confirmation for overrides, cancellation, moderation, refund, reveal/safety, and other sensitive actions.
-- Avoid bulk export. Any approved export is minimized, audited, expiring, and documented.
-- Mask PII/payment/safety fields by default and audit privileged views where required.
-- Support strong reauthentication/MFA for privileged roles before production.
+The draft event editor now has an optional event-photo picker and preview. It accepts JPEG/PNG/WebP, compresses to a bounded JPEG, saves the draft, then uploads the image. If upload fails, the draft remains saved and can be reopened to retry. Images cannot be replaced after publication. Choose only artwork the project has rights and consent to publish.
 
-## Required tests
+The event draft editor lets an administrator choose pay at venue, PayHere online, or both. The setting is visible in managed events and becomes immutable after publication under the current draft-only edit API. New drafts default to pay at venue; older events stay online-only until deliberately edited while still drafts.
 
-- Full role and event-scope authorization matrix.
-- Sensitive field masking and absence from unauthorized responses/UI.
-- Stale version/conflict behavior for event and matching edits.
-- Pair override cannot bypass hard safety/eligibility constraints.
-- Moderation action/reversal/appeal and audit.
-- Payment review/refund permissions and confirmation.
-- Keyboard/accessibility and destructive-action confirmation.
+In Event manager, choose **View registrations** on an event card to see the admin-only, paginated booking list with member nickname/email, booking state, payment method, collection, check-in, and amount. Pending, expired, cancelled, and payment-review records remain distinguishable.
 
-Update this README, canonical docs, contracts, tests, and change history whenever behavior changes.
+The sidebar **Registrations** section is the main ledger across all events. Its event selector narrows the server query to one event, and previous/next load bounded pages. Event cards open this section with their event preselected. The list includes event name, booking reference, creation/confirmation times, payment method, venue collection, and check-in. It does not verify an external card settlement.
 
+This directory contains the existing administrator workspace components and styles. It is no longer a separately deployed or separately started application: `frontend/apps/web/src/routes/AdminPage.tsx` bundles this source into the unified frontend at `/admin`.
+
+Members and administrators share `http://localhost:5173/login`. The Account-issued role directs administrators to `/admin`. The web route guard, GraphQL BFF, Event Service, and Matchmaking Service all enforce administrator access; hiding navigation is never treated as authorization.
+
+Use the unified commands from the repository root:
+
+```powershell
+bun run dev
+bun run typecheck:web
+bun run test:web
+bun run build:web
+```
+
+Admin API operations share the web application's GraphQL client and `VITE_GRAPHQL_API_URL`, defaulting to `http://localhost:8080/graphql`. This directory intentionally has no Vite entry point, development server, or production build of its own. Do not reintroduce direct browser calls to Account, Event, or Matchmaking service ports.

@@ -8,16 +8,22 @@ import (
 
 	"github.com/gehan-malshan/matchmate/account-service/internal/auth"
 	"github.com/gehan-malshan/matchmate/account-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/account-service/internal/safety"
 	"github.com/gehan-malshan/matchmate/account-service/internal/store"
 )
 
 type fakeRepo struct {
 	store.Repository
-	credential   store.Credential
-	registered   domain.RegisterInput
-	passwordHash string
-	session      domain.Session
-	account      domain.Account
+	credential        store.Credential
+	registered        domain.RegisterInput
+	passwordHash      string
+	session           domain.Session
+	account           domain.Account
+	resetHash         []byte
+	resetPasswordHash string
+	resetUsed         bool
+	mfaCode           string
+	deactivated       bool
 }
 
 func (f *fakeRepo) Register(_ context.Context, in domain.RegisterInput, hash string, _ []byte, _ time.Time, _ domain.Event) (domain.Me, error) {
@@ -28,12 +34,43 @@ func (f *fakeRepo) Register(_ context.Context, in domain.RegisterInput, hash str
 func (f *fakeRepo) CredentialsByEmail(context.Context, string) (store.Credential, error) {
 	return f.credential, nil
 }
+func (f *fakeRepo) AccountByEmail(context.Context, string) (domain.Account, error) {
+	return f.account, nil
+}
 func (f *fakeRepo) CreateSession(_ context.Context, s domain.Session) error {
 	f.session = s
 	return nil
 }
+func (f *fakeRepo) RotateSession(_ context.Context, _ []byte, s domain.Session, _ time.Time) (domain.Account, error) {
+	f.session = s
+	return f.account, nil
+}
 func (f *fakeRepo) AccountByID(context.Context, string) (domain.Account, error) {
 	return f.account, nil
+}
+func (f *fakeRepo) AllowRate(context.Context, []byte, time.Time, int) (bool, error) { return true, nil }
+func (f *fakeRepo) CreatePasswordReset(_ context.Context, _ string, hash []byte, _ time.Time) error {
+	f.resetHash = hash
+	return nil
+}
+func (f *fakeRepo) ConsumePasswordReset(_ context.Context, hash []byte, passwordHash string, _ time.Time) error {
+	if f.resetUsed || string(hash) != string(f.resetHash) {
+		return store.ErrInvalidToken
+	}
+	f.resetUsed = true
+	f.resetPasswordHash = passwordHash
+	return nil
+}
+func (f *fakeRepo) VerifyAdminTOTP(_ context.Context, _ string, code string, _ time.Time, _ []byte) error {
+	f.mfaCode = code
+	if code != "123456" {
+		return store.ErrInvalidToken
+	}
+	return nil
+}
+func (f *fakeRepo) Deactivate(context.Context, string, domain.Event) error {
+	f.deactivated = true
+	return nil
 }
 
 func testService(t *testing.T, repo store.Repository) *Service {
@@ -45,6 +82,16 @@ func testService(t *testing.T, repo store.Repository) *Service {
 	s := New(repo, tokens, time.Minute, time.Hour, time.Hour, 18, "privacy-2026-08", true)
 	s.now = func() time.Time { return time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC) }
 	return s
+}
+func TestAdminMemberIdentityInputIsBounded(t *testing.T) {
+	s := testService(t, &fakeRepo{})
+	if _, err := s.AdminMemberIdentities(context.Background(), []string{"not-a-uuid"}); err == nil {
+		t.Fatal("expected invalid account ID")
+	}
+	ids := make([]string, 51)
+	if _, err := s.AdminMemberIdentities(context.Background(), ids); err == nil {
+		t.Fatal("expected batch limit")
+	}
 }
 func TestRegisterCreatesPrivatePendingProfileAndHash(t *testing.T) {
 	repo := &fakeRepo{}
@@ -83,5 +130,130 @@ func TestLoginRequiresVerificationThenCreatesRotatingSession(t *testing.T) {
 	}
 	if string(repo.session.TokenHash) == pair.RefreshToken {
 		t.Fatal("refresh token stored in plaintext")
+	}
+}
+
+type safetyStub struct {
+	decision safety.Decision
+	err      error
+}
+
+func (s *safetyStub) Check(context.Context, string, string) (safety.Decision, error) {
+	return s.decision, s.err
+}
+func TestSuspensionBlocksLoginAndAppealReversalRestoresIt(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	a := domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"member"}, TokenVersion: 1}
+	repo := &fakeRepo{account: a, credential: store.Credential{Account: a, PasswordHash: hash, TokenVersion: 1}}
+	svc := testService(t, repo)
+	guard := &safetyStub{decision: safety.Decision{Suspended: true}}
+	svc.now = func() time.Time { return time.Now().UTC() }
+	svc.SetSafety(guard)
+	pair, err := svc.Login(context.Background(), a.Email, "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("suspended member could not obtain appeal session: %v", err)
+	}
+	claims, err := svc.tokens.Parse(pair.AccessToken)
+	if err != nil || len(claims.Roles) != 1 || claims.Roles[0] != "appeal" {
+		t.Fatalf("suspended member obtained non-appeal privileges: %+v %v", claims, err)
+	}
+	if len(pair.Roles) != 1 || pair.Roles[0] != "appeal" {
+		t.Fatalf("login response exposed wrong roles: %+v", pair.Roles)
+	}
+	refreshed, err := svc.Refresh(context.Background(), pair.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "appeal" {
+		t.Fatalf("refresh did not preserve appeal restriction: %+v %v", refreshed.Roles, err)
+	}
+	if _, err := svc.LoginWithGoogle(context.Background(), a.Email); err == nil {
+		t.Fatal("Google bypassed suspension")
+	}
+	guard.decision.Suspended = false
+	refreshed, err = svc.Refresh(context.Background(), refreshed.RefreshToken)
+	if err != nil || len(refreshed.Roles) != 1 || refreshed.Roles[0] != "member" {
+		t.Fatalf("refresh did not restore member role after reversal: %+v %v", refreshed.Roles, err)
+	}
+	pair, err = svc.Login(context.Background(), a.Email, "correct horse battery staple")
+	if err != nil {
+		t.Fatalf("reversed action still blocks login: %v", err)
+	}
+	claims, err = svc.tokens.Parse(pair.AccessToken)
+	if err != nil || len(claims.Roles) != 1 || claims.Roles[0] != "member" {
+		t.Fatalf("reversal did not restore member role: %+v %v", claims, err)
+	}
+}
+
+func TestLoginWithGoogleRequiresExistingVerifiedActiveAccount(t *testing.T) {
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"member"}, TokenVersion: 1}}
+	s := testService(t, repo)
+	pair, err := s.LoginWithGoogle(context.Background(), " MEMBER@EXAMPLE.TEST ")
+	if err != nil || pair.AccessToken == "" || repo.session.AccountID != "a1" {
+		t.Fatalf("google login pair=%+v session=%+v err=%v", pair, repo.session, err)
+	}
+	repo.account.Verification = domain.VerificationPending
+	if _, err = s.LoginWithGoogle(context.Background(), "member@example.test"); err == nil {
+		t.Fatal("unverified account logged in with Google")
+	}
+}
+
+func TestRecoveryIsSingleUseAndDoesNotExposeAccountExistence(t *testing.T) {
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified}}
+	s := testService(t, repo)
+	var raw string
+	s.SetSecurityMailer(func(_ context.Context, email, purpose, token string) error {
+		if email != "member@example.test" || purpose != "reset" {
+			t.Fatal("unexpected delivery")
+		}
+		raw = token
+		return nil
+	})
+	if err := s.RequestPasswordReset(context.Background(), "member@example.test"); err != nil {
+		t.Fatal(err)
+	}
+	if raw == "" || string(repo.resetHash) == raw {
+		t.Fatal("reset token was not separated from hash")
+	}
+	if err := s.ResetPassword(context.Background(), raw, "new secure password here"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ResetPassword(context.Background(), raw, "new secure password here"); err == nil {
+		t.Fatal("reset replay accepted")
+	}
+	valid, err := auth.VerifyPassword("new secure password here", repo.resetPasswordHash)
+	if err != nil || !valid {
+		t.Fatal("new password not hashed")
+	}
+	repo.account = domain.Account{}
+}
+
+func TestAdminRequiresMFAAndGoogleCannotBypass(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	account := domain.Account{ID: "a1", Email: "admin@example.test", Status: domain.AccountActive, Verification: domain.VerificationVerified, Roles: []string{"admin"}, TokenVersion: 1}
+	repo := &fakeRepo{account: account, credential: store.Credential{Account: account, PasswordHash: hash, TokenVersion: 1}}
+	s := testService(t, repo)
+	s.SetAdminMFAKey(make([]byte, 32))
+	if _, err := s.Login(context.Background(), account.Email, "correct horse battery staple"); err == nil {
+		t.Fatal("admin logged in without MFA")
+	}
+	if _, err := s.Login(context.Background(), account.Email, "correct horse battery staple", "123456"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.LoginWithGoogle(context.Background(), account.Email); err == nil {
+		t.Fatal("Google bypassed admin MFA")
+	}
+}
+func TestDeletionRequiresPasswordAndRejectsAdmin(t *testing.T) {
+	hash, _ := auth.HashPassword("correct horse battery staple")
+	repo := &fakeRepo{account: domain.Account{ID: "a1", Email: "member@example.test", Status: domain.AccountActive, Roles: []string{"member"}}, credential: store.Credential{PasswordHash: hash}}
+	s := testService(t, repo)
+	if err := s.DeleteAccount(context.Background(), "a1", "wrong", "correlation"); err == nil || repo.deactivated {
+		t.Fatal("deletion accepted wrong password")
+	}
+	if err := s.DeleteAccount(context.Background(), "a1", "correct horse battery staple", "correlation"); err != nil || !repo.deactivated {
+		t.Fatal("verified deletion failed")
+	}
+	repo.deactivated = false
+	repo.account.Roles = []string{"admin"}
+	if err := s.DeleteAccount(context.Background(), "a1", "correct horse battery staple", "correlation"); err == nil || repo.deactivated {
+		t.Fatal("admin self-deletion accepted")
 	}
 }

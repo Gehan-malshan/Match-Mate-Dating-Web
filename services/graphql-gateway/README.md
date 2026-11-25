@@ -1,0 +1,66 @@
+# MatchMate GraphQL Gateway
+
+Administrator-only `collectVenuePayment` and `checkInBooking` forward idempotent commands to Booking. The gateway checks the admin role; Booking repeats authorization and eligibility. Booking and registration GraphQL types expose venue collection and check-in timestamps.
+
+Event publication accepts an optional `EventPublicationApprovalInput` only through the administrator mutation. The gateway forwards it to Event Service, which requires all `event-publication-v1` confirmations for `publish`; other lifecycle actions do not require the approval object.
+
+Appeal-only Account sessions return `roles: ["appeal"]` and no `me` from `login`/`refreshSession`. Owner-scoped `myModerationActions` and `appealModerationAction` forward bearer authorization to Moderation, which repeats subject and action ownership checks. Configure `MODERATION_API_URL` for this private service route.
+
+Administrator registration queries preserve Booking's current `entryEligible` value through the Account identity join. They do not infer admission from booking state alone.
+
+The Account security mutations `resendVerification`, `requestPasswordReset`, `resetPassword`, and `deleteMyAccount` route to Account's REST owner. `login` accepts an optional administrator TOTP code. The gateway never handles or stores the TOTP secret, verification token, or recovery token beyond a single request.
+
+Event `archivedAt`, `managedEvents(archived:)`, and admin-only `archiveEvent`/`restoreEvent` expose recoverable deletion. The gateway checks the admin role, and Event repeats authorization and lifecycle checks. Archive does not delete booking history. The Event service no longer stores an event audit trail.
+
+Event `imageVersion` is included in the GraphQL model. `uploadEventImage(eventId,imageBase64)` is admin-only and forwards to Event; media bytes are read through the narrow public `GET /media/events/{eventId}` route, not GraphQL lists. Draft bytes remain private because Event returns 404 until publication. See [ADR-0002](../../docs/adr/0002-event-image-storage.md).
+
+The GraphQL gateway is the single browser-facing Backend for Frontend. It exposes `POST /graphql` on port `8080`, maps typed operations to the existing Go service REST APIs, forwards Account-issued bearer tokens and rotating refresh cookies, and performs an additional administrator-role check on privileged event and matchmaking operations.
+
+It owns no database and no business state. Account, Event, Booking, Payment, Notification, Matchmaking, and Moderation remain authoritative for their domains. RabbitMQ communication is unchanged.
+
+The schema exposes Event `paymentOptions`, Booking `paymentMethod`, and optional `createBooking(paymentMethod:)`. The gateway forwards the choice; Event and Booking remain authoritative. Existing online-only clients can omit the argument.
+
+`eventRegistrations(eventId, limit, offset)` is administrator-only. It loads event-filtered bookings from Booking, then resolves a bounded page of nicknames and email addresses from Account's admin-only batch endpoint. Member-facing `bookings` remains scoped to the caller. GraphQL responses use `Cache-Control: no-store` because registrations contain personal data.
+
+`adminRegistrations(limit, offset)` uses the same protected join but pages bookings across all events. Both queries are bounded to 50 records per page; the admin frontend requests 25.
+
+## Run
+
+Normally run it with the complete stack:
+
+```powershell
+docker compose up --build -d
+```
+
+Health and development explorer:
+
+```text
+http://localhost:8080/health/live
+http://localhost:8080/
+http://localhost:8080/graphql
+```
+
+## Configuration
+
+```text
+GRAPHQL_HTTP_ADDRESS=:8080
+GRAPHQL_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+ACCOUNT_API_URL=http://account-api:8081/api/v1
+EVENT_API_URL=http://event-api:8082/api/v1
+MATCHMAKING_API_URL=http://matchmaking-api:8083/api/v1
+PAYMENT_API_URL=http://payment-api:8084/api/v1
+BOOKING_API_URL=http://booking-api:8085/api/v1
+NOTIFICATION_API_URL=http://notification-api:8086/api/v1
+```
+
+## Development
+
+```powershell
+go tool gqlgen generate
+go test ./...
+go vet ./...
+```
+
+Change `graph/schema.graphqls` first, regenerate, implement resolvers, update frontend operations, and add contract tests in the same change. Never log tokens, cookies, profile preferences, payment fields, or GraphQL variables containing private data.
+
+Production must disable the explorer, use TLS, exact origins, edge rate limiting, persisted/allow-listed operations where appropriate, bounded pagination, query depth/complexity protection, upstream circuit-breaking, and multiple stateless replicas.

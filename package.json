@@ -7,9 +7,16 @@
     "frontend/packages/*"
   ],
   "scripts": {
+    "dev": "bun run --cwd frontend/apps/web dev",
     "dev:web": "bun run --cwd frontend/apps/web dev",
     "build:web": "bun run --cwd frontend/apps/web build",
     "typecheck:web": "bun run --cwd frontend/apps/web typecheck",
-    "test:web": "bun run --cwd frontend/apps/web test"
+    "test:web": "bun run --cwd frontend/apps/web test",
+    "test:e2e:event": "playwright test tests/e2e/browser/event-administration.spec.ts",
+    "test:e2e:install": "playwright install chromium",
+    "graphql:generate": "cd services/graphql-gateway && go tool gqlgen generate"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
   }
 }

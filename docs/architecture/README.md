@@ -1,12 +1,24 @@
 # MatchMate System Architecture
 
+## Account security lifecycle
+
+Account owns one-time verification/recovery tokens, password and session revocation, administrator TOTP, and per-account security rate windows. Notification accepts transient security-message requests from Account over a separate internal token and delivers through SMTP; raw links are never RabbitMQ facts. GraphQL exposes the matching browser mutations. Account migration 2 revokes pre-MFA administrator sessions. Account deletion pseudonymizes email and erases Account-owned profile/credential data while retaining stable IDs for unresolved cross-service retention; see [ADR-0003](../adr/0003-account-security-lifecycle.md).
+
+Event media is an optional, Event-owned draft attachment. The administrator uploads through an authenticated GraphQL mutation; Event validates/re-encodes it and stores one bounded JPEG. Public pages fetch bytes through the gateway's narrow media GET only after publication. `imageVersion` keeps bytes out of catalogue GraphQL queries. This exception to GraphQL-only browser traffic is documented in [ADR-0002](../adr/0002-event-image-storage.md).
+
+Publication is an administrator-only safety boundary. The browser gathers `event-publication-v1` confirmations for image rights, prohibited-content review, and the event safety plan; GraphQL and Event Service both enforce administrator access, and Event persists approver/time/version before emitting `EventPublished`. Restricted evidence and venue contacts are not copied into Event facts or public DTOs. See [ADR-0007](../adr/0007-event-publication-approval.md).
+
+## Current event payment-choice slice
+
+The administrator sets `ONLINE`, `AT_VENUE`, or `BOTH` on a draft event. Event owns this policy; Booking validates the member's `ONLINE`/`AT_VENUE` choice against Event and snapshots it with price/currency. Online booking follows the existing expiring hold → PayHere callback → confirmed-seat path. Venue booking commits a confirmed seat immediately under the same atomic capacity constraint and emits `BookingConfirmed`; payment is **due at the entrance**. Staff can record cash or external card collection, then check in an eligible confirmed booking. That record is not PayHere settlement. Confirmed venue reservations cannot be cancelled. See [ADR-0001](../adr/0001-event-payment-choice.md) and [ADR-0006](../adr/0006-venue-collection-and-checkin.md). Production separation of Payment/Matchmaking services is still an open deployment task.
+
 This is the canonical architecture description for MatchMate. It must remain synchronized with implementation, OpenAPI, AsyncAPI, service READMEs, ADRs, migrations, tests, and runbooks.
 
 ## 1. Product purpose
 
 MatchMate is a privacy-first, community-driven blind-dating platform for Sri Lanka, initially focused on Colombo. Its purpose is to move relationship-minded adults from safe online discovery to curated real-world interaction instead of prolonged chatting or swiping.
 
-The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, organizer controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
+The platform supports verified member registration, limited-identity community profiles, private matching preferences, curated ticketed events, explainable rule-based pairings, protected administrator controls, structured responses, consent, feedback, blocking, reporting, moderation, and audit. The MVP provides no direct member chat and uses no machine learning.
 
 ## 2. Requirement and decision labels
 
@@ -22,13 +34,13 @@ Important open questions include exact age policy, verification method, gender/g
 |---|---|
 | Visitor | Public marketing and permitted event summaries; no community profiles |
 | Member | Account/profile/preferences, safe discovery, bookings, own matches/responses, feedback, block/report |
-| Organizer | Assigned events, participants, matching runs, overrides, locks, attendance, exceptions |
+| Organizer | Assigned existing-event lifecycle and attendance operations; no event creation or matchmaking-run access |
 | Moderator | Reports/content, safety actions, profile hiding, restrictions, suspension, appeals |
 | Support/Finance | Constrained support and reconciliation without broad profile access |
-| Administrator | Roles, configuration, rulesets, audit access, emergency controls |
+| Administrator | Event creation, matching runs/overrides/locks/publication, roles, configuration, rulesets, audit access, emergency controls |
 | Service account | Machine identity with only required integration scopes |
 
-Possession of a role never bypasses ownership, event scope, resource state, privacy policy, or audit requirements.
+Possession of a role never bypasses ownership, event scope, resource state, or privacy policy. Other services may retain domain-specific audit requirements; Event does not store a separate audit history.
 
 ## 4. Data visibility model
 
@@ -48,9 +60,11 @@ Public/community responses must use explicit field allow-lists. Never serialize 
 ```text
 Discover -> register/consent -> verify -> complete safe profile
 -> supply private preferences/questionnaire -> moderation/approval
--> community discovery -> discover event -> time-limited ticket hold
--> PayHere payment -> confirmed booking -> eligible matching pool
--> deterministic matching run -> organizer review/override/lock
+-> community discovery -> discover event -> choose allowed payment method
+-> [online: time-limited hold -> verified PayHere completion -> confirmed booking]
+   OR [venue: confirmed seat immediately -> ticket payment due at entrance]
+-> eligible matching pool when enabled and policy permits
+-> deterministic matching run -> administrator review/override/lock
 -> policy-limited pairing information -> attend event
 -> structured continue/switch/interest response
 -> consent-controlled reveal -> feedback/report/safety follow-up
@@ -61,9 +75,9 @@ At each sensitive step, revalidate account status, blocks, reports, event eligib
 ## 6. Logical architecture
 
 ```text
-Member Web                 Organizer/Admin Web
-     \                           /
-      +-- WAF / Load Balancer / API Gateway --+
+Unified role-aware Web (`/app/*`, `/admin/*`)
+                         |
+      +-- WAF / Load Balancer / GraphQL BFF --+
                            |
   +----------+---------+----------+---------+---------+----------+
   |          |         |          |         |         |          |
@@ -89,7 +103,8 @@ Telemetry -> centralized logs, metrics, and traces
 | Backend | Go; prefer `net/http` or `chi`, `pgx`, and `sqlc` unless an ADR changes it |
 | Persistence | PostgreSQL database/user per service; PostGIS for approved geographic discovery |
 | Messaging | RabbitMQ, durable queues, retry/DLQ, transactional outbox/inbox, AsyncAPI |
-| API | REST/JSON through canonical `/api/v1`; OpenAPI is authoritative |
+| Browser API | Schema-first GraphQL through `/graphql`; SDL is authoritative and queries have bounded complexity |
+| Service API | REST/JSON through canonical `/api/v1`; OpenAPI remains authoritative for internal service contracts |
 | Payment | PayHere adapter isolated in Payment Service |
 | Containers | OCI/Docker; Docker Compose for local integration |
 | Delivery | GitHub Actions, independent images, path-aware CI, staged deployment |
@@ -97,9 +112,9 @@ Telemetry -> centralized logs, metrics, and traces
 
 ## 8. Service boundaries
 
-### API Gateway
+### GraphQL Gateway / BFF
 
-Owns edge routing, TLS/WAF integration, request IDs, coarse authentication, throttling, CORS, request-size limits, and temporary aliases. It owns no business data and cannot replace service authorization.
+Owns the browser-facing schema, request IDs, coarse authentication/role checks, CORS, request-size and query-complexity limits, and orchestration of narrow service calls. It owns no business data, has no database, and cannot replace service authorization. Domain services keep their REST contracts and independently validate identity, ownership, state, and role.
 
 ### Account/Profile Service
 
@@ -107,31 +122,43 @@ Owns identity, credentials, verification, roles, sessions, lifecycle, community 
 
 ### Event Service
 
-Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity.
+Owns event catalog/lifecycle, organizer assignment, venue, schedule, price, registration window, configured capacity/policy, and discovery. It owns configured limits but not consumed capacity. The Event service does not store a separate audit history; its outbox remains for cross-service event delivery.
 
 ### Booking Service
 
 Owns ticket holds, bookings, consumed capacity, allocation categories where approved, expiry, cancellation, attendance, and check-in. It is authoritative for confirmed event participation and stores the immutable price/currency snapshot.
 
+The first executable slice implements Event-derived immutable pricing, atomic capacity holds, owner-authorized Payment snapshots, expiry, Payment completion inbox consumption, late-payment review, and outbox publication. Cancellation, waitlist, attendance, and full policy integration remain incomplete.
+
 ### Payment Service
 
-Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, refunds, and payment audit. It never trusts client amount/currency and never allocates capacity.
+Owns PayHere initiation, provider orders, state, callback fingerprints, verification, reconciliation, and payment audit. The current policy offers no refunds. It never trusts client amount/currency and never allocates capacity.
+
+The executable slice implements initiation, callback verification/replay evidence, member status, Booking completion consumption, audit, transactional outbox and publisher-confirmed RabbitMQ relay. It now rejects invalid callbacks before state change, serializes booking checkout initiation, flags contradictory signed results for manual review, and exposes an administrator-only, read-only reconciliation queue. The scheduled worker opens pending-result items after 30 minutes. The approved product direction is no automatic refunds; provider retrieval/automatic resolution and production PayHere evidence remain incomplete. Review items require finance investigation, including late success and chargebacks.
 
 ### Matchmaking Service
 
-Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, organizer overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
+Owns participant snapshots, eligibility, component scores, weighted total, optimizer, runs, suggestions, administrator overrides, locks, responses, reveal consent, and feedback. It does not own source profiles or booking/payment state.
+
+The current executable prototype uses Matchmaking-owned deterministic fixtures to simulate future consumed Account/Event/Booking/Moderation facts. It validates Account-issued ES256 tokens, stores data in its independent PostgreSQL database, and exposes an administrator-only run lifecycle plus participant-scoped published results. Production integration will replace fixture projection writes with inbox-deduplicated events without changing ownership.
 
 ### Notification Service
 
 Owns templates, delivery requests/attempts, provider results, retries, suppression, and channel preferences. It normally consumes facts outside the critical transaction path.
 
+The executable slice consumes minimum-safe Account and Booking facts containing a recipient account ID, deduplicates each fact in a service-owned PostgreSQL inbox, selects versioned `en-LK` templates, applies account suppression/preferences, and records leased delivery attempts with retry/dead-letter state. Each non-suppressed delivery also creates an independently readable member-feed item. The JWT-protected API derives ownership from the Account token subject and exposes only rendered safe template text, category, time, read state, and an allow-listed application path. Local development uses a no-contact provider sink. Production email/SMS/push delivery is disabled until channel policy, an approved provider, credentials, and a constrained authenticated Account contact-resolution contract are accepted; destinations are not added to RabbitMQ facts.
+
 ### Moderation/Safety Service
 
 Owns reports, cases, evidence references, risk classification, enforcement, appeals, and restricted audit. It may start as an isolated module, but the boundary must permit later extraction.
 
+Moderation owns PostgreSQL-backed reports/cases/reference-only evidence/actions/appeals/audit, validates Account ES256 tokens, exposes owner-safe action IDs and moderator/admin operations, expires due actions, and publishes minimum-safe facts through a transactional outbox. It never reads another service database. Account, Booking, Matchmaking, and Notification use an authenticated, uncached safety REST read for immediate decisions; see [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). A suspension limits password sign-in to an appeal-only role. The GraphQL gateway forwards owner action listing and appeal submission; the browser renders a restricted `/appeal` route. Restriction checks are repeated near critical writes. Cross-service atomic admission, paid-booking resolution, moderator browser UI, and production load/outage evidence remain open.
+
 ## 9. Communication model
 
-Use synchronous REST when an immediate result is required or a narrow validation protects an invariant. Avoid long synchronous chains. Use RabbitMQ for completed facts, projections, notifications, matching-pool updates, deactivation propagation, and payment-to-booking confirmation.
+The browser uses GraphQL queries and mutations when an immediate result is required. The GraphQL BFF maps those operations to narrow synchronous REST calls owned by the domain services. Avoid long synchronous chains and N+1 resolver calls. Use RabbitMQ for completed facts, projections, notifications, matching-pool updates, deactivation propagation, and payment-to-booking confirmation.
+
+GraphQL is a client-contract and aggregation decision, not a capacity strategy. Supporting 10,000+ registered users still requires cursor pagination, bounded selections, query complexity/depth controls, rate limits, stateless gateway replicas, service connection pools, indexed PostgreSQL access, load tests, and horizontal scaling based on observed traffic.
 
 Canonical event envelope:
 
@@ -153,6 +180,10 @@ Producers persist business state and outbox in one transaction. Consumers persis
 
 ## 10. Core API map
 
+The browser calls one endpoint, `POST /graphql`. Representative operations are `login`, `me`, `events`, `bookings`, `initiatePayment`, `notifications`, `managedEvents`, and the administrator-only matching-run mutations. The complete contract is `services/graphql-gateway/graph/schema.graphqls`.
+
+The following REST map remains the internal service contract used by the GraphQL BFF and non-browser integrations.
+
 OpenAPI becomes authoritative when specifications exist.
 
 | Method | Endpoint | Owner | Purpose |
@@ -166,15 +197,20 @@ OpenAPI becomes authoritative when specifications exist.
 | POST | `/api/v1/blocks` | Account | Block member |
 | GET/POST | `/api/v1/events` | Event | Discover/create events |
 | GET/PATCH | `/api/v1/events/{eventId}` | Event | Read/update event |
-| POST | `/api/v1/bookings` | Booking | Create hold |
+| POST | `/api/v1/bookings` | Booking | Create online hold or confirmed venue reservation |
 | GET | `/api/v1/bookings/{bookingId}` | Booking | Read authorized booking |
-| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel/request cancellation |
+| POST | `/api/v1/bookings/{bookingId}/cancel` | Booking | Cancel an unpaid online hold only |
+| POST | `/api/v1/admin/bookings/{bookingId}/venue-collection` | Booking | Record administrator venue collection |
+| POST | `/api/v1/admin/bookings/{bookingId}/check-in` | Booking | Check in eligible confirmed booking |
 | POST | `/api/v1/payments/initiate` | Payment | Start PayHere from booking ID |
 | POST | `/api/v1/payments/payhere/callback` | Payment | Provider callback |
 | GET/POST | `/api/v1/events/{eventId}/matching-runs` | Matchmaking | List/generate runs |
 | POST | `/api/v1/matching-runs/{runId}/lock` | Matchmaking | Lock reviewed run |
 | POST | `/api/v1/matches/{matchId}/response` | Matchmaking | Structured response |
 | POST | `/api/v1/matches/{matchId}/reveal-consent` | Matchmaking | Record consent |
+| GET | `/api/v1/notifications` | Notification | List own in-app notifications |
+| PATCH | `/api/v1/notifications/{notificationId}/read` | Notification | Mark an owned notification read |
+| POST | `/api/v1/notifications/read-all` | Notification | Mark all own notifications read |
 | POST | `/api/v1/reports` | Moderation | Report behavior/content |
 
 Self-service uses authenticated subject identity. Caller-provided account IDs are not trusted.
@@ -196,7 +232,7 @@ Self-service uses authenticated subject identity. Caller-provided account IDs ar
 | `MatchResponseRecorded` / `RevealConsentGranted` | Matchmaking | Notification, analytics, moderation as needed |
 | `ReportCreated` / `ModerationActionApplied` | Moderation | Account, Matchmaking, Notification |
 
-Events contain only minimum identifiers and safe fields.
+Events contain only minimum identifiers and safe fields. Notification currently binds only supported Account/Booking routing keys with a safe recipient account ID; Event/Payment/Matchmaking/Moderation recipient expansion requires an explicit minimum-safe contract or projection.
 
 ## 12. State models
 
@@ -218,6 +254,8 @@ Moderation: OPEN -> TRIAGED -> INVESTIGATING -> ACTIONED | DISMISSED
 ```
 
 ## 13. Booking and PayHere flow
+
+For `AT_VENUE`, Booking checks the Event option, uses the same atomic capacity guard, writes a confirmed booking with immutable price/method snapshot and a `BookingConfirmed` outbox fact in one transaction. No PayHere order or expiring hold is created. This is **not** a paid ticket. The flow below applies only to `ONLINE` bookings.
 
 ```text
 Member -> Booking: create hold with Idempotency-Key
@@ -249,7 +287,7 @@ The complete specification is [`../matchmaking/README.md`](../matchmaking/README
 
 ```text
 Confirmed participants -> hard filters -> component scores -> weighted total
--> event-wide optimizer -> organizer review/override -> immutable lock
+-> event-wide optimizer -> administrator review/override -> immutable lock
 -> responses -> consent-controlled reveal -> feedback
 ```
 
@@ -273,6 +311,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 - Validate/scan profile text and media; quarantine contact information or unsafe content.
 - Provide block/report from profile and match surfaces.
 - A block applies to discovery, eligibility, pairing, reveal, and relevant notifications.
+- Notification APIs derive the recipient from the authenticated subject, conceal other-member item identifiers, and never expose provider destinations, delivery errors, private preferences, or moderation evidence.
 - Moderators can hide profiles, suspend accounts, exclude participation, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is not shown to the reported member.
 - Admin/organizer actions store actor, target, reason, prior/new state, time, and correlation ID.
@@ -280,7 +319,7 @@ See [`../data/README.md`](../data/README.md). Strong consistency is required ins
 
 ## 18. Observability and planning SLOs
 
-Every service emits sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, OpenTelemetry traces, and separate business audit records.
+Services emit sanitized structured logs, rate/error/latency/saturation metrics, database and broker signals, domain metrics, and OpenTelemetry traces. Domain-specific business audit records remain in services that require them; Event does not retain a separate audit history.
 
 Planning targets requiring approval:
 

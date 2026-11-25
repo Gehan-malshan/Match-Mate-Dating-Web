@@ -1,0 +1,32 @@
+asyncapi: 3.0.0
+info: {title: MatchMate Moderation Enforcement Facts, version: 1.0.0}
+channels:
+  moderationFacts:
+    address: matchmate.events
+    messages:
+      enforcement: {$ref: '#/components/messages/ModerationFact'}
+operations:
+  publishModerationFacts:
+    action: send
+    channel: {$ref: '#/channels/moderationFacts'}
+    summary: Moderation publishes transactional minimum-safe facts using moderation.<eventType> routing keys.
+components:
+  messages:
+    ModerationFact:
+      payload:
+        type: object
+        additionalProperties: false
+        required: [eventId,eventType,schemaVersion,occurredAt,aggregateId,correlationId,causationId,actorId,payload]
+        properties:
+          eventId: {type: string, format: uuid}
+          eventType: {type: string, enum: [ReportSubmitted,ModerationCaseDismissed,ModerationActionApplied,ModerationActionExpired,ModerationActionReversed,AppealSubmitted,AppealUpheld]}
+          schemaVersion: {type: integer, const: 1}
+          occurredAt: {type: string, format: date-time}
+          aggregateId: {type: string, format: uuid}
+          correlationId: {type: string}
+          causationId: {type: string}
+          actorId: {type: string}
+          payload:
+            type: object
+            description: Minimum-safe payload. Enforcement facts include targetId, targetType, actionClass, scope, version, and effective state; no reporter identity, evidence, description, or private notes.
+            additionalProperties: true

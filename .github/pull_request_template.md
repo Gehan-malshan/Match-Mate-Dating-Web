@@ -33,7 +33,7 @@ Describe the user or operational outcome, not only the files changed.
 - [ ] OpenAPI updated when REST behavior changed
 - [ ] AsyncAPI updated when event behavior changed
 - [ ] ADR added or updated for a significant decision
-- [ ] `docs/change-management/CHANGELOG.md` includes complete before/after details
+- [ ] The **Before and after** section above records the complete observable change; no shared `CHANGELOG.md` is used
 
 ## Data and compatibility
 
@@ -48,4 +48,3 @@ Describe the user or operational outcome, not only the files changed.
 - [ ] Logging and metrics do not expose sensitive data
 - [ ] Architecture invariants in `AGENTS.md` remain satisfied
 - [ ] Reviewer can understand the complete change from this PR and repository documentation alone
-

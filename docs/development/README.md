@@ -1,6 +1,8 @@
 # MatchMate Developer Workstation Setup
 
-This is the canonical setup guide for developers and coding agents working in Visual Studio Code. It describes the current documentation-only repository and the toolchain that will be used as Go services, React applications, contracts, and Docker infrastructure are introduced.
+Account security integration: the root ignored `.env` can enable SMTP verification/recovery links with `NOTIFICATION_PROVIDER=smtp`, provider credentials, `SECURITY_MAIL_TOKEN`, and `SECURITY_PUBLIC_URL`. Set `ADMIN_MFA_ENCRYPTION_KEY` to test administrator TOTP, then enroll/confirm through the Account container as shown in `docs/runbooks/account-security.md`. The default development sink discards security emails. The account migration job now applies versions 1 and 2 idempotently.
+
+This is the canonical setup guide for developers and coding agents working in Visual Studio Code. The repository now contains executable frontend, Account/Profile, Event, Matchmaking, Booking, Payment, Notification, and initial Moderation slices.
 
 ## 1. Supported development model
 
@@ -183,6 +185,7 @@ The root Bun workspace groups all frontend applications and frontend-only packag
 ```text
 frontend/apps/web
 frontend/apps/admin
+frontend/packages/graphql-client
 frontend/packages/ui
 frontend/packages/validation
 frontend/packages/telemetry
@@ -204,19 +207,25 @@ The root `package.json` defines npm-compatible workspaces:
 
 The only frontend lockfile is `bun.lock`. Do not add `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `package-lock.json`, or `yarn.lock`.
 
-Install and verify the implemented member application from the repository root:
+Install and verify the implemented frontend workspace from the repository root:
 
 ```powershell
 bun install --frozen-lockfile
 bun run typecheck:web
 bun run test:web
 bun run build:web
+bun run dev
+```
+
+`bun run dev` starts one role-aware application on `http://localhost:5173`. Use the shared login; administrators are routed to protected `/admin`. GraphQL runs at `http://localhost:8080/graphql` when the Docker stack is up. The direct web command remains available:
+
+```powershell
 bun run dev:web
 ```
 
 Only run commands actually defined in the checked-in root `package.json`. ESLint, Prettier, TypeScript, Vite, test tools, and related packages must be local pinned development dependencies; do not rely on global installations.
 
-Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. An admin command will be added only when `frontend/apps/admin` becomes executable. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
+Use Bun to run Vite rather than replacing Vite's plugin-based build configuration. The checked-in root scripts are authoritative. TypeScript type checking remains separate from Bun's TypeScript transpilation.
 
 ## 11. Docker and local dependencies
 
@@ -229,7 +238,15 @@ docker compose ps
 docker compose logs --tail 100
 ```
 
-Planned local containers include PostgreSQL databases, RabbitMQ, optional Redis, gateway, Go services, and web applications.
+Current local containers include independent PostgreSQL databases for all executable services, RabbitMQ, Go APIs/workers, and migration jobs. Notification uses PostgreSQL `5438` and API `8086`. Moderation uses PostgreSQL `5439`, API `8087`, Account JWKS validation, an outbox relay, and an expiry worker. Optional Redis, gateway, real email providers, downstream moderation consumers, and orchestration remain later work.
+
+The current Event database and migration can be started independently with:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml up -d --build
+```
+
+See `services/event-service/README.md` for JWT public-key configuration, tests, and health checks.
 
 Use named development volumes and fictional seed data. Never mount or import production data. Do not delete shared volumes or databases unless the target and recovery effect are understood.
 

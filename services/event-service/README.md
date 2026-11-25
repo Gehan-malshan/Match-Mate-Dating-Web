@@ -1,6 +1,12 @@
 # Event Service
 
+Migration 4 adds a recoverable event archive (`archived_at`). Admin-only `POST /events/{eventId}/archive` implements the UI's Delete button; it requires an expected version and accepts only drafts or cancelled events. `POST /events/{eventId}/restore` returns the event to the managed list but does not undo cancellation. Archive/restore emit outbox facts. Event and booking rows are not hard-deleted. Migration 5 removes the Event audit table, including any existing records. `GET /organizer/events` excludes archived records by default; administrators may use `?archived=true` to review deleted events. See [ADR-0003](../../docs/adr/0003-event-recoverable-delete.md).
+
+Admin draft images are owned by Event: migration 3 adds an `image_version` counter and a bounded JPEG `event_image` table. `PUT /api/v1/events/{eventId}/image` accepts a validated base64 JPEG from an admin while the event is a draft and re-encodes it to strip metadata. `GET` on that path serves bytes only after publication. Images are optional; existing events retain stock artwork. Migration 6 records the administrator, UTC time, and `event-publication-v1` review version. Publication requires image-rights, image-moderation, and event-safety confirmations at both GraphQL and Event Service boundaries. See [ADR-0002](../../docs/adr/0002-event-image-storage.md), [ADR-0007](../../docs/adr/0007-event-publication-approval.md), and the [publication runbook](../../docs/runbooks/event-publication-safety.md).
+
 Owns the event catalog, organizer ownership, event lifecycle, venue, schedule, ticket price, configured capacity, registration windows, and event discovery.
+
+Event drafts now choose `paymentOptions`: `AT_VENUE`, `ONLINE`, or `BOTH`. Existing events and omitted API fields default to `ONLINE`; administrators choose the value in the event editor before publication. Published events cannot be edited by the current API. Public discovery includes the option but never exact venue details. Event does not track whether an individual ticket has been paid. Migration 2 adds the constrained option column with a legacy-online default.
 
 The Booking Service remains authoritative for consumed capacity and active ticket holds.
 
@@ -16,7 +22,7 @@ The Booking Service remains authoritative for consumed capacity and active ticke
 
 Consumed seats, ticket holds, confirmed bookings, payments, matching results, notification delivery, or account profiles.
 
-## Proposed API
+## Implemented API
 
 ```text
 GET    /api/v1/events
@@ -27,15 +33,15 @@ POST   /api/v1/events/{eventId}/publish
 POST   /api/v1/events/{eventId}/open-registration
 POST   /api/v1/events/{eventId}/close-registration
 POST   /api/v1/events/{eventId}/cancel
-PUT    /api/v1/events/{eventId}/capacity-policy
-PUT    /api/v1/events/{eventId}/matching-policy
+POST   /api/v1/events/{eventId}/archive
+POST   /api/v1/events/{eventId}/restore
 ```
 
-Mutations require assigned organizer/admin scope, optimistic concurrency, reason/audit where appropriate, and valid state transitions.
+Draft creation requires the `admin` role. Existing-event updates and lifecycle transitions retain assigned-organizer/admin scope, optimistic concurrency, and valid state transitions.
 
-## Proposed data
+## Implemented data
 
-`event`, `event_location`, `event_capacity_policy`, `event_matching_policy`, and `outbox`.
+The first migration creates `event` and `outbox`; migration 3 adds `event_image`. Migration 5 drops `event_audit` on existing databases. Location, capacity policy, and matching policy are versioned on the event aggregate for this first slice; separate policy history tables are deferred until published-policy replacement and Booking validation are implemented.
 
 Key invariants:
 
@@ -62,7 +68,7 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 ## Required tests
 
 - All lifecycle transitions and invalid transitions.
-- Organizer/admin scope and unrelated organizer denial.
+- Administrator-only creation, assigned organizer/admin update scope, and unrelated organizer denial.
 - Optimistic concurrency/stale update.
 - Date/time-zone/registration boundaries.
 - Decimal price/currency and policy versioning.
@@ -72,7 +78,88 @@ May consume safe booking allocation facts for a non-authoritative discovery proj
 
 ## Completion criteria
 
-An organizer can manage an event through approved states and a member can discover only eligible published events. Configuration is versioned, authorized, auditable, observable, and safe for Booking/Matchmaking consumers.
+An administrator can create an event, an assigned organizer or administrator can manage approved later states, and a member can discover only eligible published events. Configuration is versioned, authorized, observable, and safe for Booking/Matchmaking consumers. The Event service does not maintain an audit history.
 
-Update this README, architecture/data docs, contracts, tests, and change history whenever behavior changes.
+Update this README, architecture/data docs, contracts, and tests whenever behavior changes. Record the before/after impact in the pull request; this repository deliberately does not maintain a merge-prone shared change-log file.
 
+## Current implementation boundary
+
+The executable Go service uses `net/http`, `pgx`, and a service-owned PostgreSQL database. Administrator-only draft creation, draft replacement, assigned-organizer listing, publish, open registration, close registration, cancellation, public discovery, and public detail are implemented. Every update uses `expectedVersion`; stale writes return `EVENT_VERSION_CONFLICT`. Mutation authorization validates an ES256 access token using Account Service JWK discovery or a configured static public key. Creation requires `admin`; later updates remain limited to the assigned organizer or an administrator. Lifecycle changes create transactional outbox records, not Event audit records. `cmd/outbox-relay` claims unpublished records safely, publishes persistent messages with RabbitMQ publisher confirms, and marks them published only after acknowledgement.
+
+Discovery intentionally omits organizer IDs and the exact venue name. It returns only future events in `PUBLISHED`, `REGISTRATION_OPEN`, or `REGISTRATION_CLOSED` state. Configured capacity is a catalog value and is not an availability promise; Booking remains authoritative for holds and consumed seats.
+
+The protected administrator UI is in `frontend/apps/admin`; member discovery/detail is in `frontend/apps/web`. A real-PostgreSQL component suite is available when `EVENT_TEST_DATABASE_URL` is set. `tests/e2e/event-service-smoke.ps1` verifies the authenticated API path, while `tests/e2e/browser/event-administration.spec.ts` covers the actual admin browser journey for create, image upload, review-gated publish, cancel, delete/restore, and registration view.
+
+Still open for Phase 2: separate policy history/replacement endpoints, Booking validation before capacity reduction, later lifecycle states, production gateway integration, RabbitMQ failure/DLQ tests, object-storage scaling, and production operational evidence. The service is not production complete until these items are resolved.
+
+## Beginner verification
+
+Run the fast tests from this directory:
+
+```powershell
+go test ./...
+go vet ./...
+```
+
+Start the complete local baseline (Account/Profile, Event, their databases, and four shared development events) from the repository root:
+
+```powershell
+docker compose up --build -d
+```
+
+`event-seed` runs only with `APP_ENV=development`, after migrations. It inserts or refreshes four fixed-ID upcoming catalogue fixtures so all developers see the same event names and fields; it never runs in a production topology and does not create bookings or payments.
+
+For the Event stack alone:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml up -d --build
+$env:DATABASE_URL='postgres://matchmate:matchmate@localhost:5434/matchmate_event?sslmode=disable'
+go run ./services/event-service/cmd/migrate
+```
+
+By default, the API loads Account Service signing keys from `http://localhost:8081/.well-known/jwks.json`. Start Account Service before testing organizer commands. A deployment may instead inject a matching static public key through `JWT_PUBLIC_KEY_PEM`.
+
+```powershell
+$env:HTTP_ADDRESS=':8082'
+$env:JWT_ISSUER='matchmate-account'
+$env:JWT_AUDIENCE='matchmate-api'
+$env:ACCOUNT_JWKS_URL='http://localhost:8081/.well-known/jwks.json'
+go run ./services/event-service/cmd/api
+```
+
+These checks need no token:
+
+```powershell
+Invoke-RestMethod http://localhost:8082/health/live
+Invoke-RestMethod http://localhost:8082/health/ready
+Invoke-RestMethod 'http://localhost:8082/api/v1/events?limit=10'
+```
+
+Use `contracts/openapi/event-v1.yaml` for request bodies. Organizer commands require `Authorization: Bearer <access-token>`; never add a local authentication bypass.
+
+After Account and Event APIs are running, execute the safe development smoke test from the repository root:
+
+```powershell
+./tests/e2e/event-service-smoke.ps1
+```
+
+The smoke test checks both `/health/ready` endpoints first and stops with a startup hint when either API or its PostgreSQL dependency is unavailable.
+
+When your terminal is already inside `services/event-service`, the equivalent convenience command is:
+
+```powershell
+./tests/e2e/event-service-smoke.ps1
+```
+
+To run the real-PostgreSQL component suite against the local Event database:
+
+```powershell
+$env:EVENT_TEST_DATABASE_URL='postgres://matchmate:matchmate@localhost:5434/matchmate_event?sslmode=disable'
+go test ./services/event-service/internal/store/postgres -count=1
+```
+
+Start the relay after the Account development Compose stack has started RabbitMQ:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml --profile messaging up -d --build event-outbox-relay
+```

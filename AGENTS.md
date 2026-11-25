@@ -42,7 +42,7 @@ Do not start implementation from a ticket title alone.
 - Each service owns its domain logic, PostgreSQL database, migrations, credentials, backups, and operational signals.
 - A service must never read, join, or write another service's database.
 - Cross-service identifiers are scalar IDs, not cross-database foreign keys.
-- REST/JSON is used for immediate commands and queries; RabbitMQ events propagate completed business facts.
+- The browser uses the typed GraphQL gateway for immediate commands and queries. The gateway calls service-owned REST/JSON APIs; RabbitMQ events propagate completed business facts.
 - Critical dual writes use a transactional outbox; consumers use inbox deduplication and idempotent state transitions.
 - Business entities and database models are not shared across services.
 - Shared packages are limited to frontend UI, contract helpers, telemetry, and other technical concerns.
@@ -73,7 +73,7 @@ Documentation must describe the implemented result, not an intended result that 
 
 | Change type | Required updates |
 |---|---|
-| REST endpoint or DTO | OpenAPI, API guide, service README, contract tests, change log |
+| GraphQL or REST endpoint/DTO | GraphQL SDL or OpenAPI, API guide, service README, contract tests, change log |
 | RabbitMQ event | AsyncAPI, producer and consumer READMEs, compatibility tests, replay/retention notes, change log |
 | Database schema | Service migrations, data guide, rollback/forward plan, migration tests, change log |
 | Service boundary or ownership | Architecture guide, data guide, ADR, affected READMEs, change log |
@@ -87,7 +87,7 @@ Documentation must describe the implemented result, not an intended result that 
 
 ## 6. Contract and compatibility rules
 
-- Use `/api/v1` as the canonical public base path.
+- Use `/graphql` as the browser-facing endpoint and `/api/v1` as the canonical internal service base path.
 - Use `application/problem+json` with stable error codes and a `traceId`.
 - Use UTC ISO-8601 timestamps and decimal money with an explicit ISO 4217 currency.
 - Require `Idempotency-Key` for booking, payment initiation, cancellation, refund, and other non-repeatable commands.

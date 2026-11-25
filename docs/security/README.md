@@ -1,6 +1,10 @@
 # MatchMate Security, Privacy, and Safety Baseline
 
+Account security now includes production-gated administrator TOTP, Google-admin sign-in denial when MFA is enabled, hashed one-use recovery tokens, session revocation on reset, PostgreSQL-backed login/discovery rate windows, transient SMTP security links, and overlapping JWT public keys. The member delete command requires password reauthentication and erases Account-owned personal fields. Production still needs edge/WAF limits, SMTP delivery and abuse monitoring, MFA recovery/key-rotation policy, and a cross-service retention/deletion decision. See [ADR-0003](../adr/0003-account-security-lifecycle.md) and [runbook](../runbooks/account-security.md).
+
 This baseline applies to every application, service, worker, contract, database, event, log, deployment, and operator workflow. Security and privacy controls are acceptance criteria, not post-launch enhancements.
+
+Moderation actions now have an authenticated private current-state read at Account login/discovery, Booking admission/payment snapshot and admin entry eligibility, Matchmaking generation/lock/publication/reveal, and Notification send/feed. The response exposes only effective booleans. Sensitive operations fail closed during a Moderation outage. Suspended members receive an `appeal`-role token after password verification so they can list their own active action IDs and appeal through Moderation; the role is denied at ordinary Account and Booking endpoints. See [ADR-0005](../adr/0005-authoritative-moderation-safety-reads.md). No cross-database atomicity is claimed for an action committed after a final safety read.
 
 ## 1. Primary assets
 
@@ -31,11 +35,12 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Hash passwords with approved Argon2id or bcrypt parameters and unique salts.
 - Short-lived RS256/ES256 access tokens; publish JWKs and support overlapping key rotation.
 - Rotating refresh sessions stored as non-reusable hashes; detect reuse and revoke family.
+- Each frontend deduplicates concurrent refresh attempts into one in-flight request; one browser context must never submit the same rotating token concurrently.
 - Validate issuer, audience, signature, expiry, issued/not-before times, and token version.
 - Revoke sessions on password reset, deactivation, serious moderation action, and suspected compromise.
 - Rate-limit registration, login, refresh, verification, password reset, and email-availability behavior.
 - Reduce account enumeration through consistent responses/timing where practical.
-- Multi-factor authentication is strongly recommended for organizer, moderator, finance, support, and admin roles before production.
+- Multi-factor authentication is strongly recommended for organizer, moderator, finance, support, and admin roles before production; it is mandatory policy work for event-creation and matchmaking administrators.
 
 ## 4. Authorization baseline
 
@@ -56,8 +61,14 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Private preferences may produce generalized explanation reasons but not reveal exact answers.
 - Blocks apply to discovery, eligibility, pairing, reveal, and relevant notifications.
 - Consent purpose/version/time is stored for reveal and other sensitive processing.
+- Event discovery exposes broad location and approved catalog fields only; assigned organizer identifiers and exact venue names remain operational fields. Event mutations validate the Account-issued ES256 token again inside Event Service. Creation requires `admin`; existing-event changes enforce assigned-organizer/admin scope.
+- Matching-run listing, generation, review, override, lock, and publication require `admin` inside Matchmaking Service. Organizer accounts are denied even if the frontend is bypassed. Member match actions remain pairing-participant scoped.
 
 ## 6. Payment controls
+
+Booking now derives price/currency from Event, stores the immutable snapshot, and exposes it only after Account-token verification and subject ownership checks. Capacity updates, Payment inbox insertion, confirmation, and Booking outbox facts use local transactions. Late payment never recreates released capacity.
+
+The Payment slice validates Account-issued ES256 tokens for member operations, forwards the token to Booking's constrained snapshot check, compares ownership locally, rejects invalid or ambiguous PayHere callbacks before payment state changes, fingerprints verified callback receipts, and omits account/provider identifiers from member DTOs. The read-only, cursor-paged discrepancy queue requires the administrator role; it contains no recipient contact or card data. Live configuration rejects local or non-HTTPS PayHere return/cancel/notify URLs. Gateway/WAF callback rate limits and production secret-manager wiring remain deployment requirements.
 
 - Payment Service derives amount/currency from immutable Booking snapshot.
 - Verify PayHere signature plus merchant, order, amount, currency, booking relation, and state.
@@ -67,6 +78,18 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Reconcile pending, duplicate, mismatch, late, refund, and unknown outcomes.
 - Separate finance/support scopes and audit all manual decisions.
 
+### Notification controls
+
+- Notification consumes only explicitly bound minimum-safe facts and stores recipient account IDs, not email/phone destinations from events.
+- Template variables are allow-listed; unknown variables and unsafe multiline subjects fail before provider delivery.
+- Account deactivation creates suppression and stops pending/retry deliveries.
+- Inbox and business-key uniqueness make duplicate broker delivery safe.
+- Member feed endpoints validate Account-issued ES256 issuer/audience/expiry, derive ownership from `sub`, accept no caller-selected recipient, and return not found for absent or other-member item IDs.
+- Member DTOs expose only safe rendered template text, category, time, read state, and allow-listed application paths; provider references/errors and source payloads remain private.
+- The development sink logs no recipient destination or rendered message body and is rejected outside development/test.
+- Exact-origin CORS permits the member application in local development. Production edge rate limits and TLS remain deployment requirements.
+- Production email delivery requires an approved provider, credentials from a secret manager, authenticated constrained Account contact resolution, provider idempotency, timeout/rate controls, preference/legal-category policy, and sanitized provider errors.
+
 ## 7. Application and upload security
 
 - Validate at trust boundaries with size, type, range, enum, and semantic checks.
@@ -74,6 +97,7 @@ Maintain a structured threat model with trust boundaries and mitigations as impl
 - Escape/sanitize displayed text; define approved rich-content policy or use plain text.
 - Protect against SSRF by blocking arbitrary server-side URL fetches and validating provider destinations.
 - Upload through private storage with randomized object keys, content/type verification, size/dimension limits, malware scan, moderation state, and controlled delivery URLs.
+- Event publication additionally requires the versioned administrator confirmation for image rights, prohibited-content review, and the event safety plan. Event stores only the approver, time, and procedure version; restricted evidence and venue contacts stay outside public APIs, events, and logs. See ADR-0007 and the event publication runbook.
 - Configure CORS narrowly. Apply CSRF controls if browser credentials are cookie-based.
 - Set appropriate security headers and avoid exposing stack traces/internal IDs.
 
@@ -92,15 +116,19 @@ Never log passwords, tokens, secrets, raw identity evidence, full callback paylo
 
 Use sanitized IDs/hashes and structured fields. Metrics labels must remain low-cardinality and contain no personal data.
 
-Business audit records include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive.
+Where a service retains business audit records, they include actor, target, action, prior/new state, reason, time, correlation, and source. Audit access is restricted and itself audited where sensitive. The Event service does not retain a separate audit history.
 
 ## 10. Moderation and safety
+
+The initial Moderation service repeats Account JWT validation, requires UUID account subjects, permits reporting to member/organizer/moderator/admin roles, restricts case/assignment/status/action/decision APIs to moderator/admin roles, binds appeals to the affected account ID, and never returns reporter identity or evidence through owner-report responses. Appeal-only tokens can list the owner's active action summaries and submit an appeal through two GraphQL operations; normal Account profile and administrator operations remain closed. Evidence is bounded reference metadata and hashes. Privileged case reads, assignment, investigation/dismissal, action, appeal, reversal, and expiry are audited; enforcement events omit descriptions, reporter identity, evidence, and private notes.
+
+The current per-process report limiter is defense-in-depth for local/single-replica use. Production requires gateway plus distributed rate enforcement. Downstream services must consume enforcement facts idempotently before cross-domain exclusion is complete.
 
 - Block/report available from relevant profile/match surfaces.
 - Risk triage and temporary action available for urgent safety cases.
 - Moderation actions can hide profiles, suspend accounts, exclude events/matching, invalidate unpublished pairings, and prevent reveal.
 - Reporter identity is protected from the target.
-- Organizer cannot override block/safety/hard consent controls.
+- Organizers cannot access matching-run controls; administrators still cannot override block, safety, account, booking, reciprocal preference, age, deal-breaker, repeat-pair, or hard consent controls.
 - Event-day check-in, emergency escalation, venue conduct, evidence, law-enforcement/legal request, and support SLA require approved operational policies before launch.
 
 ## 11. Data lifecycle
@@ -132,4 +160,3 @@ Business audit records include actor, target, action, prior/new state, reason, t
 - [ ] Retention/deletion/backup effects are defined.
 - [ ] Audit, alerts, incident/runbook, and rollback are ready.
 - [ ] Security/privacy/safety changes have complete before/after documentation.
-

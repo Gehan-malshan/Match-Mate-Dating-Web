@@ -1,14 +1,25 @@
 # MatchMate
 
+Venue bookings now support administrator-recorded cash or external card collection followed by check-in for eligible confirmed attendees. Confirmed venue seats have no cancellation option. See [ADR-0006](docs/adr/0006-venue-collection-and-checkin.md).
+
+Account security now has email verification and password recovery links (through Notification SMTP), administrator TOTP when configured, durable Account-owned login/discovery limits, JWT signing-key overlap, and password-confirmed account deletion with Account-owned data minimization. The default local notification sink does not deliver email links; configure SMTP to test them. Start with [Account security runbook](docs/runbooks/account-security.md). Cross-service retention, live SMTP evidence, edge limits, and MFA recovery remain production gates.
+
+Administrators can attach one optional image while an event is a draft. The Event Service stores a sanitized JPEG, and published event pages use it instead of rotating artwork. See [ADR-0002](docs/adr/0002-event-image-storage.md).
+
+Event publication now requires the accepted `event-publication-v1` image-rights, content-moderation, and event-safety review. Event retains the approving administrator, UTC time, and procedure version, and the browser journey is enforced in CI. See [ADR-0007](docs/adr/0007-event-publication-approval.md).
+
+Event drafts support pay at venue, PayHere online, or both (see [ADR-0001](docs/adr/0001-event-payment-choice.md)). A venue reservation confirms a seat immediately but remains unpaid until staff records collection at the entrance. Existing events retain online-only behavior. A production deployment without Payment/Matchmaking remains separate work.
+
 MatchMate is a privacy-first, community-driven blind-dating platform focused on helping people move from online discovery to safe, organized, real-world dating events.
 
-This repository is a monorepo for the MatchMate member website, organizer portal, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
+This repository is a monorepo for one role-aware MatchMate website, a Go GraphQL gateway, Go microservices, API and event contracts, infrastructure definitions, and technical documentation.
 
 ## Planned technology stack
 
 - Frontend: React, TypeScript, TanStack Router, TanStack Query, TanStack Form, Zod, and Vite
 - Frontend tooling: Bun for package management and script execution; Vite for development and production builds
 - Backend: Go microservices
+- Browser API: schema-first GraphQL BFF; service APIs remain REST/JSON internally
 - Databases: PostgreSQL with independent ownership per service
 - Messaging: RabbitMQ
 - Payments: PayHere
@@ -22,13 +33,15 @@ This repository is a monorepo for the MatchMate member website, organizer portal
 Match-Mate-Dating-Web/
 |-- frontend/
 |   |-- apps/
-|   |   |-- web/                   Member-facing React/TanStack application
-|   |   `-- admin/                 Organizer and moderation portal
+|   |   |-- web/                   Unified member/admin React/TanStack application
+|   |   `-- admin/                 Admin UI source consumed by the unified web build
 |   `-- packages/
+|       |-- graphql-client/        Shared GraphQL HTTP/session client
 |       |-- ui/                    Shared frontend design system
 |       |-- validation/            Frontend validation and generated client helpers
 |       `-- telemetry/             Frontend observability helpers
 |-- services/
+|   |-- graphql-gateway/           Browser-facing GraphQL schema and BFF resolvers
 |   |-- account-service/           Authentication, profiles, preferences, and blocks
 |   |-- event-service/             Event catalog, schedules, pricing, and policies
 |   |-- matchmaking-service/       Rule-based compatibility and event pairing
@@ -37,7 +50,7 @@ Match-Mate-Dating-Web/
 |   |-- notification-service/      Email, SMS, and other notifications
 |   `-- moderation-service/        Reports, moderation, and safety actions
 |-- contracts/
-|   |-- openapi/                   REST API contracts
+|   |-- openapi/                   Internal service REST API contracts
 |   `-- asyncapi/                  RabbitMQ event contracts
 |-- infrastructure/
 |   |-- docker/                    Container build conventions
@@ -74,18 +87,28 @@ Match-Mate-Dating-Web/
 - The repository is shared, but every application and service remains independently deployable.
 - Each Go service owns its domain logic, database, migrations, and runtime configuration.
 - Services do not read or write another service's database.
-- REST is used for immediate operations; RabbitMQ carries durable business events.
+- The browser uses GraphQL for immediate operations; the gateway calls service-owned REST APIs, while RabbitMQ carries durable business events.
 - Matchmaking uses transparent rules, weighted scoring, and deterministic pairing optimization without machine learning.
 - Personally identifiable information and private matching preferences are not exposed in community profiles.
 - Shared packages contain technical utilities or frontend components, not shared microservice domain models.
 
 ## Current status
 
-The repository contains the member landing page plus the first Account/Profile vertical slice: Go REST API, PostgreSQL migration, development users, ES256/refresh-session authentication, private profiles/preferences, community-safe projections, moderation decisions, RabbitMQ outbox relay, and React registration/login/profile routes. Event, Booking, Payment, Matchmaking, Notification, and full Moderation services remain planned.
+The browser-facing migration now uses one GraphQL endpoint and one role-aware web application. The GraphQL gateway is a BFF over the existing service REST contracts; it does not own domain data or replace RabbitMQ.
 
-## Quick start with Make
+The repository contains executable Account/Profile, Event, deterministic Matchmaking, Booking, Payment, Notification, and Moderation slices. Moderation reports/actions/appeals publish minimum-safe facts. Account, Booking, Matchmaking, and Notification read current effective actions through a private, fail-closed Moderation API at safety-sensitive decisions. Suspended members can use the restricted browser appeal route, and administrators see current entry eligibility for event registrations. See [ADR-0005](docs/adr/0005-authoritative-moderation-safety-reads.md) for the remaining race and policy limits.
 
-Prerequisites are Go 1.26+, Bun 1.3+, Docker Desktop with Docker Compose, and GNU Make. On Windows, run these commands from a terminal where `make --version` succeeds (for example Git Bash or a GNU Make installation). Keep Docker Desktop running.
+The Account/Profile slice, initial Event vertical slice, and deterministic Matchmaking prototype are executable.
+Event provides scoped draft management, lifecycle commands, safe future-event
+discovery, optimistic concurrency, a service-owned PostgreSQL migration,
+audit/outbox relay, v1 contracts, member discovery pages, and an administrator-only
+event workspace. Matchmaking includes an administrator-only generation/review/override/lock/publish interface and currently uses versioned development fixtures until production Booking and Moderation consumers exist. Booking and Payment provide the first executable hold, immutable-price, PayHere-initiation, callback, outbox, and confirmation-consumer flow; real PayHere sandbox evidence, refunds, attendance, and production delivery remain incremental work.
+Notification consumes minimum-safe Account and Booking facts, deduplicates them in its independent PostgreSQL database, applies account suppression, and runs a retryable delivery worker against a development-only privacy-safe sink. Authenticated members now receive an owner-scoped in-app feed through the navigation bell, history page, unread controls, and polling-based popup toasts. Real email and its provider credentials/contact-resolution contract remain policy/integration work.
+
+## Quick start
+
+Prerequisites are Go 1.26+, Bun 1.3+, and Docker Desktop with Docker Compose.
+GNU Make is optional. Keep Docker Desktop running.
 
 First-time setup on Windows:
 
@@ -100,14 +123,14 @@ Start the backend from the repository root:
 docker compose up --build -d
 ```
 
-In a second terminal, start the frontend:
+In a second terminal, start the unified frontend:
 
 ```powershell
-bun run dev:web
+bun run dev
 ```
 
-Open `http://localhost:5173` after Bun prints the Vite URL. Docker automatically
-runs the idempotent database migration and creates the shared development users.
+Open `http://localhost:5173`. Members and administrators use the same login. The backend-issued role routes administrators to protected `/admin`; member features remain separately protected. The browser calls `http://localhost:8080/graphql`. Docker automatically runs the idempotent database migration and
+creates the shared development users.
 
 If GNU Make is installed, `make start` performs those two startup steps for you:
 it starts the Docker backend, then keeps the frontend development server running in
@@ -119,12 +142,12 @@ Verify backend startup:
 make status
 ```
 
-The `account-migrate` and `account-seed` jobs should show `Exited (0)`, which means success. `postgres-account`, `rabbitmq`, `account-api`, and `account-outbox` should be running.
+Migration and seed jobs should show `Exited (0)`, which means success. PostgreSQL databases, RabbitMQ, APIs on ports `8081` through `8087`, and the long-running workers should show `Up`.
 
-In a second terminal, start the web application:
+In a second terminal, start the unified frontend:
 
 ```bash
-make web
+make apps
 ```
 
 Open `http://127.0.0.1:5173`. The API is available at `http://localhost:8081`, and RabbitMQ management is at `http://localhost:15672` using `matchmate` / `matchmate`.
@@ -136,16 +159,24 @@ Email: member@example.test
 Password: MatchMateDev123!
 ```
 
-Additional development users are `community@example.test`, `moderator@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production.
+Administrator login at `http://localhost:5173/login`:
+
+```text
+Email: admin@example.test
+Password: MatchMateDev123!
+```
+
+Additional development users are `community@example.test`, `moderator@example.test`, `organizer@example.test`, and `suspended@example.test`; all use the same public development-only password. These accounts never belong in staging or production. The organizer fixture cannot create events or manage matchmaking runs.
 
 ## Make command reference
 
 ```text
 make help                         Show all commands
 make setup                        Install Bun and Go dependencies
-make start                        Start backend, then frontend in one terminal
+make start                        Start backend, then the unified frontend
 make backend                      Start/rebuild the local backend
-make frontend                     Start the frontend only
+make apps                         Start the unified member/admin frontend
+make frontend                     Start the unified frontend only
 make status                       Show running and completed containers
 make logs                         Follow backend/infrastructure logs
 make test                         Run backend and frontend tests
@@ -163,8 +194,9 @@ If GNU Make is unavailable, the underlying Bun, Go, and Docker commands remain d
 4. Add Event Service.
 5. Add Booking capacity and hold flow.
 6. Add Payment Service and confirmed-booking integration.
-7. Implement Matchmaking Service and organizer review/lock workflow.
-8. Add event interaction, Notification, moderation hardening, observability, security, and production delivery.
+7. Implement Matchmaking Service and administrator review/lock workflow.
+8. Expand Notification from its Account/Booking development slice to approved providers and remaining safe recipient facts.
+9. Add event interaction, moderation hardening, observability, security, and production delivery.
 
 ## Documentation
 

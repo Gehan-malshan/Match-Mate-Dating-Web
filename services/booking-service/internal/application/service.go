@@ -1,0 +1,201 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"github.com/gehan-malshan/matchmate/booking-service/internal/domain"
+	"github.com/gehan-malshan/matchmate/booking-service/internal/safety"
+	"github.com/google/uuid"
+	"time"
+)
+
+var (
+	ErrConflict   = errors.New("conflict")
+	ErrNotFound   = errors.New("not found")
+	ErrCapacity   = errors.New("event capacity exhausted")
+	ErrInvalid    = errors.New("invalid request")
+	ErrDependency = errors.New("dependency unavailable")
+	ErrExcluded   = errors.New("member is excluded from this event")
+)
+
+type EventReader interface {
+	Get(context.Context, string) (domain.EventSnapshot, error)
+}
+type Repository interface {
+	Create(context.Context, domain.Booking, string, string, int) (domain.Booking, bool, error)
+	Get(context.Context, string, string) (domain.Booking, error)
+	List(context.Context, string, int) ([]domain.Booking, error)
+	ListForEvent(context.Context, string, int, int) ([]domain.Booking, error)
+	ListRegistrations(context.Context, int, int) ([]domain.Booking, error)
+	Cancel(context.Context, string, string, string, time.Time) (domain.Booking, bool, error)
+	Expire(context.Context, time.Time, int) (int, error)
+	CollectVenue(context.Context, string, string, string, string, time.Time) (domain.Booking, error)
+	CheckIn(context.Context, string, string, string, time.Time) (domain.Booking, error)
+	GetForStaff(context.Context, string) (domain.Booking, error)
+}
+type Service struct {
+	repo   Repository
+	events EventReader
+	hold   time.Duration
+	now    func() time.Time
+	safety interface {
+		Check(context.Context, string, string) (safety.Decision, error)
+	}
+}
+
+func New(repo Repository, events EventReader, hold time.Duration) *Service {
+	return &Service{repo: repo, events: events, hold: hold, now: time.Now}
+}
+func (s *Service) SetSafety(client interface {
+	Check(context.Context, string, string) (safety.Decision, error)
+}) {
+	s.safety = client
+}
+func (s *Service) checkSafety(ctx context.Context, actor, eventID string) error {
+	if s.safety == nil {
+		return nil
+	}
+	decision, err := s.safety.Check(ctx, actor, eventID)
+	if err != nil {
+		return fmt.Errorf("%w: moderation safety", ErrDependency)
+	}
+	if decision.Suspended || decision.EventExcluded {
+		return ErrExcluded
+	}
+	return nil
+}
+
+// CheckActor rejects suspended JWT holders before any Booking route runs.
+func (s *Service) CheckActor(ctx context.Context, actor string) error {
+	return s.checkSafety(ctx, actor, "")
+}
+func (s *Service) Create(ctx context.Context, actor, eventID, method, key string) (domain.Booking, error) {
+	if eventID == "" || key == "" {
+		return domain.Booking{}, fmt.Errorf("%w: eventId and Idempotency-Key are required", ErrInvalid)
+	}
+	if err := s.checkSafety(ctx, actor, eventID); err != nil {
+		return domain.Booking{}, err
+	}
+	e, err := s.events.Get(ctx, eventID)
+	if err != nil {
+		return domain.Booking{}, fmt.Errorf("%w: Event service", ErrDependency)
+	}
+	now := s.now().UTC()
+	if err = domain.ValidateEvent(e, now); err != nil {
+		return domain.Booking{}, fmt.Errorf("%w: %v", ErrConflict, err)
+	}
+	if method == "" && (e.PaymentOptions == "" || e.PaymentOptions == "ONLINE") {
+		method = "ONLINE"
+	}
+	if !domain.AllowedPaymentMethod(e.PaymentOptions, method) {
+		return domain.Booking{}, fmt.Errorf("%w: payment method is not available for this event", ErrInvalid)
+	}
+	b := domain.Booking{ID: uuid.NewString(), AccountID: actor, EventID: e.EventID, State: domain.Pending, PaymentMethod: method, Amount: domain.NormalizeMoney(e.Price), Currency: e.Currency, PolicyVersion: e.CapacityPolicyVersion, ExpiresAt: now.Add(s.hold), Version: 1, CreatedAt: now}
+	if method == "AT_VENUE" {
+		b.State = domain.Confirmed
+		b.ConfirmedAt = &now
+	}
+	if err := s.checkSafety(ctx, actor, e.EventID); err != nil {
+		return domain.Booking{}, err
+	}
+	b, _, err = s.repo.Create(ctx, b, key, eventID+":"+method, e.ConfiguredCapacity)
+	return b, err
+}
+func (s *Service) Get(ctx context.Context, actor, id string) (domain.Booking, error) {
+	return s.repo.Get(ctx, actor, id)
+}
+func (s *Service) List(ctx context.Context, actor string, limit int) ([]domain.Booking, error) {
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	return s.repo.List(ctx, actor, limit)
+}
+func (s *Service) ListForEvent(ctx context.Context, eventID string, limit, offset int) ([]domain.Booking, error) {
+	if _, err := uuid.Parse(eventID); err != nil || limit < 1 || limit > 51 || offset < 0 {
+		return nil, ErrInvalid
+	}
+	return s.repo.ListForEvent(ctx, eventID, limit, offset)
+}
+func (s *Service) ListRegistrations(ctx context.Context, limit, offset int) ([]domain.Booking, error) {
+	if limit < 1 || limit > 51 || offset < 0 {
+		return nil, ErrInvalid
+	}
+	return s.repo.ListRegistrations(ctx, limit, offset)
+}
+
+// EntryEligible is recomputed from current moderation state. A confirmed
+// reservation is not an admission credential when the member is excluded.
+func (s *Service) EntryEligible(ctx context.Context, booking domain.Booking) (bool, error) {
+	if booking.State != domain.Confirmed {
+		return false, nil
+	}
+	if err := s.checkSafety(ctx, booking.AccountID, booking.EventID); err != nil {
+		if errors.Is(err, ErrExcluded) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+func (s *Service) Cancel(ctx context.Context, actor, id, key string) (domain.Booking, error) {
+	if id == "" || key == "" {
+		return domain.Booking{}, fmt.Errorf("%w: bookingId and Idempotency-Key are required", ErrInvalid)
+	}
+	b, _, err := s.repo.Cancel(ctx, actor, id, key, s.now().UTC())
+	return b, err
+}
+func (s *Service) CollectVenue(ctx context.Context, actor, bookingID, key, method string) (domain.Booking, error) {
+	if actor == "" || bookingID == "" || key == "" || (method != "CASH" && method != "CARD_AT_VENUE") {
+		return domain.Booking{}, ErrInvalid
+	}
+	if err := s.staffEligibility(ctx, bookingID); err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repo.CollectVenue(ctx, actor, bookingID, key, method, s.now().UTC())
+}
+func (s *Service) CheckIn(ctx context.Context, actor, bookingID, key string) (domain.Booking, error) {
+	if actor == "" || bookingID == "" || key == "" {
+		return domain.Booking{}, ErrInvalid
+	}
+	if err := s.staffEligibility(ctx, bookingID); err != nil {
+		return domain.Booking{}, err
+	}
+	return s.repo.CheckIn(ctx, actor, bookingID, key, s.now().UTC())
+}
+func (s *Service) staffEligibility(ctx context.Context, bookingID string) error {
+	b, err := s.repo.GetForStaff(ctx, bookingID)
+	if err != nil {
+		return err
+	}
+	if b.State != domain.Confirmed {
+		return ErrConflict
+	}
+	event, eventErr := s.events.Get(ctx, b.EventID)
+	if eventErr != nil {
+		return ErrDependency
+	}
+	if event.Status == "CANCELLED" {
+		return ErrConflict
+	}
+	return s.checkSafety(ctx, b.AccountID, b.EventID)
+}
+func (s *Service) Snapshot(ctx context.Context, actor, id string) (domain.Booking, error) {
+	b, err := s.repo.Get(ctx, actor, id)
+	if err != nil {
+		return b, err
+	}
+	if err := s.checkSafety(ctx, actor, b.EventID); err != nil {
+		return b, err
+	}
+	if b.State != domain.Pending || b.PaymentMethod != "ONLINE" {
+		return b, fmt.Errorf("%w: booking is not pending payment", ErrConflict)
+	}
+	if !b.ExpiresAt.After(s.now().UTC()) {
+		return b, fmt.Errorf("%w: booking hold expired", ErrConflict)
+	}
+	return b, nil
+}
+func (s *Service) Expire(ctx context.Context, limit int) (int, error) {
+	return s.repo.Expire(ctx, s.now().UTC(), limit)
+}

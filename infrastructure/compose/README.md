@@ -1,5 +1,13 @@
 # Docker Compose
 
+The root Booking migration applies version 6 before Booking API startup. The admin Registrations table then records venue collection and check-in through the GraphQL gateway. Confirmed venue bookings cannot be cancelled. See `docs/adr/0006-venue-collection-and-checkin.md`.
+
+The Event migration job applies version 6 publication-review fields before Event API startup. The Event browser workflow starts the root Compose stack, waits for GraphQL/Event/Booking health, and runs Playwright Chromium through the unified frontend.
+
+The GraphQL gateway now calls the Moderation API for owner-scoped action listing and appeal submission. It waits for `moderation-api` to start and uses the private `MODERATION_API_URL`; suspended members use the browser `/appeal` route.
+
+Account security migration 2 and the private Account-to-Notification security email endpoint are part of the root stack. Set `NOTIFICATION_PROVIDER=smtp` and SMTP credentials in ignored root `.env` for real verification/recovery email. `SECURITY_MAIL_TOKEN` must be distinct from `INTERNAL_SERVICE_TOKEN`; set `ADMIN_MFA_ENCRYPTION_KEY` to exercise administrator TOTP. The default development sink does not deliver reset links. See `docs/runbooks/account-security.md`.
+
 The Account/Profile development topology starts PostgreSQL and RabbitMQ, applies the versioned Account migration, and seeds shared fake logins automatically:
 
 From the repository root, use the standard Docker Compose command:
@@ -23,3 +31,23 @@ docker compose -f infrastructure/compose/account-profile.compose.yml logs accoun
 ```
 
 `account-migrate` and `account-seed` should show `Exited (0)`; this is successful for one-shot jobs. Shared login details are documented in `services/account-service/README.md`. This automatic seed exists only in the development Compose file and must never be copied into staging or production manifests.
+
+The Event Service has an independent PostgreSQL database and migration job:
+
+```powershell
+docker compose -f infrastructure/compose/event.compose.yml --profile api up -d --build
+docker compose -f infrastructure/compose/event.compose.yml ps -a
+docker compose -f infrastructure/compose/event.compose.yml logs event-migrate
+```
+
+The `api` profile starts Event API on port 8082 and discovers the Account development signing key from the Account API on the host. Start Account API before using protected organizer commands. The optional `messaging` profile starts the Event outbox relay and expects RabbitMQ from the Account development topology on host port 5672. Full commands and checks are documented in `services/event-service/README.md`.
+
+The root command also starts the Matchmaking prototype on port `8083` with its independent PostgreSQL database on development port `5435`. Startup order is `postgres-matchmaking (healthy) -> matchmaking-migrate (exit 0) -> matchmaking-seed (exit 0) -> matchmaking-api`. Its versioned development cohort is service-owned fixture data and never runs in production manifests.
+
+The root command now includes `booking-payment.compose.yml`. Booking uses API port `8085` and PostgreSQL port `5437`; Payment uses API port `8084` and PostgreSQL port `5436`. It discovers Account ES256 keys from Account JWKS and uses Event API on port `8082` plus RabbitMQ from the Account topology. The local file supplies non-functional PayHere placeholders unless real sandbox values are provided. Both outbox relays and the Booking Payment consumer run by default so a verified payment fact can confirm a booking. Do not start the included files as separate Compose projects while the root stack is running, because their host ports are already owned by the root project. See `docs/runbooks/booking-payment-local.md`.
+
+The root command also includes `notification.compose.yml`. Notification owns PostgreSQL port `5438`, exposes health and the authenticated member-feed API on port `8086`, consumes supported Account/Booking facts from RabbitMQ, and processes provider deliveries with a development-only sink. Startup order is `postgres-notification (healthy) -> notification-migrate (exit 0) -> notification-api/notification-consumer/notification-worker`; the consumer waits for the Compose-managed RabbitMQ service to be healthy. The API validates Account ES256 keys through the local JWKS endpoint and permits only the exact member Vite origins. No real recipient destination or provider credential is configured locally. See `docs/runbooks/notification-local.md`.
+
+The root command includes `moderation.compose.yml`. Moderation owns PostgreSQL port `5439`, exposes health and authenticated APIs on `8087`, publishes safe facts to the shared RabbitMQ exchange, and runs a due-action expiry worker. Startup order is `postgres-moderation (healthy) -> moderation-migrate (exit 0) -> moderation-api/moderation-outbox-relay/moderation-expiry-worker`. Account, Booking, Matchmaking, and Notification now use `MODERATION_API_URL` and the distinct `MODERATION_SERVICE_TOKEN` for uncached current-safety checks; the token is a development fixture in Compose and must be replaced outside development. See `docs/runbooks/moderation-local.md` and ADR-0005.
+
+Each Go service builds one development image containing its API, migration, seed, and worker binaries. The API service owns the Compose `build` declaration; its migration/seed/worker containers reuse that same local image with a command override and `pull_policy: never`. This avoids parallel Buildx exports colliding on one tag and prevents Compose from trying to pull these development-only images from Docker Hub. Google OAuth is optional locally; the Account Compose service leaves all OAuth settings empty by default and enables it only when all three client ID, client secret, and callback URL values are set.
