@@ -123,6 +123,8 @@ Start the backend from the repository root:
 docker compose up --build -d
 ```
 
+For Vercel frontend hosting, the root `vercel.json` sends direct client-route visits to the SPA entry point. See [web deployment settings](frontend/apps/web/README.md); the Go GraphQL gateway still requires its own public HTTPS deployment.
+
 In a second terminal, start the unified frontend:
 
 ```powershell

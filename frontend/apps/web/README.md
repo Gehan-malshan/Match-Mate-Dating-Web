@@ -62,6 +62,8 @@ The development URL is `http://127.0.0.1:5173`; the production build is written 
 
 GraphQL defaults to `http://localhost:8080/graphql`. Override it with `VITE_GRAPHQL_API_URL` (see `.env.example`). The gateway must allow the exact Vite origin and use TLS/secure cookies in production.
 
+For Vercel, keep the project Root Directory at the repository root so Bun resolves workspace packages. Use `bun install --frozen-lockfile`, `bun run build:web`, and output directory `frontend/apps/web/dist`. The root `vercel.json` rewrites direct visits to client routes such as `/login`, `/events`, and `/admin` to `index.html`; TanStack Router then handles the path. Set `VITE_GRAPHQL_API_URL` to the public HTTPS GraphQL endpoint before testing backend features. Rollback by redeploying the previous frontend build; this rewrite changes no API, database, or service state.
+
 ## Brand assets
 
 Approved logo files live under `public/brand`. The supplied artwork is preserved as `matchmate-logo-source.png`; runtime navigation uses the transparent, optimized `matchmate-logo-nav.png`, and browser metadata uses `matchmate-favicon.png`. Do not replace, redraw, recolor, or repurpose these files without updating the canonical design guide and change history.
